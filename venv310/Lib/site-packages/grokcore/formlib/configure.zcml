@@ -1,0 +1,7 @@
+<configure xmlns="http://namespaces.zope.org/zope">
+
+  <include package="grokcore.view" />
+  <include package="zope.container" />
+  <include package="zope.formlib" />
+
+</configure>

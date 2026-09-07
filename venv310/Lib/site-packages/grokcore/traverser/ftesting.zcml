@@ -1,0 +1,13 @@
+<configure
+   xmlns="http://namespaces.zope.org/zope"
+   xmlns:grok="http://namespaces.zope.org/grok"
+   xmlns:browser="http://namespaces.zope.org/browser"
+   i18n_domain="grokcore.traverser"
+   package="grokcore.traverser">
+
+   <include package="grokcore.view" file="ftesting.zcml" />
+   <include package="grokcore.view" file="publication_security.zcml" />
+   <include package="grokcore.traverser" />
+   <grok:grok package=".tests.functional" />
+
+</configure>

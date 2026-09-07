@@ -1,0 +1,8 @@
+<html>
+<body>
+This template knows about the following custom namespace name:
+
+  myname:
+   ${myname}
+</body>
+</html>

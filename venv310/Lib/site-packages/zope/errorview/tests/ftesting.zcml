@@ -1,0 +1,12 @@
+<configure
+  xmlns="http://namespaces.zope.org/zope"
+  xmlns:browser="http://namespaces.zope.org/browser">
+
+  <include package="zope.errorview" file="browser.zcml" />
+
+  <utility
+    factory='.test_browser.MockAuthenticationUtility'
+    provides='zope.authentication.interfaces.IAuthentication'
+  />
+
+</configure>

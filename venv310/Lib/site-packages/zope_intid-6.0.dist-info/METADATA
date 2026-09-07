@@ -1,0 +1,217 @@
+Metadata-Version: 2.4
+Name: zope.intid
+Version: 6.0
+Summary: Integer Id Utility
+Home-page: http://github.com/zopefoundation/zope.intid
+Author: Albertas Agejevas and Gintautas Miliauskas
+Author-email: zope-dev@zope.dev
+Maintainer: Zope developers
+Maintainer-email: zope-dev@zope.dev
+License: ZPL-2.1
+Keywords: zope3 integer id utility
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Environment :: Web Environment
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: Zope Public License
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Programming Language :: Python :: Implementation :: CPython
+Classifier: Programming Language :: Python :: Implementation :: PyPy
+Classifier: Natural Language :: English
+Classifier: Operating System :: OS Independent
+Classifier: Topic :: Internet :: WWW/HTTP
+Classifier: Framework :: Zope :: 3
+Requires-Python: >=3.9
+License-File: LICENSE.txt
+Requires-Dist: persistent
+Requires-Dist: BTrees
+Requires-Dist: setuptools
+Requires-Dist: zope.lifecycleevent>=3.5.2
+Requires-Dist: zope.component
+Requires-Dist: zope.event
+Requires-Dist: zope.interface
+Requires-Dist: zope.keyreference
+Requires-Dist: zope.location>=3.5.4
+Requires-Dist: zope.security
+Provides-Extra: test
+Requires-Dist: ZODB; extra == "test"
+Requires-Dist: zope.testing; extra == "test"
+Requires-Dist: zope.site; extra == "test"
+Requires-Dist: zope.traversing; extra == "test"
+Requires-Dist: zope.container; extra == "test"
+Provides-Extra: docs
+Requires-Dist: repoze.sphinx.autointerface; extra == "docs"
+Requires-Dist: sphinx_rtd_theme; extra == "docs"
+Requires-Dist: Sphinx; extra == "docs"
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: home-page
+Dynamic: keywords
+Dynamic: license
+Dynamic: license-file
+Dynamic: maintainer
+Dynamic: maintainer-email
+Dynamic: provides-extra
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
+
+================
+ ``zope.intid``
+================
+
+.. image:: https://img.shields.io/pypi/v/zope.intid.svg
+        :target: https://pypi.org/project/zope.intid/
+        :alt: Latest release
+
+.. image:: https://img.shields.io/pypi/pyversions/zope.intid.svg
+        :target: https://pypi.org/project/zope.intid/
+        :alt: Supported Python versions
+
+.. image:: https://github.com/zopefoundation/zope.intid/actions/workflows/tests.yml/badge.svg
+        :target: https://github.com/zopefoundation/zope.intid/actions/workflows/tests.yml
+
+.. image:: https://readthedocs.org/projects/zopeintid/badge/?version=latest
+         :target: http://zopeintid.readthedocs.io/en/latest/?badge=latest
+         :alt: Documentation Status
+
+.. image:: https://coveralls.io/repos/github/zopefoundation/zope.intid/badge.svg?branch=master
+        :target: https://coveralls.io/github/zopefoundation/zope.intid?branch=master
+        :alt: Code Coverage
+
+
+This package provides an API to create integer ids for any object. Later
+objects can be looked up by their id as well. This functionality is commonly
+used in situations where dealing with objects is undesirable, such as in
+search indices or any code that needs an easy hash of an object.
+
+Documentation is hosted at http://zopeintid.readthedocs.io
+
+
+=========
+ Changes
+=========
+
+6.0 (2025-09-12)
+================
+
+- Replace ``pkg_resources`` namespace with PEP 420 native namespace.
+
+
+5.1 (2025-02-14)
+================
+
+- Add support for Python 3.12, 3.13.
+
+- Drop support for Python 3.7, 3.8.
+
+
+5.0 (2023-02-21)
+================
+
+- Add support for Python 3.9, 3.10, 3.11.
+
+- Drop support for Python 2.7, 3.5, 3.6.
+
+- Drop support for deprecated ``python setup.py test``.
+
+
+4.4.0 (2021-03-19)
+==================
+
+- Fixed deprecation warning for ``zope.site.hooks`` in tests.
+
+- Add support for Python 3.7 and 3.8.
+
+- Drop support for Python 3.4.
+
+- Fix incorrect import of
+  ``zope.interface.interfaces.IComponentLookup`` in tests.
+
+4.3.0 (2017-07-26)
+==================
+
+- Add support for Python 3.6.
+
+- Drop support for Python 3.3.
+
+
+4.2.0 (2016-12-08)
+==================
+
+- Raise more informative KeyError subclasses from the utility when intids
+  or objects cannot be found. This distinguishes them from errors
+  raised by normal dictionaries or BTrees, and is useful in unit
+  testing or when persisting intids or sharing them among processes
+  for later or concurrent use.
+
+- Propagate ``POSKeyError`` from ``queryId`` instead of returning the
+  default object. This exception indicates a corrupt database, not a
+  missing object. The ``queryObject`` function already behaved this way.
+
+- Stop depending on ZODB for anything except testing.
+
+- Add support for Python 3.5 and PyPy3 5.2.
+
+- Drop support for Python 2.6.
+
+4.1.0 (2014-12-27)
+==================
+
+- Add support for PyPy (PyPy3 blocked on PyPy3-compatible ``zodbpickle``).
+
+- Add support for Python 3.4.
+
+
+4.0.0 (2014-12-20)
+==================
+
+- Add support for testing on Travis.
+
+
+4.0.0a1 (2013-02-22)
+====================
+
+- Add support for Python 3.3.
+
+- Replace deprecated ``zope.interface.implements`` usage with equivalent
+  ``zope.interface.implementer`` decorator.
+
+- Drop support for Python 2.4 and 2.5.
+
+- Bug fix: ensure that the IntId utility never generates ids greater
+  than the maxint of the BTree family being used.
+
+3.7.2 (2009-12-27)
+==================
+
+- Use the zope.component API in favor of ztapi.
+
+- Remove ``zope.app.testing`` dependency.
+
+3.7.1 (2009-05-18)
+==================
+
+- Remove dependencies on ``zope.container``.  Instead import
+  ``Object*Event`` classes from ``zope.lifecycleevent`` and import
+  ``IContained`` from ``zope.location``.  In order to be able to do
+  this, depend on ``zope.lifecycleevent``>=3.5.2 and
+  ``zope.location``>=3.5.4.
+
+- Remove a dependency on ``zope.container.contained.Contained``
+  (this is a dumb base class that defines __parent__ and __name__
+  as None and declares that the class implements IContained).
+
+3.7.0 (2009-02-01)
+==================
+
+- Split out this package from ``zope.app.intid``. The latter one
+  now only contains browser views and compatibility imports while
+  whole IntId functionality is moved here.

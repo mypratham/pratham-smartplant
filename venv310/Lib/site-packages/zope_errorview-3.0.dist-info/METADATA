@@ -1,0 +1,137 @@
+Metadata-Version: 2.4
+Name: zope.errorview
+Version: 3.0
+Summary: Basic HTTP and Browser exception views.
+Home-page: https://github.com/zopefoundation/zope.errorview
+Author: Zope Foundation and Contributors
+Author-email: zope-dev@zope.dev
+License: ZPL-2.1
+Keywords: zope3 http error view
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Environment :: Web Environment
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: Zope Public License
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Programming Language :: Python :: Implementation :: CPython
+Classifier: Programming Language :: Python :: Implementation :: PyPy
+Classifier: Natural Language :: English
+Classifier: Operating System :: OS Independent
+Classifier: Topic :: Internet :: WWW/HTTP
+Classifier: Framework :: Zope :: 3
+Requires-Python: >=3.9
+License-File: LICENSE.rst
+Requires-Dist: setuptools
+Requires-Dist: zope.component
+Requires-Dist: zope.i18n
+Requires-Dist: zope.i18nmessageid
+Requires-Dist: zope.interface
+Requires-Dist: zope.publisher
+Requires-Dist: zope.security
+Provides-Extra: test
+Requires-Dist: zope.testing; extra == "test"
+Requires-Dist: zope.testrunner>=6.4; extra == "test"
+Requires-Dist: zope.authentication; extra == "test"
+Requires-Dist: zope.browser; extra == "test"
+Requires-Dist: zope.browserpage; extra == "test"
+Provides-Extra: browser
+Requires-Dist: zope.authentication; extra == "browser"
+Requires-Dist: zope.browser; extra == "browser"
+Requires-Dist: zope.browserpage; extra == "browser"
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: home-page
+Dynamic: keywords
+Dynamic: license
+Dynamic: license-file
+Dynamic: provides-extra
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
+
+==============
+zope.errorview
+==============
+
+Provides basic HTTP and Browser views for common exceptions.
+
+Refactored from `zope.app.http`_.exception and `zope.app.exception`_.
+
+.. _`zope.app.http`: http://pypi.python.org/pypi/zope.app.http
+.. _`zope.app.exception`: http://pypi.python.org/pypi/zope.app.exception
+
+
+=========
+ CHANGES
+=========
+
+3.0 (2025-09-12)
+================
+
+- Replace ``pkg_resources`` namespace with PEP 420 native namespace.
+
+
+2.1 (2025-09-04)
+================
+
+- Add support for Python 3.12, 3.13.
+
+- Drop support for Python 3.7, 3.8.
+
+
+2.0 (2023-02-09)
+================
+
+- Drop support for Python 2.7, 3.4, 3.5, 3.6.
+
+- Add support for Python 3.7, 3.8, 3.9, 3.10, 3.11.
+
+
+1.2.0 (2018-01-15)
+==================
+
+- Remove the whitespace between the content-type and charset of the default
+  error views. This is because in certain cases zope.publisher.http will parse
+  the content type parameters and combine them back again without the
+  whitespace. This fix makes things more predictable esp. in tests.
+
+1.1 (2018-01-10)
+================
+
+- Additional fixes for Python 3 compatibility.
+
+  NOTE: The error view base classes now set a Content-Type response header to
+  "text/plain". If your error view subclassing from the zope.errorview classes
+  return a response body other than "text/plain" you need to explicitly set
+  the Content-Type in your views.
+
+1.0.0 (2017-05-10)
+==================
+
+- Add support for Python 3.4, 3.5, 3.6 and PyPy.
+
+- Fix typo in Dutch translation
+
+0.11 (2011-06-28)
+=================
+
+- Added nl translations.
+
+0.10 (2011-02-08)
+=================
+
+- Exception views do not by default provide ISystemErrorView anymore as it
+  would result in duplicate log output. The mixin class still exists for
+  writing custom error views that do provide ISystemErrorView.
+
+0.9 (2011-01-20)
+================
+
+- Initial release.

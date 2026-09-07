@@ -1,0 +1,197 @@
+Metadata-Version: 2.4
+Name: zope.keyreference
+Version: 7.0
+Summary: Key References
+Home-page: https://github.com/zopefoundation/zope.keyreference
+Author: Zope Foundation and Contributors
+Author-email: zope-dev@zope.dev
+License: ZPL-2.1
+Project-URL: Documentation, https://zopekeyreference.readthedocs.io/
+Keywords: zope3 key reference persistent
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Environment :: Web Environment
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: Zope Public License
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Programming Language :: Python :: Implementation :: CPython
+Classifier: Programming Language :: Python :: Implementation :: PyPy
+Classifier: Natural Language :: English
+Classifier: Operating System :: OS Independent
+Classifier: Topic :: Internet :: WWW/HTTP
+Classifier: Framework :: Zope :: 3
+Requires-Python: >=3.9
+License-File: LICENSE.txt
+Requires-Dist: setuptools
+Requires-Dist: ZODB
+Requires-Dist: zope.component
+Requires-Dist: zope.i18nmessageid
+Requires-Dist: zope.interface
+Requires-Dist: zope.schema
+Provides-Extra: test
+Requires-Dist: zope.testing; extra == "test"
+Requires-Dist: zope.testrunner>=6.4; extra == "test"
+Provides-Extra: docs
+Requires-Dist: repoze.sphinx.autointerface; extra == "docs"
+Requires-Dist: Sphinx; extra == "docs"
+Requires-Dist: sphinx_rtd_theme; extra == "docs"
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: home-page
+Dynamic: keywords
+Dynamic: license
+Dynamic: license-file
+Dynamic: project-url
+Dynamic: provides-extra
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
+
+===================
+ zope.keyreference
+===================
+
+.. image:: https://img.shields.io/pypi/v/zope.keyreference.svg
+   :target: https://pypi.org/project/zope.keyreference/
+   :alt: Latest Version
+
+.. image:: https://img.shields.io/pypi/pyversions/zope.keyreference.svg
+   :target: https://pypi.org/project/zope.keyreference/
+   :alt: Supported Python versions
+
+.. image:: https://github.com/zopefoundation/zope.keyreference/actions/workflows/tests.yml/badge.svg
+   :target: https://github.com/zopefoundation/zope.keyreference/actions/workflows/tests.yml
+   :alt: Build Status
+
+.. image:: https://coveralls.io/repos/github/zopefoundation/zope.keyreference/badge.svg
+   :target: https://coveralls.io/github/zopefoundation/zope.keyreference
+   :alt: Code Coverage
+
+.. image:: https://readthedocs.org/projects/zopekeyreference/badge/?version=latest
+   :target: https://zopekeyreference.readthedocs.io/en/latest/?badge=latest
+   :alt: Documentation Status
+
+Object references that support stable comparison and hashes.
+
+Documentation can be found at https://zopekeyreference.readthedocs.io
+
+
+=========
+ Changes
+=========
+
+7.0 (2025-09-12)
+================
+
+- Replace ``pkg_resources`` namespace with PEP 420 native namespace.
+
+
+6.1 (2025-02-14)
+================
+
+- Add support for Python 3.12, 3.13.
+
+- Drop support for Python 3.7, 3.8.
+
+
+6.0 (2023-04-25)
+================
+
+- Drop support for Python 2.7, 3.5, 3.6.
+
+- Add support for Python 3.11.
+
+- Make the tests compatible with ``zope.testing >= 5``.
+
+
+5.0.0 (2022-03-25)
+==================
+
+- Remove ``__cmp__`` methods. Since the implementation of the rich
+  comparison methods (``__eq__``, etc) in 4.0a1, the interpreter won't
+  call ``__cmp__``, even on Python 2. See `issue 10
+  <https://github.com/zopefoundation/zope.keyreference/issues/10>`_.
+
+- Add support for Python 3.8, 3.9, and 3.10.
+
+- Drop support for Python 3.4.
+
+
+4.2.0 (2018-10-26)
+==================
+
+- Add support for Python 3.5, 3.6, and 3.7.
+
+- Drop support for Python 2.6 and 3.3.
+
+
+4.1.0 (2014-12-27)
+==================
+
+- Add support for PyPy (PyPy3 blocked on PyPy3-compatible ``zodbpickle``).
+
+- Add support for Python 3.4.
+
+
+4.0.0 (2014-12-20)
+==================
+
+- Add support for testing on Travis.
+
+
+4.0.0a2 (2013-02-25)
+====================
+
+- Ensure that the ``SimpleKeyReference`` implementation (used for testing)
+  also implements rich comparison properly.
+
+
+4.0.0a1 (2013-02-22)
+====================
+
+- Add support for Python 3.3.
+
+- Replace deprecated ``zope.component.adapts`` usage with equivalent
+  ``zope.component.adapter`` decorator.
+
+- Replace deprecated ``zope.interface.implements`` usage with equivalent
+  ``zope.interface.implementer`` decorator.
+
+- Drop support for Python 2.4 and 2.5.
+
+
+3.6.4 (2011-11-30)
+==================
+
+- Fix tests broken by removal of ``zope.testing`` from test dependencies:
+  avoid the ``ZODB3`` module that needs it.
+
+3.6.3 (2011-11-29)
+==================
+
+- Prefer the standard libraries doctest module to the one from ``zope.testing``.
+
+3.6.2 (2009-09-15)
+==================
+
+- Make the tests pass with ZODB3.9, which changed the repr() of the persistent
+  classes.
+
+3.6.1 (2009-02-01)
+==================
+
+- Load keyreferences, pickled by old zope.app.keyreference even
+  if its not installed anymore (so don't break if one updates a
+  project that don't directly depends on zope.app.keyreference).
+
+3.6.0 (2009-01-31)
+==================
+
+- Rename ``zope.app.keyreference`` to ``zope.keyreference``.

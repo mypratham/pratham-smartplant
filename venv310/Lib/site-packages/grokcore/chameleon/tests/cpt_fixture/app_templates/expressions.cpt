@@ -1,0 +1,24 @@
+<html>
+<body>
+  <div tal:define="food 'Yummy Dinoburger'"
+       tal:omit-tag="">
+    <!-- We support `exists` -->
+    <div tal:condition="exists: food">
+      ${food}
+    </div>
+
+    <!-- We support `not` -->
+    <div tal:content="not: food" />
+    <div tal:content="not('food')" />
+    <div tal:content="not: 1 in [2,3]" />
+    <div tal:content="not: not: food" />
+
+    <!-- We support `path` -->
+    <div tal:content="path: food/upper" />
+
+    <!-- We support `provider` -->
+    <tal:main content="structure provider:main" />
+
+  </div>
+</body>
+</html>

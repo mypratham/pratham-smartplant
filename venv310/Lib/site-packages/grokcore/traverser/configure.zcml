@@ -1,0 +1,12 @@
+<configure
+    xmlns="http://namespaces.zope.org/zope"
+    xmlns:browser="http://namespaces.zope.org/browser"
+    xmlns:grok="http://namespaces.zope.org/grok">
+
+
+  <adapter factory=".components.ContextTraverser" />
+  <adapter factory=".components.ContainerTraverser" />
+
+  <include package="." file="meta.zcml" />
+
+</configure>

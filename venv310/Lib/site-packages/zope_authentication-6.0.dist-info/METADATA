@@ -1,0 +1,194 @@
+Metadata-Version: 2.4
+Name: zope.authentication
+Version: 6.0
+Summary: Definition of authentication basics for the Zope Framework
+Home-page: https://zopeauthentication.readthedocs.io/
+Author: Zope Foundation and Contributors
+Author-email: zope-dev@zope.dev
+License: ZPL-2.1
+Keywords: zope security authentication
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Environment :: Web Environment
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: Zope Public License
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Programming Language :: Python :: Implementation :: CPython
+Classifier: Programming Language :: Python :: Implementation :: PyPy
+Classifier: Natural Language :: English
+Classifier: Operating System :: OS Independent
+Classifier: Topic :: Internet :: WWW/HTTP
+Classifier: Framework :: Zope :: 3
+Requires-Python: >=3.9
+License-File: LICENSE.txt
+Requires-Dist: setuptools
+Requires-Dist: zope.browser
+Requires-Dist: zope.component>=3.6.0
+Requires-Dist: zope.i18nmessageid
+Requires-Dist: zope.interface>=3.8
+Requires-Dist: zope.schema
+Requires-Dist: zope.security
+Provides-Extra: test
+Requires-Dist: zope.testing; extra == "test"
+Requires-Dist: zope.testrunner>=6.4; extra == "test"
+Provides-Extra: docs
+Requires-Dist: repoze.sphinx.autointerface; extra == "docs"
+Requires-Dist: Sphinx; extra == "docs"
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: home-page
+Dynamic: keywords
+Dynamic: license
+Dynamic: license-file
+Dynamic: provides-extra
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
+
+=====================
+ zope.authentication
+=====================
+
+.. image:: https://img.shields.io/pypi/v/zope.authentication.svg
+        :target: https://pypi.org/project/zope.authentication/
+        :alt: Latest release
+
+.. image:: https://img.shields.io/pypi/pyversions/zope.authentication.svg
+        :target: https://pypi.org/project/zope.authentication/
+        :alt: Supported Python versions
+
+.. image:: https://github.com/zopefoundation/zope.authentication/actions/workflows/tests.yml/badge.svg
+        :target: https://github.com/zopefoundation/zope.authentication/actions/workflows/tests.yml
+
+.. image:: https://coveralls.io/repos/github/zopefoundation/zope.authentication/badge.svg?branch=master
+        :target: https://coveralls.io/github/zopefoundation/zope.authentication?branch=master
+
+.. image:: https://readthedocs.org/projects/zopeauthentication/badge/?version=latest
+        :target: https://zopeauthentication.readthedocs.io/en/latest/
+        :alt: Documentation Status
+
+This package provides a definition of authentication concepts for use in
+Zope Framework. This includes:
+
+- ``IAuthentication``
+- ``IUnauthenticatedPrincipal``
+- ``ILogout``
+
+Documentation is hosted at https://zopeauthentication.readthedocs.io/en/latest/
+
+
+=========
+ Changes
+=========
+
+6.0 (2025-09-12)
+================
+
+- Replace ``pkg_resources`` namespace with PEP 420 native namespace.
+
+
+5.1 (2025-02-13)
+================
+
+- Add support for Python 3.12, 3.13.
+
+- Drop support for Python 3.7, 3.8.
+
+
+5.0 (2023-01-06)
+================
+
+- Add support for Python 3.10, 3.11.
+
+- Drop support for Python 2.7, 3.5, 3.6.
+
+
+4.5.0 (2021-03-19)
+==================
+
+- Add support for Python 3.8 and 3.9.
+
+- Drop support for Python 3.4.
+
+- Fix deprecated test imports from zope.component to use the correct
+  imports from zope.interface.
+
+4.4.0 (2018-08-24)
+==================
+
+- Host documentation at https://zopeauthentication.readthedocs.io
+
+- Add support for Python 3.7.
+
+- Drop support for Python 3.3.
+
+- Drop support for ``python setup.py test``.
+
+
+4.3.0 (2017-05-11)
+==================
+
+- Add support for Python 3.5 and 3.6.
+
+- Drop support for Python 2.6 and 3.2.
+
+
+4.2.1 (2015-06-05)
+==================
+
+- Add support for PyPy3 and Python 3.2.
+
+
+4.2.0 (2014-12-26)
+==================
+
+- Add support for PyPy.  PyPy3 support is blocked on a release of a fix for:
+  https://bitbucket.org/pypy/pypy/issue/1946
+
+- Add support for Python 3.4.
+
+- Add support for testing on Travis.
+
+
+4.1.0 (2013-02-21)
+==================
+
+- Add support for Python 3.3.
+
+- Add ``tox.ini`` and ``MANIFEST.in``.
+
+
+4.0.0 (2012-07-04)
+==================
+
+- Break inappropriate testing dependency on ``zope.component.nextutility``.
+
+  (Forward-compatibility with ``zope.component`` 4.0.0).
+
+- Replace deprecated ``zope.component.adapts`` usage with equivalent
+  ``zope.component.adapter`` decorator.
+
+- Replace deprecated ``zope.interface.implements`` usage with equivalent
+  ``zope.interface.implementer`` decorator.
+
+- Drop support for Python 2.4 and 2.5.
+
+
+3.7.1 (2010-04-30)
+==================
+
+- Remove undeclared testing dependency on ``zope.testing``.
+
+3.7.0 (2009-03-14)
+==================
+
+Initial release. This package was split off from ``zope.app.security`` to
+provide a separate common interface definition for authentication utilities
+without extra dependencies.

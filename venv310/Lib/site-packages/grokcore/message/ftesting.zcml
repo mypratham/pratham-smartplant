@@ -1,0 +1,20 @@
+<configure
+  xmlns="http://namespaces.zope.org/zope"
+  xmlns:grok="http://namespaces.zope.org/grok"
+  >
+  <include package="grokcore.message"/>
+
+  <!--
+  These registration seem to be made somewhere in the stack when running the
+  application. For the tests we need to register them explicitely
+  -->
+  <utility
+    factory="zope.session.http.CookieClientIdManager"
+    provides="zope.session.interfaces.IClientIdManager"
+  />
+
+  <utility
+    factory="zope.session.session.RAMSessionDataContainer"
+    provides="zope.session.interfaces.ISessionDataContainer"
+  />
+</configure>

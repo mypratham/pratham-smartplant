@@ -1,0 +1,8 @@
+<configure xmlns="http://namespaces.zope.org/zope">
+
+  <subscriber
+      for="zope.publisher.interfaces.http.IHTTPVirtualHostChangedEvent"
+      handler=".http.notifyVirtualHostChanged"
+      />
+
+</configure>

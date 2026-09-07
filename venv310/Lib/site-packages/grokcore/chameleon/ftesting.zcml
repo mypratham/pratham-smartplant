@@ -1,0 +1,25 @@
+<configure
+   xmlns="http://namespaces.zope.org/zope"
+   xmlns:grok="http://namespaces.zope.org/grok"
+   xmlns:i18n="http://namespaces.zope.org/i18n"
+   i18n_domain="grokcore-chameleon-tests"
+   package="grokcore.chameleon">
+
+  <include package="zope.component" file="meta.zcml"/>
+  <include package="zope.security" file="meta.zcml"/>
+  <include package="zope.i18n" file="meta.zcml" />
+  <include package="zope.browserpage" file="meta.zcml"/>
+  <include package="grokcore.viewlet" file="meta.zcml" />
+
+  <include package="zope.traversing"/>
+  <include package="zope.traversing.browser"/>
+  <include package="zope.container"/>
+  <include package="zope.i18n" />
+  <include package="zope.publisher" />
+  <include package="zope.app.appsetup"/>
+  <include package="grokcore.viewlet"/>
+  <include package="grokcore.chameleon"/>
+
+  <i18n:registerTranslations directory="tests/locale" />
+
+</configure>

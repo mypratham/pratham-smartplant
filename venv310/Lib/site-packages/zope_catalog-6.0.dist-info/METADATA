@@ -1,0 +1,203 @@
+Metadata-Version: 2.4
+Name: zope.catalog
+Version: 6.0
+Summary: Cataloging and Indexing Framework for the Zope Toolkit
+Home-page: https://github.com/zopefoundation/zope.catalog
+Author: Zope Foundation and Contributors
+Author-email: zope-dev@zope.dev
+License: ZPL-2.1
+Keywords: zope3 catalog index
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Environment :: Web Environment
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: Zope Public License
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Programming Language :: Python :: Implementation :: CPython
+Classifier: Programming Language :: Python :: Implementation :: PyPy
+Classifier: Natural Language :: English
+Classifier: Operating System :: OS Independent
+Classifier: Topic :: Internet :: WWW/HTTP
+Classifier: Framework :: Zope :: 3
+Requires-Python: >=3.9
+License-File: LICENSE.txt
+Requires-Dist: setuptools
+Requires-Dist: persistent
+Requires-Dist: BTrees
+Requires-Dist: zope.annotation
+Requires-Dist: zope.intid
+Requires-Dist: zope.component>=3.8
+Requires-Dist: zope.container
+Requires-Dist: zope.index>=3.5
+Requires-Dist: zope.interface
+Requires-Dist: zope.lifecycleevent
+Requires-Dist: zope.location
+Requires-Dist: zope.schema
+Provides-Extra: test
+Requires-Dist: zope.site; extra == "test"
+Requires-Dist: zope.testing; extra == "test"
+Requires-Dist: zope.testrunner>=6.4; extra == "test"
+Provides-Extra: docs
+Requires-Dist: Sphinx; extra == "docs"
+Requires-Dist: repoze.sphinx.autointerface; extra == "docs"
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: home-page
+Dynamic: keywords
+Dynamic: license
+Dynamic: license-file
+Dynamic: provides-extra
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
+
+==============
+ zope.catalog
+==============
+
+.. image:: https://img.shields.io/pypi/v/zope.catalog.svg
+        :target: https://pypi.python.org/pypi/zope.catalog/
+        :alt: Latest release
+
+.. image:: https://img.shields.io/pypi/pyversions/zope.catalog.svg
+        :target: https://pypi.org/project/zope.catalog/
+        :alt: Supported Python versions
+
+.. image:: https://github.com/zopefoundation/zope.catalog/actions/workflows/tests.yml/badge.svg
+        :target: https://github.com/zopefoundation/zope.catalog/actions/workflows/tests.yml
+
+.. image:: https://coveralls.io/repos/github/zopefoundation/zope.catalog/badge.svg?branch=master
+        :target: https://coveralls.io/github/zopefoundation/zope.catalog?branch=master
+
+.. image:: https://readthedocs.org/projects/zopecatalog/badge/?version=latest
+        :target: http://zopecatalog.readthedocs.org/en/latest/
+        :alt: Documentation Status
+
+Catalogs provide management of collections of related indexes with a basic
+search algorithm.
+
+
+=========
+ Changes
+=========
+
+6.0 (2025-09-12)
+================
+
+- Replace ``pkg_resources`` namespace with PEP 420 native namespace.
+
+
+5.1 (2025-06-17)
+================
+
+- Add support for Python 3.12, 3.13.
+
+- Drop support for Python 3.7, 3.8.
+
+5.0 (2023-09-01)
+================
+
+- Drop support for Python 2.7, 3.5, 3.6.
+
+- Drop support for deprecated ``python setup.py test``.
+
+- Add support for Python 3.11.
+
+
+4.4.1 (2022-09-01)
+==================
+
+- Fix deprecation warning.
+
+
+4.4.0 (2022-04-06)
+==================
+
+- Add support for Python 3.7, 3.8, 3.9, 3.10.
+
+- Drop support for Python 3.4.
+
+
+4.3.0 (2021-03-19)
+==================
+
+- Drop support for Python 3.3.
+
+- Replace deprecated usage of ``zope.site.hooks`` with
+  ``zope.component.hooks``.
+
+- Replace deprecated test usage of
+  ``zope.component.interfaces.IComponentLookup`` with the proper
+  import from ``zope.interface``. This only impacted testing this
+  package.
+
+
+4.2.1 (2017-05-09)
+==================
+
+- Fix the definition of ``IAttributeIndex`` to specify a
+  ``NativeStringLine`` instead of a ``BytesLine``. Bytes cannot be
+  used with ``getattr`` on Python 3.
+  See `issue 7 <https://github.com/zopefoundation/zope.catalog/issues/7>`_.
+
+
+4.2.0 (2017-05-05)
+==================
+
+- Add support for Python 3.5 and 3.6.
+
+- Drop support for Python 2.6.
+
+- Fix the text index throwing a ``WrongType`` error on import in
+  Python 3. See `issue 5 <https://github.com/zopefoundation/zope.catalog/issues/5>`_.
+
+4.1.0 (2015-06-02)
+==================
+
+- Replace use of long-deprecated ``zope.testing.doctest`` with stdlib's
+  ``doctest``.
+
+- Add support for PyPy (PyPy3 support is blocked on a PyPy3-compatible
+  release of ``zodbpickle``).
+
+- Convert doctests to Sphinx documentation, including building docs
+  and running doctest snippets under ``tox``.
+
+4.0.0 (2014-12-24)
+==================
+
+- Add support for Python 3.4.
+
+4.0.0a1 (2013-02-25)
+====================
+
+- Add support for Python 3.3.
+
+- Replace deprecated ``zope.interface.implements`` usage with equivalent
+  ``zope.interface.implementer`` decorator.
+
+- Drop support for Python 2.4 and 2.5.
+
+3.8.2 (2011-11-29)
+==================
+
+- Conform to repository policy.
+
+3.8.1 (2009-12-27)
+==================
+
+- Remov ``zope.app.testing`` dependency.
+
+3.8.0 (2009-02-01)
+==================
+
+- Move core functionality from ``zope.app.catalog`` to this package.
+  The ``zope.app.catalog`` package now only contains ZMI-related browser
+  views and backward-compatibility imports.

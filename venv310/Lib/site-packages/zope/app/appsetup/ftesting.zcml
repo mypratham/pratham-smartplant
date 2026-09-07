@@ -1,0 +1,20 @@
+<configure xmlns="http://namespaces.zope.org/zope">
+
+  <include package="zope.component" file="meta.zcml" />
+  <include package="zope.component" />
+
+  <!-- Those next ZCML includes are required by zope.app.appsetup. So
+       should be in the real configure.zcml. zope.security probably be
+       include in zope.site configuration -->
+  <include package="zope.security" file="meta.zcml" />
+  <include package="zope.security" />
+
+  <include package="zope.location" />
+  <include package="zope.traversing" />
+  <include package="zope.container" />
+  <include package="zope.site" />
+
+  <!-- Include zope.app.appsetup so there is an Application in our DB -->
+  <include package="zope.app.appsetup" />
+
+</configure>

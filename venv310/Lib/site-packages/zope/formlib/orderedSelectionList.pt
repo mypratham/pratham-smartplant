@@ -1,0 +1,61 @@
+<script type="text/javascript" src="++resource++zope.formlib/ordered_selection.js"></script>
+
+<table border="0" class="ordered-selection-field">
+  <tr>
+    <td>
+      <select id="from" name="from" size="5" multiple="multiple"
+          tal:attributes="name string:${view/name}.from;
+                          id string:${view/name}.from;
+                          size view/size"
+                          >
+        <option tal:repeat="entry view/choices"
+                tal:attributes="value entry/value"
+                tal:content="entry/text" i18n:translate=""/>
+      </select>
+    </td>
+    <td>
+      <button name="from2toButton" type="button" value=" -&gt;"
+          onclick="javascript:from2to()"
+          tal:attributes="onClick string:javascript:from2to('${view/name}')"
+          >&nbsp;-&gt;</button>
+      <br />
+      <button name="to2fromButton" type="button" value="&lt;- "
+          onclick="javascript:to2from()"
+          tal:attributes="onClick string:javascript:to2from('${view/name}')"
+          >&lt;-&nbsp;</button>
+    </td>
+    <td>
+      <select id="to" name="to" size="5" multiple="multiple"
+          tal:attributes="name string:${view/name}.to;
+                          id string:${view/name}.to;
+                          size view/size">
+        <option tal:repeat="entry view/selected"
+                tal:attributes="value entry/value"
+                tal:content="entry/text" i18n:translate=""/>
+      </select>
+      <input name="foo-empty-marker" type="hidden"
+        tal:attributes="name string:${view/name}-empty-marker"/>
+      <span id="toDataContainer" style="display: none"
+            tal:attributes="id string:${view/name}.toDataContainer">
+        <script type="text/javascript" tal:content="string:
+          copyDataForSubmit('${view/name}');">
+          // initial copying of field "field.to" --> "field"
+          copyDataForSubmit("<i tal:replace="view/name"/>");
+        </script>
+      </span>
+    </td>
+    <td>
+      <button
+          name="upButton" type="button" value="^"
+          onclick="javascript:moveUp()"
+          tal:attributes="onClick string:javascript:moveUp('${view/name}')"
+          >^</button>
+      <br />
+      <button
+          name="downButton" type="button" value="v"
+          onclick="javascript:moveDown()"
+          tal:attributes="onClick string:javascript:moveDown('${view/name}')"
+          >v</button>
+    </td>
+  </tr>
+</table>

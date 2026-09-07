@@ -1,0 +1,4 @@
+<p xmlns:metal="http://xml.zope.org/namespaces/metal"
+   metal:define-macro="hello">
+  Hello from <b metal:define-slot="name">macro master</b>
+</p>

@@ -1,0 +1,2203 @@
+Metadata-Version: 2.4
+Name: zc.catalog
+Version: 5.0
+Summary: Extensions to the Zope 3 Catalog
+Home-page: https://github.com/zopefoundation/zc.catalog
+Author: Zope Foundation and Contributors
+Author-email: zope-dev@zope.dev
+License: ZPL-2.1
+Keywords: zope3 i18n date time duration catalog index
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Environment :: Web Environment
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: Zope Public License
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Programming Language :: Python :: Implementation :: CPython
+Classifier: Programming Language :: Python :: Implementation :: PyPy
+Classifier: Natural Language :: English
+Classifier: Operating System :: OS Independent
+Classifier: Topic :: Internet :: WWW/HTTP
+Classifier: Framework :: Zope :: 3
+Requires-Python: >=3.9
+License-File: LICENSE.txt
+Requires-Dist: BTrees>=4.4.1
+Requires-Dist: persistent
+Requires-Dist: pytz
+Requires-Dist: setuptools
+Requires-Dist: zope.catalog>=4.2.1
+Requires-Dist: zope.component>=4.3.0
+Requires-Dist: zope.container>=4.1.0
+Requires-Dist: zope.i18nmessageid>=4.1.0
+Requires-Dist: zope.index>=4.3.0
+Requires-Dist: zope.interface>=4.4.0
+Requires-Dist: zope.intid>=4.2.0
+Requires-Dist: zope.publisher>=3.12
+Requires-Dist: zope.schema>=4.4.2
+Requires-Dist: zope.security>=4.1.0
+Provides-Extra: test
+Requires-Dist: ZODB; extra == "test"
+Requires-Dist: beautifulsoup4; extra == "test"
+Requires-Dist: zope.annotation; extra == "test"
+Requires-Dist: zope.app.appsetup; extra == "test"
+Requires-Dist: zope.app.basicskin; extra == "test"
+Requires-Dist: zope.app.catalog; extra == "test"
+Requires-Dist: zope.app.catalog; extra == "test"
+Requires-Dist: zope.app.component; extra == "test"
+Requires-Dist: zope.app.container; extra == "test"
+Requires-Dist: zope.app.form; extra == "test"
+Requires-Dist: zope.app.publisher>=4.0; extra == "test"
+Requires-Dist: zope.app.rotterdam; extra == "test"
+Requires-Dist: zope.app.schema>=4.0; extra == "test"
+Requires-Dist: zope.app.wsgi; extra == "test"
+Requires-Dist: zope.browsermenu; extra == "test"
+Requires-Dist: zope.browserpage; extra == "test"
+Requires-Dist: zope.browserresource; extra == "test"
+Requires-Dist: zope.dottedname; extra == "test"
+Requires-Dist: zope.keyreference; extra == "test"
+Requires-Dist: zope.login; extra == "test"
+Requires-Dist: zope.password; extra == "test"
+Requires-Dist: zope.principalannotation; extra == "test"
+Requires-Dist: zope.principalregistry; extra == "test"
+Requires-Dist: zope.securitypolicy; extra == "test"
+Requires-Dist: zope.testbrowser>=5.2; extra == "test"
+Requires-Dist: zope.testing; extra == "test"
+Requires-Dist: zope.testrunner>=6.4; extra == "test"
+Requires-Dist: zopyx.txng3.ext>=2.0.0; extra == "test"
+Provides-Extra: browser
+Requires-Dist: zope.app.form; extra == "browser"
+Requires-Dist: zope.browsermenu; extra == "browser"
+Provides-Extra: stemmer
+Requires-Dist: zopyx.txng3.ext>=2.0.0; extra == "stemmer"
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: home-page
+Dynamic: keywords
+Dynamic: license
+Dynamic: license-file
+Dynamic: provides-extra
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
+
+==========
+zc.catalog
+==========
+
+.. image:: https://img.shields.io/pypi/v/zc.catalog.svg
+   :target: https://pypi.org/project/zc.catalog/
+   :alt: Latest Version
+
+.. image:: https://img.shields.io/pypi/pyversions/zc.catalog.svg
+   :target: https://pypi.org/project/zc.catalog/
+   :alt: Supported Python versions
+
+.. image:: https://github.com/zopefoundation/zc.catalog/actions/workflows/tests.yml/badge.svg
+   :target: https://github.com/zopefoundation/zc.catalog/actions/workflows/tests.yml
+   :alt: Build Status
+
+.. image:: https://coveralls.io/repos/github/zopefoundation/zc.catalog/badge.svg
+   :target: https://coveralls.io/github/zopefoundation/zc.catalog
+   :alt: Code Coverage
+
+
+zc.catalog is an extension to the Zope 3 catalog, Zope 3's indexing
+and search facility. zc.catalog contains a number of extensions to the
+Zope 3 catalog, such as some new indexes, improved globbing and
+stemming support, and an alternative catalog implementation.
+
+
+.. contents::
+
+=========
+ CHANGES
+=========
+
+5.0 (2025-09-18)
+================
+
+* Replace ``pkg_resources`` namespace with PEP 420 native namespace.
+
+
+4.0 (2025-01-29)
+================
+
+* Add support for Python 3.9, 3.10, 3.11, 3.12, 3.13.
+
+* Drop support for Python 2.7, 3.5, 3.6, 3.7, 3.8.
+
+
+3.0 (2019-03-21)
+================
+
+- Drop support for Python 3.4 as it reached its end of life.
+
+- Add support for Python 3.7 and 3.8a2.
+
+
+2.0.1 (2017-06-15)
+==================
+
+- Add Python 3 compatibility for the ``zopyx.txng3.ext`` stemmer.
+  See `#4 <https://github.com/zopefoundation/zc.catalog/issues/4>`_.
+
+
+2.0.0 (2017-05-09)
+==================
+
+- Add support for Python 3.4, 3.5, 3.6 and PyPy. Note that the
+  ``zopyx.txng3.ext`` stemmer is not available on Python 3.
+
+- Remove test dependency on zope.app.zcmlfiles and zope.app.testing,
+  among others.
+
+
+1.6 (2013-07-04)
+================
+
+- Using Python's ``doctest`` module instead of deprecated
+  ``zope.testing.doctest``.
+
+- Move ``zope.intid`` to dependencies.
+
+
+1.5.1 (2012-01-20)
+==================
+
+- Fix the extent catalog's `searchResults` method to work when using a
+  local uid source.
+
+- Replaced a testing dependency on ``zope.app.authentication`` with
+  ``zope.password``.
+
+- Removed ``zope.app.server`` test dependency.
+
+
+1.5 (2010-10-19)
+================
+
+- The package's ``configure.zcml`` does not include the browser subpackage's
+  ``configure.zcml`` anymore.
+
+  This, together with ``browser`` and ``test_browser`` ``extras_require``,
+  decouples the browser view registrations from the main code. As a result
+  projects that do not need the ZMI views to be registered are not pulling in
+  the zope.app.* dependencies anymore.
+
+  To enable the ZMI views for your project, you will have to do two things:
+
+  * list ``zc.catalog [browser]`` as a ``install_requires``.
+
+  * have your project's ``configure.zcml`` include the ``zc.catalog.browser``
+    subpackage.
+
+- Only include the browser tests whenever the dependencies for the browser
+  tests are available.
+
+- Python2.7 test fix.
+
+
+1.4.5 (2010-10-05)
+==================
+
+- Remove implicit test dependency on zope.app.dublincore, that was not needed
+  in the first place.
+
+
+1.4.4 (2010-07-06)
+==================
+
+* Fixed test-failure happening with more recent ``mechanize`` (>=2.0).
+
+
+1.4.3 (2010-03-09)
+==================
+
+* Try to import the stemmer from the zopyx.txng3.ext package first, which
+  as of 3.3.2 contains stability and memory leak fixes.
+
+
+1.4.2 (2010-01-20)
+==================
+
+* Fix missing testing dependencies when using ZTK by adding zope.login.
+
+1.4.1 (2009-02-27)
+==================
+
+* Add FieldIndex-like sorting support for the ValueIndex.
+
+* Add sorting indexes support for the NormalizationWrapper.
+
+
+1.4.0 (2009-02-07)
+==================
+
+* Fixed a typo in ValueIndex addform and addMenuItem
+
+* Use ``zope.container`` instead of ``zope.app.container``.
+
+* Use ``zope.keyreference`` instead of ``zope.app.keyreference``.
+
+* Use ``zope.intid`` instead of ``zope.app.intid``.
+
+* Use ``zope.catalog`` instead of ``zope.app.catalog``.
+
+
+1.3.0 (2008-09-10)
+==================
+
+* Added hook point to allow extent catalog to be used with local UID sources.
+
+
+1.2.0 (2007-11-03)
+==================
+
+* Updated package meta-data.
+
+* zc.catalog now can use 64-bit BTrees ("L") as provided by ZODB 3.8.
+
+* Albertas Agejavas (alga@pov.lt) included the new CallableWrapper, for
+  when the typical Zope 3 index-by-adapter story
+  (zope.app.catalog.attribute) is unnecessary trouble, and you just want
+  to use a callable.  See callablewrapper.txt.  This can also be used for
+  other indexes based on the zope.index interfaces.
+
+* Extents now have a __len__.  The current implementation defers to the
+  standard BTree len implementation, and shares its performance
+  characteristics: it needs to wake up all of the buckets, but if all of the
+  buckets are awake it is a fairly quick operation.
+
+* A simple ISelfPoulatingExtent was added to the extentcatalog module for
+  which populating is a no-op.  This is directly useful for catalogs that
+  are used as implementation details of a component, in which objects are
+  indexed explicitly by your own calls rather than by the usual subscribers.
+  It is also potentially slightly useful as a base for other self-populating
+  extents.
+
+
+1.1.1 (2007-3-17)
+=================
+
+'all_of' would return all results when one of the values had no results.
+Reported, with test and fix provided, by Nando Quintana.
+
+
+1.1 (2007-01-06)
+================
+
+Features removed
+----------------
+
+The queueing of events in the extent catalog has been entirely removed.
+Subtransactions caused significant problems to the code introduced in 1.0.
+Other solutions also have significant problems, and the win of this kind
+of queueing is qustionable.  Here is a run down of the approaches rejected
+for getting the queueing to work:
+
+* _p_invalidate (used in 1.0).  Not really designed for use within a
+  transaction, and reverts to last savepoint, rather than the beginning of
+  the transaction.  Could monkeypatch savepoints to iterate over
+  precommit transaction hooks but that just smells too bad.
+
+* _p_resolveConflict.  Requires application software to exist in ZEO and
+  even ZRS installations, which is counter to our software deployment goals.
+  Also causes useless repeated writes of empty queue to database, but that's
+  not the showstopper.
+
+* vague hand-wavy ideas for separate storages or transaction managers for the
+  queue.  Never panned out in discussion.
+
+
+1.0 (2007-01-05)
+================
+
+Bugs fixed
+----------
+
+* adjusted extentcatalog tests to trigger (and discuss and test) the queueing
+  behavior.
+
+* fixed problem with excessive conflict errors due to queueing code.
+
+* updated stemming to work with newest version of TextIndexNG's extensions.
+
+* omitted stemming test when TextIndexNG's extensions are unavailable, so
+  tests pass without it.  Since TextIndexNG's extensions are optional, this
+  seems reasonable.
+
+* removed use of zapi in extentcatalog.
+
+
+0.2 (2006-11-22)
+================
+
+Features added
+--------------
+
+* First release on Cheeseshop.
+
+
+=============
+ Value Index
+=============
+
+The valueindex is an index similar to, but more flexible than a standard Zope
+field index.  The index allows searches for documents that contain any of a
+set of values; between a set of values; any (non-None) values; and any empty
+values.
+
+Additionally, the index supports an interface that allows examination of the
+indexed values.
+
+It is as policy-free as possible, and is intended to be the engine for indexes
+with more policy, as well as being useful itself.
+
+On creation, the index has no wordCount, no documentCount, and is, as
+expected, fairly empty.
+
+    >>> from zc.catalog.index import ValueIndex
+    >>> index = ValueIndex()
+    >>> index.documentCount()
+    0
+    >>> index.wordCount()
+    0
+    >>> index.maxValue() # doctest: +ELLIPSIS
+    Traceback (most recent call last):
+    ...
+    ValueError:...
+    >>> index.minValue() # doctest: +ELLIPSIS
+    Traceback (most recent call last):
+    ...
+    ValueError:...
+    >>> list(index.values())
+    []
+    >>> len(index.apply({'any_of': (5,)}))
+    0
+
+The index supports indexing any value.  All values within a given index must
+sort consistently across Python versions.
+
+    >>> data = {1: 'a',
+    ...         2: 'b',
+    ...         3: 'a',
+    ...         4: 'c',
+    ...         5: 'd',
+    ...         6: 'c',
+    ...         7: 'c',
+    ...         8: 'b',
+    ...         9: 'c',
+    ... }
+    >>> for k, v in data.items():
+    ...     index.index_doc(k, v)
+    ...
+
+After indexing, the statistics and values match the newly entered content.
+
+    >>> list(index.values())
+    ['a', 'b', 'c', 'd']
+    >>> index.documentCount()
+    9
+    >>> index.wordCount()
+    4
+    >>> index.maxValue()
+    'd'
+    >>> index.minValue()
+    'a'
+    >>> list(index.ids())
+    [1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+The index supports four types of query.  The first is 'any_of'.  It
+takes an iterable of values, and returns an iterable of document ids that
+contain any of the values.  The results are not weighted.
+
+    >>> list(index.apply({'any_of': ('b', 'c')}))
+    [2, 4, 6, 7, 8, 9]
+    >>> list(index.apply({'any_of': ('b',)}))
+    [2, 8]
+    >>> list(index.apply({'any_of': ('d',)}))
+    [5]
+    >>> bool(index.apply({'any_of': (42,)}))
+    False
+
+Another query is 'any', If the key is None, all indexed document ids with any
+values are returned.  If the key is an extent, the intersection of the extent
+and all document ids with any values is returned.
+
+    >>> list(index.apply({'any': None}))
+    [1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+    >>> from zc.catalog.extentcatalog import FilterExtent
+    >>> extent = FilterExtent(lambda extent, uid, obj: True)
+    >>> for i in range(15):
+    ...     extent.add(i, i)
+    ...
+    >>> list(index.apply({'any': extent}))
+    [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    >>> limited_extent = FilterExtent(lambda extent, uid, obj: True)
+    >>> for i in range(5):
+    ...     limited_extent.add(i, i)
+    ...
+    >>> list(index.apply({'any': limited_extent}))
+    [1, 2, 3, 4]
+
+The 'between' argument takes from 1 to four values.  The first is the
+minimum, and defaults to None, indicating no minimum; the second is the
+maximum, and defaults to None, indicating no maximum; the next is a boolean for
+whether the minimum value should be excluded, and defaults to False; and the
+last is a boolean for whether the maximum value should be excluded, and also
+defaults to False.  The results are not weighted.
+
+    >>> list(index.apply({'between': ('b', 'd')}))
+    [2, 4, 5, 6, 7, 8, 9]
+    >>> list(index.apply({'between': ('c', None)}))
+    [4, 5, 6, 7, 9]
+    >>> list(index.apply({'between': ('c',)}))
+    [4, 5, 6, 7, 9]
+    >>> list(index.apply({'between': ('b', 'd', True, True)}))
+    [4, 6, 7, 9]
+
+Using an invalid (non-comparable) argument to between produces nothing:
+
+    >>> list(index.apply({'between': (1, 5)}))
+    []
+
+The 'none' argument takes an extent and returns the ids in the extent
+that are not indexed; it is intended to be used to return docids that have
+no (or empty) values.
+
+    >>> list(index.apply({'none': extent}))
+    [0, 10, 11, 12, 13, 14]
+
+Trying to use more than one of these at a time generates an error.
+
+    >>> index.apply({'between': (5,), 'any_of': (3,)})
+    ... # doctest: +ELLIPSIS
+    Traceback (most recent call last):
+    ...
+    ValueError:...
+
+Using none of them simply returns None.
+
+    >>> index.apply({}) # returns None
+
+Invalid query names cause ValueErrors.
+
+    >>> index.apply({'foo': ()})
+    ... # doctest: +ELLIPSIS
+    Traceback (most recent call last):
+    ...
+    ValueError:...
+
+When you unindex a document, the searches and statistics should be updated.
+
+    >>> index.unindex_doc(5)
+    >>> len(index.apply({'any_of': ('d',)}))
+    0
+    >>> index.documentCount()
+    8
+    >>> index.wordCount()
+    3
+    >>> list(index.values())
+    ['a', 'b', 'c']
+    >>> list(index.ids())
+    [1, 2, 3, 4, 6, 7, 8, 9]
+
+Reindexing a document that has a changed value also is reflected in
+subsequent searches and statistic checks.
+
+    >>> list(index.apply({'any_of': ('b',)}))
+    [2, 8]
+    >>> data[8] = 'e'
+    >>> index.index_doc(8, data[8])
+    >>> index.documentCount()
+    8
+    >>> index.wordCount()
+    4
+    >>> list(index.apply({'any_of': ('e',)}))
+    [8]
+    >>> list(index.apply({'any_of': ('b',)}))
+    [2]
+    >>> data[2] = 'e'
+    >>> index.index_doc(2, data[2])
+    >>> index.documentCount()
+    8
+    >>> index.wordCount()
+    3
+    >>> list(index.apply({'any_of': ('e',)}))
+    [2, 8]
+    >>> list(index.apply({'any_of': ('b',)}))
+    []
+
+Reindexing a document for which the value is now None causes it to be removed
+from the statistics.
+
+    >>> data[3] = None
+    >>> index.index_doc(3, data[3])
+    >>> index.documentCount()
+    7
+    >>> index.wordCount()
+    3
+    >>> list(index.ids())
+    [1, 2, 4, 6, 7, 8, 9]
+
+This affects both ways of determining the ids that are and are not in the index
+(that do and do not have values).
+
+    >>> list(index.apply({'any': None}))
+    [1, 2, 4, 6, 7, 8, 9]
+    >>> list(index.apply({'any': extent}))
+    [1, 2, 4, 6, 7, 8, 9]
+    >>> list(index.apply({'none': extent}))
+    [0, 3, 5, 10, 11, 12, 13, 14]
+
+The values method can be used to examine the indexed values for a given
+document id.  For a valueindex, the "values" for a given doc_id will always
+have a length of 0 or 1.
+
+    >>> index.values(doc_id=8)
+    ('e',)
+
+And the containsValue method provides a way of determining membership in the
+values.
+
+    >>> index.containsValue('a')
+    True
+    >>> index.containsValue('q')
+    False
+
+Sorting Value Indexes
+=====================
+
+Value indexes supports sorting, just like zope.index.field.FieldIndex.
+
+    >>> index.clear()
+
+    >>> index.index_doc(1, 9)
+    >>> index.index_doc(2, 8)
+    >>> index.index_doc(3, 7)
+    >>> index.index_doc(4, 6)
+    >>> index.index_doc(5, 5)
+    >>> index.index_doc(6, 4)
+    >>> index.index_doc(7, 3)
+    >>> index.index_doc(8, 2)
+    >>> index.index_doc(9, 1)
+
+    >>> list(index.sort([4, 2, 9, 7, 3, 1, 5]))
+    [9, 7, 5, 4, 3, 2, 1]
+
+We can also specify the ``reverse`` argument to reverse results:
+
+    >>> list(index.sort([4, 2, 9, 7, 3, 1, 5], reverse=True))
+    [1, 2, 3, 4, 5, 7, 9]
+
+And as per IIndexSort, we can limit results by specifying the ``limit``
+argument:
+
+    >>> list(index.sort([4, 2, 9, 7, 3, 1, 5], limit=3))
+    [9, 7, 5]
+
+If we pass an id that is not indexed by this index, it won't be included
+in the result.
+
+    >>> list(index.sort([2, 10]))
+    [2]
+
+
+=========
+Set Index
+=========
+
+The setindex is an index similar to, but more general than a traditional
+keyword index.  The values indexed are expected to be iterables; the index
+allows searches for documents that contain any of a set of values; all of a set
+of values; or between a set of values.
+
+Additionally, the index supports an interface that allows examination of the
+indexed values.
+
+It is as policy-free as possible, and is intended to be the engine for indexes
+with more policy, as well as being useful itself.
+
+On creation, the index has no wordCount, no documentCount, and is, as
+expected, fairly empty.
+
+    >>> from zc.catalog.index import SetIndex
+    >>> index = SetIndex()
+    >>> index.documentCount()
+    0
+    >>> index.wordCount()
+    0
+    >>> index.maxValue() # doctest: +ELLIPSIS
+    Traceback (most recent call last):
+    ...
+    ValueError:...
+    >>> index.minValue() # doctest: +ELLIPSIS
+    Traceback (most recent call last):
+    ...
+    ValueError:...
+    >>> list(index.values())
+    []
+    >>> len(index.apply({'any_of': (5,)}))
+    0
+
+The index supports indexing any value.  All values within a given index must
+sort consistently across Python versions. In practice
+this means that the values need to be homogeneous.
+
+    >>> data = {1: ['a', '1'],
+    ...         2: ['b', 'a', '3', '4', '7'],
+    ...         3: ['1'],
+    ...         4: ['1', '4', 'c'],
+    ...         5: ['7'],
+    ...         6: ['5', '6', '7'],
+    ...         7: ['c'],
+    ...         8: ['1', '6'],
+    ...         9: ['a', 'c', '2', '3', '4', '6',],
+    ... }
+    >>> for k, v in data.items():
+    ...     index.index_doc(k, v)
+    ...
+
+After indexing, the statistics and values match the newly entered content.
+
+    >>> list(index.values())
+    ['1', '2', '3', '4', '5', '6', '7', 'a', 'b', 'c']
+    >>> index.documentCount()
+    9
+    >>> index.wordCount()
+    10
+    >>> index.maxValue()
+    'c'
+    >>> index.minValue()
+    '1'
+    >>> list(index.ids())
+    [1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+The index supports five types of query.  The first is 'any_of'.  It
+takes an iterable of values, and returns an iterable of document ids that
+contain any of the values.  The results are weighted.
+
+    >>> list(index.apply({'any_of': ('b', '1', '5')}))
+    [1, 2, 3, 4, 6, 8]
+    >>> list(index.apply({'any_of': ('b', '1', '5')}))
+    [1, 2, 3, 4, 6, 8]
+    >>> list(index.apply({'any_of': ('42',)}))
+    []
+    >>> index.apply({'any_of': ('a', '3', '7')})              # doctest: +ELLIPSIS
+    BTrees...FBucket([(1, 1.0), (2, 3.0), (5, 1.0), (6, 1.0), (9, 2.0)])
+
+Using an invalid (non-comparable) argument is ignored:
+
+    >>> list(index.apply({'any_of': (1,)}))
+    []
+    >>> list(index.apply({'any_of': (1, '1')}))
+    [1, 3, 4, 8]
+
+Another query is 'any'. If the key is None, all indexed document ids with any
+values are returned.  If the key is an extent, the intersection of the extent
+and all document ids with any values is returned.
+
+    >>> list(index.apply({'any': None}))
+    [1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+    >>> from zc.catalog.extentcatalog import FilterExtent
+    >>> extent = FilterExtent(lambda extent, uid, obj: True)
+    >>> for i in range(15):
+    ...     extent.add(i, i)
+    ...
+    >>> list(index.apply({'any': extent}))
+    [1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+    >>> limited_extent = FilterExtent(lambda extent, uid, obj: True)
+    >>> for i in range(5):
+    ...     limited_extent.add(i, i)
+    ...
+    >>> list(index.apply({'any': limited_extent}))
+    [1, 2, 3, 4]
+
+The 'all_of' argument also takes an iterable of values, but returns an
+iterable of document ids that contains all of the values.  The results are not
+weighted.
+
+    >>> list(index.apply({'all_of': ('a',)}))
+    [1, 2, 9]
+    >>> list(index.apply({'all_of': ('3', '4')}))
+    [2, 9]
+    >>> list(index.apply({'all_of': (3, '4')}))
+    []
+    >>> list(index.apply({'all_of': ('3', 4)}))
+    []
+
+These tests illustrate two related reported errors that have been fixed.
+
+    >>> list(index.apply({'all_of': ('z', '3', '4')}))
+    []
+    >>> list(index.apply({'all_of': ('3', '4', 'z')}))
+    []
+
+The 'between' argument takes from 1 to four values.  The first is the
+minimum, and defaults to None, indicating no minimum; the second is the
+maximum, and defaults to None, indicating no maximum; the next is a boolean for
+whether the minimum value should be excluded, and defaults to False; and the
+last is a boolean for whether the maximum value should be excluded, and also
+defaults to False.  The results are weighted.
+
+    >>> list(index.apply({'between': ('1', '7')}))
+    [1, 2, 3, 4, 5, 6, 8, 9]
+    >>> list(index.apply({'between': ('b', None)}))
+    [2, 4, 7, 9]
+    >>> list(index.apply({'between': ('b',)}))
+    [2, 4, 7, 9]
+    >>> list(index.apply({'between': ('1', '7', True, True)}))
+    [2, 4, 6, 8, 9]
+    >>> index.apply({'between': ('2', '6')})               # doctest: +ELLIPSIS
+    BTrees...FBucket([(2, 2.0), (4, 1.0), (6, 2.0), (8, 1.0), (9, 4.0)])
+
+Using invalid (non-comparable) arguments produces no results:
+
+    >>> list(index.apply({'between': (1, 7)}))
+    []
+
+
+The 'none' argument takes an extent and returns the ids in the extent
+that are not indexed; it is intended to be used to return docids that have
+no (or empty) values.
+
+    >>> list(index.apply({'none': extent}))
+    [0, 10, 11, 12, 13, 14]
+
+Trying to use more than one of these at a time generates an error.
+
+    >>> index.apply({'all_of': ('5',), 'any_of': ('3',)})
+    ... # doctest: +ELLIPSIS
+    Traceback (most recent call last):
+    ...
+    ValueError:...
+
+Using none of them simply returns None.
+
+    >>> index.apply({}) # returns None
+
+Invalid query names cause ValueErrors.
+
+    >>> index.apply({'foo': ()})
+    ... # doctest: +ELLIPSIS
+    Traceback (most recent call last):
+    ...
+    ValueError:...
+
+When you unindex a document, the searches and statistics should be updated.
+
+    >>> index.unindex_doc(6)
+    >>> len(index.apply({'any_of': ('5',)}))
+    0
+    >>> index.documentCount()
+    8
+    >>> index.wordCount()
+    9
+    >>> list(index.values())
+    ['1', '2', '3', '4', '6', '7', 'a', 'b', 'c']
+    >>> list(index.ids())
+    [1, 2, 3, 4, 5, 7, 8, 9]
+
+Reindexing a document that has new additional values also is reflected in
+subsequent searches and statistic checks.
+
+    >>> data[8].extend(['5', 'c'])
+    >>> index.index_doc(8, data[8])
+    >>> index.documentCount()
+    8
+    >>> index.wordCount()
+    10
+    >>> list(index.apply({'any_of': ('5',)}))
+    [8]
+    >>> list(index.apply({'any_of': ('c',)}))
+    [4, 7, 8, 9]
+
+The same is true for reindexing a document with both additions and removals.
+
+    >>> 2 in set(index.apply({'any_of': ('7',)}))
+    True
+    >>> 2 in set(index.apply({'any_of': ('2',)}))
+    False
+    >>> data[2].pop()
+    '7'
+    >>> data[2].append('2')
+    >>> index.index_doc(2, data[2])
+    >>> 2 in set(index.apply({'any_of': ('7',)}))
+    False
+    >>> 2 in set(index.apply({'any_of': ('2',)}))
+    True
+
+Reindexing a document that no longer has any values causes it to be removed
+from the statistics.
+
+    >>> del data[2][:]
+    >>> index.index_doc(2, data[2])
+    >>> index.documentCount()
+    7
+    >>> index.wordCount()
+    9
+    >>> list(index.ids())
+    [1, 3, 4, 5, 7, 8, 9]
+
+This affects both ways of determining the ids that are and are not in the index
+(that do and do not have values).
+
+    >>> list(index.apply({'any': None}))
+    [1, 3, 4, 5, 7, 8, 9]
+    >>> list(index.apply({'none': extent}))
+    [0, 2, 6, 10, 11, 12, 13, 14]
+
+The values method can be used to examine the indexed values for a given
+document id.
+
+    >>> set(index.values(doc_id=8)) == set(['1', '5', '6', 'c'])
+    True
+
+And the containsValue method provides a way of determining membership in the
+values.
+
+    >>> index.containsValue('5')
+    True
+    >>> index.containsValue(5)
+    False
+    >>> index.containsValue('20')
+    False
+
+
+==================
+ Normalized Index
+==================
+
+The index module provides a normalizing wrapper, a DateTime normalizer, and
+a set index and a value index normalized with the DateTime normalizer.
+
+The normalizing wrapper implements a full complement of index interfaces--
+zope.index.interfaces.IInjection, zope.index.interfaces.IIndexSearch,
+zope.index.interfaces.IStatistics, and zc.catalog.interfaces.IIndexValues--
+and delegates all of the behavior to the wrapped index, normalizing values
+using the normalizer before the index sees them.
+
+The normalizing wrapper currently only supports queries offered by
+zc.catalog.interfaces.ISetIndex and zc.catalog.interfaces.IValueIndex.
+
+The normalizer interface requires the following methods, as defined in the
+interface:
+
+    def value(value):
+        """normalize or check constraints for an input value; raise an error
+        or return the value to be indexed."""
+
+    def any(value, index):
+        """normalize a query value for a "any_of" search; return a sequence of
+        values."""
+
+    def all(value, index):
+        """Normalize a query value for an "all_of" search; return the value
+        for query"""
+
+    def minimum(value, index):
+        """normalize a query value for minimum of a range; return the value for
+        query"""
+
+    def maximum(value, index):
+        """normalize a query value for maximum of a range; return the value for
+        query"""
+
+The DateTime normalizer performs the following normalizations and validations.
+Whenever a timezone is needed, it tries to get a request from the current
+interaction and adapt it to zope.interface.common.idatetime.ITZInfo; failing
+that (no request or no adapter) it uses the system local timezone.
+
+- input values must be datetimes with a timezone.  They are normalized to the
+  resolution specified when the normalizer is created: a resolution of 0
+  normalizes values to days; a resolution of 1 to hours; 2 to minutes; 3 to
+  seconds; and 4 to microseconds.
+
+- 'any' values may be timezone-aware datetimes, timezone-naive datetimes,
+  or dates.  dates are converted to any value from the start to the end of the
+  given date in the found timezone, as described above.  timezone-naive
+  datetimes get the found timezone.
+
+- 'all' values may be timezone-aware datetimes or timezone-naive datetimes.
+  timezone-naive datetimes get the found timezone.
+
+- 'minimum' values may be timezone-aware datetimes, timezone-naive datetimes,
+  or dates.  dates are converted to the start of the given date in the found
+  timezone, as described above.  timezone-naive datetimes get the found
+  timezone.
+
+- 'maximum' values may be timezone-aware datetimes, timezone-naive datetimes,
+  or dates.  dates are converted to the end of the given date in the found
+  timezone, as described above.  timezone-naive datetimes get the found
+  timezone.
+
+Let's look at the DateTime normalizer first, and then an integration of it
+with the normalizing wrapper and the value and set indexes.
+
+The indexed values are parsed with 'value'.
+
+    >>> from zc.catalog.index import DateTimeNormalizer
+    >>> n = DateTimeNormalizer() # defaults to minutes
+    >>> import datetime
+    >>> import pytz
+    >>> naive_datetime = datetime.datetime(2005, 7, 15, 11, 21, 32, 104)
+    >>> date = naive_datetime.date()
+    >>> aware_datetime = naive_datetime.replace(
+    ...     tzinfo=pytz.timezone('US/Eastern'))
+    >>> n.value(naive_datetime)
+    Traceback (most recent call last):
+    ...
+    ValueError: This index only indexes timezone-aware datetimes.
+    >>> n.value(date)
+    Traceback (most recent call last):
+    ...
+    ValueError: This index only indexes timezone-aware datetimes.
+    >>> n.value(aware_datetime) # doctest: +ELLIPSIS
+    datetime.datetime(2005, 7, 15, 11, 21, tzinfo=<DstTzInfo 'US/Eastern'...>)
+
+If we specify a different resolution, the results are different.
+
+    >>> another = DateTimeNormalizer(1) # hours
+    >>> another.value(aware_datetime) # doctest: +ELLIPSIS
+    datetime.datetime(2005, 7, 15, 11, 0, tzinfo=<DstTzInfo 'US/Eastern'...>)
+
+Note that changing the resolution of an indexed value may create surprising
+results, because queries do not change their resolution.  Therefore, if you
+index something with a datetime with a finer resolution that the normalizer's,
+then searching for that datetime will not find the doc_id.
+
+Values in an 'any_of' query are parsed with 'any'.  'any' should return a
+sequence of values.  It requires an index, which we will mock up here.
+
+    >>> class DummyIndex(object):
+    ...     def values(self, start, stop, exclude_start, exclude_stop):
+    ...         assert not exclude_start and exclude_stop
+    ...         six_hours = datetime.timedelta(hours=6)
+    ...         res = []
+    ...         dt = start
+    ...         while dt < stop:
+    ...             res.append(dt)
+    ...             dt += six_hours
+    ...         return res
+    ...
+    >>> index = DummyIndex()
+    >>> tuple(n.any(naive_datetime, index)) # doctest: +ELLIPSIS
+    (datetime.datetime(2005, 7, 15, 11, 21, 32, 104, tzinfo=<...Local...>),)
+    >>> tuple(n.any(aware_datetime, index)) # doctest: +ELLIPSIS
+    (datetime.datetime(2005, 7, 15, 11, 21, 32, 104, tzinfo=<...Eastern...>),)
+    >>> tuple(n.any(date, index)) # doctest: +NORMALIZE_WHITESPACE +ELLIPSIS
+    (datetime.datetime(2005, 7, 15, 0, 0, tzinfo=<...Local...>),
+     datetime.datetime(2005, 7, 15, 6, 0, tzinfo=<...Local...>),
+     datetime.datetime(2005, 7, 15, 12, 0, tzinfo=<...Local...>),
+     datetime.datetime(2005, 7, 15, 18, 0, tzinfo=<...Local...>))
+
+Values in an 'all_of' query are parsed with 'all'.
+
+    >>> n.all(naive_datetime, index) # doctest: +ELLIPSIS
+    datetime.datetime(2005, 7, 15, 11, 21, 32, 104, tzinfo=<...Local...>)
+    >>> n.all(aware_datetime, index) # doctest: +ELLIPSIS
+    datetime.datetime(2005, 7, 15, 11, 21, 32, 104, tzinfo=<...Eastern...>)
+    >>> n.all(date, index) # doctest: +ELLIPSIS
+    Traceback (most recent call last):
+    ...
+    ValueError: ...
+
+Minimum values in a 'between' query as well as those in other methods are
+parsed with 'minimum'.  They also take an optional exclude boolean, which
+indicates whether the minimum is to be excluded.  For datetimes, it only
+makes a difference if you pass in a date.
+
+    >>> n.minimum(naive_datetime, index) # doctest: +ELLIPSIS
+    datetime.datetime(2005, 7, 15, 11, 21, 32, 104, tzinfo=<...Local...>)
+    >>> n.minimum(naive_datetime, index, exclude=True) # doctest: +ELLIPSIS
+    datetime.datetime(2005, 7, 15, 11, 21, 32, 104, tzinfo=<...Local...>)
+
+    >>> n.minimum(aware_datetime, index) # doctest: +ELLIPSIS
+    datetime.datetime(2005, 7, 15, 11, 21, 32, 104, tzinfo=<...Eastern...>)
+    >>> n.minimum(aware_datetime, index, True) # doctest: +ELLIPSIS
+    datetime.datetime(2005, 7, 15, 11, 21, 32, 104, tzinfo=<...Eastern...>)
+
+    >>> n.minimum(date, index) # doctest: +ELLIPSIS
+    datetime.datetime(2005, 7, 15, 0, 0, tzinfo=<...Local...>)
+    >>> n.minimum(date, index, True) # doctest: +ELLIPSIS
+    datetime.datetime(2005, 7, 15, 23, 59, 59, 999999, tzinfo=<...Local...>)
+
+Maximum values in a 'between' query as well as those in other methods are
+parsed with 'maximum'.  They also take an optional exclude boolean, which
+indicates whether the maximum is to be excluded.  For datetimes, it only
+makes a difference if you pass in a date.
+
+    >>> n.maximum(naive_datetime, index) # doctest: +ELLIPSIS
+    datetime.datetime(2005, 7, 15, 11, 21, 32, 104, tzinfo=<...Local...>)
+    >>> n.maximum(naive_datetime, index, exclude=True) # doctest: +ELLIPSIS
+    datetime.datetime(2005, 7, 15, 11, 21, 32, 104, tzinfo=<...Local...>)
+
+    >>> n.maximum(aware_datetime, index) # doctest: +ELLIPSIS
+    datetime.datetime(2005, 7, 15, 11, 21, 32, 104, tzinfo=<...Eastern...>)
+    >>> n.maximum(aware_datetime, index, True) # doctest: +ELLIPSIS
+    datetime.datetime(2005, 7, 15, 11, 21, 32, 104, tzinfo=<...Eastern...>)
+
+    >>> n.maximum(date, index) # doctest: +ELLIPSIS
+    datetime.datetime(2005, 7, 15, 23, 59, 59, 999999, tzinfo=<...Local...>)
+    >>> n.maximum(date, index, True) # doctest: +ELLIPSIS
+    datetime.datetime(2005, 7, 15, 0, 0, tzinfo=<...Local...>)
+
+Now let's examine these normalizers in the context of a real index.
+
+    >>> from zc.catalog.index import DateTimeValueIndex, DateTimeSetIndex
+    >>> setindex = DateTimeSetIndex() # minutes resolution
+    >>> data = [] # generate some data
+    >>> def date_gen(
+    ...     start=aware_datetime,
+    ...     count=12,
+    ...     period=datetime.timedelta(hours=10)):
+    ...     dt = start
+    ...     ix = 0
+    ...     while ix < count:
+    ...         yield dt
+    ...         dt += period
+    ...         ix += 1
+    ...
+    >>> gen = date_gen()
+    >>> count = 0
+    >>> while True:
+    ...     try:
+    ...         next_ = [next(gen) for i in range(6)]
+    ...     except StopIteration:
+    ...         break
+    ...     data.append((count, next_[0:1]))
+    ...     count += 1
+    ...     data.append((count, next_[1:3]))
+    ...     count += 1
+    ...     data.append((count, next_[3:6]))
+    ...     count += 1
+    ...
+    >>> print(data) # doctest: +ELLIPSIS +NORMALIZE_WHITESPACE
+    [(0,
+      [datetime.datetime(2005, 7, 15, 11, 21, 32, 104, ...<...Eastern...>)]),
+     (1,
+      [datetime.datetime(2005, 7, 15, 21, 21, 32, 104, ...<...Eastern...>),
+       datetime.datetime(2005, 7, 16, 7, 21, 32, 104, ...<...Eastern...>)]),
+     (2,
+      [datetime.datetime(2005, 7, 16, 17, 21, 32, 104, ...<...Eastern...>),
+       datetime.datetime(2005, 7, 17, 3, 21, 32, 104, ...<...Eastern...>),
+       datetime.datetime(2005, 7, 17, 13, 21, 32, 104, ...<...Eastern...>)]),
+     (3,
+      [datetime.datetime(2005, 7, 17, 23, 21, 32, 104, ...<...Eastern...>)]),
+     (4,
+      [datetime.datetime(2005, 7, 18, 9, 21, 32, 104, ...<...Eastern...>),
+       datetime.datetime(2005, 7, 18, 19, 21, 32, 104, ...<...Eastern...>)]),
+     (5,
+      [datetime.datetime(2005, 7, 19, 5, 21, 32, 104, ...<...Eastern...>),
+       datetime.datetime(2005, 7, 19, 15, 21, 32, 104, ...<...Eastern...>),
+       datetime.datetime(2005, 7, 20, 1, 21, 32, 104, ...<...Eastern...>)])]
+    >>> data_dict = dict(data)
+    >>> for doc_id, value in data:
+    ...     setindex.index_doc(doc_id, value)
+    ...
+    >>> list(setindex.ids())
+    [0, 1, 2, 3, 4, 5]
+    >>> set(setindex.values()) == set(
+    ...     setindex.normalizer.value(v) for v in date_gen())
+    True
+
+For the searches, we will actually use a request and interaction, with an
+adapter that returns the Eastern timezone.  This makes the examples less
+dependent on the machine that they use.
+
+    >>> import zope.security.management
+    >>> import zope.publisher.browser
+    >>> import zope.interface.common.idatetime
+    >>> import zope.publisher.interfaces
+    >>> request = zope.publisher.browser.TestRequest()
+    >>> zope.security.management.newInteraction(request)
+    >>> from zope import interface, component
+    >>> @interface.implementer(zope.interface.common.idatetime.ITZInfo)
+    ... @component.adapter(zope.publisher.interfaces.IRequest)
+    ... def tzinfo(req):
+    ...     return pytz.timezone('US/Eastern')
+    ...
+    >>> component.provideAdapter(tzinfo)
+    >>> n.all(naive_datetime, index).tzinfo is pytz.timezone('US/Eastern')
+    True
+
+    >>> set(setindex.apply({'any_of': (datetime.date(2005, 7, 17),
+    ...                                datetime.date(2005, 7, 20),
+    ...                                datetime.date(2005, 12, 31))})) == set(
+    ...     (2, 3, 5))
+    True
+
+Note that this search is using the normalized values.
+
+    >>> set(setindex.apply({'all_of': (
+    ...     datetime.datetime(
+    ...         2005, 7, 16, 7, 21, tzinfo=pytz.timezone('US/Eastern')),
+    ...     datetime.datetime(
+    ...         2005, 7, 15, 21, 21, tzinfo=pytz.timezone('US/Eastern')),)})
+    ...     ) == set((1,))
+    True
+    >>> list(setindex.apply({'any': None}))
+    [0, 1, 2, 3, 4, 5]
+    >>> set(setindex.apply({'between': (
+    ...     datetime.datetime(2005, 4, 1, 12), datetime.datetime(2006, 5, 1))})
+    ...     ) == set((0, 1, 2, 3, 4, 5))
+    True
+    >>> set(setindex.apply({'between': (
+    ...     datetime.datetime(2005, 4, 1, 12), datetime.datetime(2006, 5, 1),
+    ...     True, True)})
+    ...     ) == set((0, 1, 2, 3, 4, 5))
+    True
+
+'between' searches should deal with dates well.
+
+    >>> set(setindex.apply({'between': (
+    ...     datetime.date(2005, 7, 16), datetime.date(2005, 7, 17))})
+    ...     ) == set((1, 2, 3))
+    True
+    >>> len(setindex.apply({'between': (
+    ...     datetime.date(2005, 7, 16), datetime.date(2005, 7, 17))})
+    ...     ) == len(setindex.apply({'between': (
+    ...     datetime.date(2005, 7, 15), datetime.date(2005, 7, 18),
+    ...     True, True)})
+    ...     )
+    True
+
+Removing docs works as usual.
+
+    >>> setindex.unindex_doc(1)
+    >>> list(setindex.ids())
+    [0, 2, 3, 4, 5]
+
+Value, Minvalue and Maxvalue can take timezone-less datetimes and dates.
+
+    >>> setindex.minValue() # doctest: +ELLIPSIS
+    datetime.datetime(2005, 7, 15, 11, 21, ...<...Eastern...>)
+    >>> setindex.minValue(datetime.date(2005, 7, 17)) # doctest: +ELLIPSIS
+    datetime.datetime(2005, 7, 17, 3, 21, ...<...Eastern...>)
+
+    >>> setindex.maxValue() # doctest: +ELLIPSIS
+    datetime.datetime(2005, 7, 20, 1, 21, ...<...Eastern...>)
+    >>> setindex.maxValue(datetime.date(2005, 7, 17)) # doctest: +ELLIPSIS
+    datetime.datetime(2005, 7, 17, 23, 21, ...<...Eastern...>)
+
+    >>> list(setindex.values(
+    ... datetime.date(2005, 7, 17), datetime.date(2005, 7, 17)))
+    ... # doctest: +ELLIPSIS +NORMALIZE_WHITESPACE
+    [datetime.datetime(2005, 7, 17, 3, 21, ...<...Eastern...>),
+     datetime.datetime(2005, 7, 17, 13, 21, ...<...Eastern...>),
+     datetime.datetime(2005, 7, 17, 23, 21, ...<...Eastern...>)]
+
+    >>> zope.security.management.endInteraction() # TODO put in tests tearDown
+
+Sorting
+=======
+
+The normalization wrapper provides the zope.index.interfaces.IIndexSort
+interface if its upstream index provides it. For example, the
+DateTimeValueIndex will provide IIndexSort, because ValueIndex provides
+sorting. It will also delegate the ``sort`` method to the value index.
+
+    >>> from zc.catalog.index import DateTimeValueIndex
+    >>> from zope.index.interfaces import IIndexSort
+
+    >>> ix = DateTimeValueIndex()
+    >>> IIndexSort.providedBy(ix.index)
+    True
+    >>> IIndexSort.providedBy(ix)
+    True
+    >>> ix.sort.__self__ is ix.index
+    True
+
+But it won't work for indexes that doesn't do sorting, for example
+DateTimeSetIndex.
+
+    >>> ix = DateTimeSetIndex()
+    >>> IIndexSort.providedBy(ix.index)
+    False
+    >>> IIndexSort.providedBy(ix)
+    False
+    >>> ix.sort
+    Traceback (most recent call last):
+    ...
+    AttributeError: 'SetIndex' object has no attribute 'sort'
+
+
+================
+ Extent Catalog
+================
+
+An extent catalog is very similar to a normal catalog except that it
+only indexes items addable to its extent.  The extent is both a filter
+and a set that may be merged with other result sets.  The filtering is
+an additional feature we will discuss below; we'll begin with a simple
+"do nothing" extent that only supports the second use case.
+
+We create the state that the text needs here.
+
+    >>> import zope.keyreference.persistent
+    >>> import zope.component
+    >>> import zope.intid
+    >>> import zope.component
+    >>> import zope.interface.interfaces
+    >>> import zope.component.persistentregistry
+    >>> from ZODB.MappingStorage import DB
+    >>> import transaction
+
+    >>> zope.component.provideAdapter(
+    ...     zope.keyreference.persistent.KeyReferenceToPersistent,
+    ...     adapts=(zope.interface.Interface,))
+    >>> zope.component.provideAdapter(
+    ...     zope.keyreference.persistent.connectionOfPersistent,
+    ...     adapts=(zope.interface.Interface,))
+
+    >>> site_manager = None
+    >>> def getSiteManager(context=None):
+    ...     if context is None:
+    ...         if site_manager is None:
+    ...             return zope.component.getGlobalSiteManager()
+    ...         else:
+    ...             return site_manager
+    ...     else:
+    ...         try:
+    ...             return zope.interface.interfaces.IComponentLookup(context)
+    ...         except TypeError as error:
+    ...             raise zope.component.ComponentLookupError(*error.args)
+    ...
+    >>> def setSiteManager(sm):
+    ...     global site_manager
+    ...     site_manager = sm
+    ...     if sm is None:
+    ...         zope.component.getSiteManager.reset()
+    ...     else:
+    ...         zope.component.getSiteManager.sethook(getSiteManager)
+    ...
+    >>> def makeRoot():
+    ...     db = DB()
+    ...     conn = db.open()
+    ...     root = conn.root()
+    ...     site_manager = root['components'] = (
+    ...         zope.component.persistentregistry.PersistentComponents())
+    ...     site_manager.__bases__ = (zope.component.getGlobalSiteManager(),)
+    ...     site_manager.registerUtility(
+    ...         zope.intid.IntIds(family=btrees_family),
+    ...         provided=zope.intid.interfaces.IIntIds)
+    ...     setSiteManager(site_manager)
+    ...     transaction.commit()
+    ...     return root
+    ...
+
+    >>> @zope.component.adapter(zope.interface.Interface)
+    ... @zope.interface.implementer(zope.interface.interfaces.IComponentLookup)
+    ... def getComponentLookup(obj):
+    ...     return obj._p_jar.root()['components']
+    ...
+    >>> zope.component.provideAdapter(getComponentLookup)
+
+To show the extent catalog at work, we need an intid utility, an
+index, some items to index.  We'll do this within a real ZODB and a
+real intid utility.
+
+    >>> import zc.catalog
+    >>> import zc.catalog.interfaces
+    >>> from zc.catalog import interfaces, extentcatalog
+    >>> from zope import interface, component
+    >>> from zope.interface import verify
+    >>> import persistent
+    >>> import BTrees.IFBTree
+
+    >>> root = makeRoot()
+    >>> intid = zope.component.getUtility(
+    ...     zope.intid.interfaces.IIntIds, context=root)
+    >>> TreeSet = btrees_family.IF.TreeSet
+
+    >>> from zope.container.interfaces import IContained
+    >>> @interface.implementer(IContained)
+    ... class DummyIndex(persistent.Persistent):
+    ...     __parent__ = __name__ = None
+    ...     def __init__(self):
+    ...         self.uids = TreeSet()
+    ...     def unindex_doc(self, uid):
+    ...         if uid in self.uids:
+    ...             self.uids.remove(uid)
+    ...     def index_doc(self, uid, obj):
+    ...         self.uids.insert(uid)
+    ...     def clear(self):
+    ...         self.uids.clear()
+    ...     def apply(self, query):
+    ...         return [uid for uid in self.uids if uid <= query]
+    ...
+    >>> class DummyContent(persistent.Persistent):
+    ...     def __init__(self, name, parent):
+    ...         self.id = name
+    ...         self.__parent__ = parent
+    ...
+
+    >>> extent = extentcatalog.Extent(family=btrees_family)
+    >>> verify.verifyObject(interfaces.IExtent, extent)
+    True
+    >>> root['catalog'] = catalog = extentcatalog.Catalog(extent)
+    >>> verify.verifyObject(interfaces.IExtentCatalog, catalog)
+    True
+    >>> index = DummyIndex()
+    >>> catalog['index'] = index
+    >>> transaction.commit()
+
+Now we have a catalog set up with an index and an extent.  We can add
+some data to the extent:
+
+    >>> matches = []
+    >>> for i in range(100):
+    ...     c = DummyContent(i, root)
+    ...     root[i] = c
+    ...     doc_id = intid.register(c)
+    ...     catalog.index_doc(doc_id, c)
+    ...     matches.append(doc_id)
+    >>> matches.sort()
+    >>> sorted(extent) == sorted(index.uids) == matches
+    True
+
+We can get the size of the extent.
+
+    >>> len(extent)
+    100
+
+Unindexing an object that is in the catalog should simply remove it from the
+catalog and index as usual.
+
+    >>> matches[0] in catalog.extent
+    True
+    >>> matches[0] in catalog['index'].uids
+    True
+    >>> catalog.unindex_doc(matches[0])
+    >>> matches[0] in catalog.extent
+    False
+    >>> matches[0] in catalog['index'].uids
+    False
+    >>> doc_id = matches.pop(0)
+    >>> sorted(extent) == sorted(index.uids) == matches
+    True
+
+Clearing the catalog clears both the extent and the contained indexes.
+
+    >>> catalog.clear()
+    >>> list(catalog.extent) == list(catalog['index'].uids) == []
+    True
+
+Updating all indexes and an individual index both also update the extent.
+
+    >>> catalog.updateIndexes()
+    >>> matches.insert(0, doc_id)
+    >>> sorted(extent) == sorted(index.uids) == matches
+    True
+
+    >>> index2 = DummyIndex()
+    >>> catalog['index2'] = index2
+    >>> index2.__parent__ == catalog
+    True
+    >>> index.uids.remove(matches[0]) # to confirm that only index 2 is touched
+    >>> catalog.updateIndex(index2)
+    >>> sorted(extent) == sorted(index2.uids) == matches
+    True
+    >>> matches[0] in index.uids
+    False
+    >>> matches[0] in index2.uids
+    True
+    >>> res = index.uids.insert(matches[0])
+
+But so why have an extent in the first place?  It allows indices to
+operate against a reliable collection of the full indexed data;
+therefore, it allows the indices in zc.catalog to perform NOT
+operations.
+
+The extent itself provides a number of merging features to allow its
+values to be merged with other BTrees.IFBTree data structures.  These
+include intersection, union, difference, and reverse difference.
+Given an extent named 'extent' and another IFBTree data structure
+named 'data', intersections can be spelled "extent & data" or "data &
+extent"; unions can be spelled "extent | data" or "data | extent";
+differences can be spelled "extent - data"; and reverse differences
+can be spelled "data - extent".  Unions and intersections are
+weighted.
+
+    >>> extent = extentcatalog.Extent(family=btrees_family)
+    >>> for i in range(1, 100, 2):
+    ...     extent.add(i, None)
+    ...
+    >>> alt_set = TreeSet()
+    >>> _ = alt_set.update(range(0, 166, 33)) # return value is unimportant here
+    >>> sorted(alt_set)
+    [0, 33, 66, 99, 132, 165]
+    >>> sorted(extent & alt_set)
+    [33, 99]
+    >>> sorted(alt_set & extent)
+    [33, 99]
+    >>> sorted(extent.intersection(alt_set))
+    [33, 99]
+    >>> original = set(extent)
+    >>> union_matches = original.copy()
+    >>> union_matches.update(alt_set)
+    >>> union_matches = sorted(union_matches)
+    >>> sorted(alt_set | extent) == union_matches
+    True
+    >>> sorted(extent | alt_set) == union_matches
+    True
+    >>> sorted(extent.union(alt_set)) == union_matches
+    True
+    >>> sorted(alt_set - extent)
+    [0, 66, 132, 165]
+    >>> sorted(extent.rdifference(alt_set))
+    [0, 66, 132, 165]
+    >>> original.remove(33)
+    >>> original.remove(99)
+    >>> set(extent - alt_set) == original
+    True
+    >>> set(extent.difference(alt_set)) == original
+    True
+
+We can pass our own instantiated UID utility to extentcatalog.Catalog.
+
+    >>> extent = extentcatalog.Extent(family=btrees_family)
+    >>> uidutil = zope.intid.IntIds()
+    >>> cat = extentcatalog.Catalog(extent, uidutil)
+    >>> cat["index"] = DummyIndex()
+    >>> cat.UIDSource is uidutil
+    True
+
+    >>> cat._getUIDSource() is uidutil
+    True
+
+The ResultSet instance returned by the catalog's `searchResults` method
+uses our UID utility.
+
+    >>> obj = DummyContent(43, root)
+    >>> uid = uidutil.register(obj)
+    >>> cat.index_doc(uid, obj)
+    >>> res = cat.searchResults(index=uid)
+    >>> res.uidutil is uidutil
+    True
+
+    >>> list(res) == [obj]
+    True
+
+`searchResults` may also return None.
+
+    >>> cat.searchResults() is None
+    True
+
+Calling `updateIndex` and `updateIndexes` when the catalog has its uid source
+set works as well.
+
+    >>> cat.clear()
+    >>> uid in cat.extent
+    False
+
+All objects in the uid utility are indexed.
+
+    >>> cat.updateIndexes()
+    >>> uid in cat.extent
+    True
+
+    >>> len(cat.extent)
+    1
+
+    >>> obj2 = DummyContent(44, root)
+    >>> uid2 = uidutil.register(obj2)
+    >>> cat.updateIndexes()
+    >>> len(cat.extent)
+    2
+
+    >>> uid2 in cat.extent
+    True
+
+    >>> uidutil.unregister(obj2)
+
+    >>> cat.clear()
+    >>> uid in cat.extent
+    False
+    >>> cat.updateIndex(cat["index"])
+    >>> uid in cat.extent
+    True
+
+With a self-populating extent, calling `updateIndex` or `updateIndexes` means
+only the objects whose ids are in the extent are updated/reindexed; if present,
+the catalog will use its uid source to look up the objects by id.
+
+    >>> extent = extentcatalog.NonPopulatingExtent(family=btrees_family)
+    >>> cat = extentcatalog.Catalog(extent, uidutil)
+    >>> cat["index"] = DummyIndex()
+
+    >>> extent.add(uid, obj)
+    >>> uid in cat["index"].uids
+    False
+
+    >>> cat.updateIndexes()
+    >>> uid in cat["index"].uids
+    True
+
+    >>> cat.clear()
+    >>> uid in cat["index"].uids
+    False
+
+    >>> uid in cat.extent
+    False
+
+    >>> cat.extent.add(uid, obj)
+    >>> cat.updateIndex(cat["index"])
+    >>> uid in cat["index"].uids
+    True
+
+Unregister the objects of the previous tests from intid utility:
+
+    >>> intid = zope.component.getUtility(
+    ...     zope.intid.interfaces.IIntIds, context=root)
+    >>> for doc_id in matches:
+    ...     intid.unregister(intid.queryObject(doc_id))
+
+
+Catalog with a filter extent
+============================
+
+As discussed at the beginning of this document, extents can not only help
+with index operations, but also act as a filter, so that a given catalog
+can answer questions about a subset of the objects contained in the intids.
+
+The filter extent only stores objects that match a given filter.
+
+    >>> def filter(extent, uid, ob):
+    ...     assert interfaces.IFilterExtent.providedBy(extent)
+    ...     # This is an extent of objects with odd-numbered uids without a
+    ...     # True ignore attribute
+    ...     return uid % 2 and not getattr(ob, 'ignore', False)
+    ...
+    >>> extent = extentcatalog.FilterExtent(filter, family=btrees_family)
+    >>> verify.verifyObject(interfaces.IFilterExtent, extent)
+    True
+    >>> root['catalog1'] = catalog = extentcatalog.Catalog(extent)
+    >>> verify.verifyObject(interfaces.IExtentCatalog, catalog)
+    True
+    >>> index = DummyIndex()
+    >>> catalog['index'] = index
+    >>> transaction.commit()
+
+Now we have a catalog set up with an index and an extent.  If we create
+some content and ask the catalog to index it, only the ones that match
+the filter will be in the extent and in the index.
+
+    >>> matches = []
+    >>> fails = []
+    >>> i = 0
+    >>> while True:
+    ...     c = DummyContent(i, root)
+    ...     root[i] = c
+    ...     doc_id = intid.register(c)
+    ...     catalog.index_doc(doc_id, c)
+    ...     if filter(extent, doc_id, c):
+    ...         matches.append(doc_id)
+    ...     else:
+    ...         fails.append(doc_id)
+    ...     i += 1
+    ...     if i > 99 and len(matches) > 4:
+    ...         break
+    ...
+    >>> matches.sort()
+    >>> sorted(extent) == sorted(index.uids) == matches
+    True
+
+If a content object is indexed that used to match the filter but no longer
+does, it should be removed from the extent and indexes.
+
+    >>> matches[0] in catalog.extent
+    True
+    >>> obj = intid.getObject(matches[0])
+    >>> obj.ignore = True
+    >>> filter(extent, matches[0], obj)
+    False
+    >>> catalog.index_doc(matches[0], obj)
+    >>> doc_id = matches.pop(0)
+    >>> doc_id in catalog.extent
+    False
+    >>> sorted(extent) == sorted(index.uids) == matches
+    True
+
+Unindexing an object that is not in the catalog should be a no-op.
+
+    >>> fails[0] in catalog.extent
+    False
+    >>> catalog.unindex_doc(fails[0])
+    >>> fails[0] in catalog.extent
+    False
+    >>> sorted(extent) == sorted(index.uids) == matches
+    True
+
+Updating all indexes and an individual index both also update the extent.
+
+    >>> index2 = DummyIndex()
+    >>> catalog['index2'] = index2
+    >>> index2.__parent__ == catalog
+    True
+    >>> index.uids.remove(matches[0]) # to confirm that only index 2 is touched
+    >>> catalog.updateIndex(index2)
+    >>> sorted(extent) == sorted(index2.uids)
+    True
+    >>> matches[0] in index.uids
+    False
+    >>> matches[0] in index2.uids
+    True
+    >>> res = index.uids.insert(matches[0])
+
+If you update a single index and an object is no longer a member of the extent,
+it is removed from all indexes.
+
+    >>> matches[0] in catalog.extent
+    True
+    >>> matches[0] in index.uids
+    True
+    >>> matches[0] in index2.uids
+    True
+    >>> obj = intid.getObject(matches[0])
+    >>> obj.ignore = True
+    >>> catalog.updateIndex(index2)
+    >>> matches[0] in catalog.extent
+    False
+    >>> matches[0] in index.uids
+    False
+    >>> matches[0] in index2.uids
+    False
+    >>> doc_id = matches.pop(0)
+    >>> (matches == sorted(catalog.extent) == sorted(index.uids)
+    ...  == sorted(index2.uids))
+    True
+
+
+Self-populating extents
+=======================
+
+An extent may know how to populate itself; this is especially useful if
+the catalog can be initialized with fewer items than those available in
+the IIntIds utility that are also within the nearest Zope 3 site (the
+policy coded in the basic Zope 3 catalog).
+
+Such an extent must implement the `ISelfPopulatingExtent` interface,
+which requires two attributes.  Let's use the `FilterExtent` class as a
+base for implementing such an extent, with a method that selects content item
+0 (created and registered above)::
+
+    >>> class PopulatingExtent(
+    ...     extentcatalog.FilterExtent,
+    ...     extentcatalog.NonPopulatingExtent):
+    ...
+    ...     def populate(self):
+    ...         if self.populated:
+    ...             return
+    ...         self.add(intid.getId(root[0]), root[0])
+    ...         super(PopulatingExtent, self).populate()
+
+Creating a catalog based on this extent ignores objects in the
+database already::
+
+    >>> def accept_any(extent, uid, ob):
+    ...     return True
+
+    >>> extent = PopulatingExtent(accept_any, family=btrees_family)
+    >>> catalog = extentcatalog.Catalog(extent)
+    >>> index = DummyIndex()
+    >>> catalog['index'] = index
+    >>> root['catalog2'] = catalog
+    >>> transaction.commit()
+
+At this point, our extent remains unpopulated::
+
+    >>> extent.populated
+    False
+
+Iterating over the extent does not cause it to be automatically
+populated::
+
+    >>> list(extent)
+    []
+
+Causing our new index to be filled will cause the `populate()` method
+to be called, setting the `populate` flag as a side-effect::
+
+    >>> catalog.updateIndex(index)
+    >>> extent.populated
+    True
+
+    >>> list(extent) == [intid.getId(root[0])]
+    True
+
+The index has been updated with the documents identified by the
+extent::
+
+    >>> list(index.uids) == [intid.getId(root[0])]
+    True
+
+Updating the same index repeatedly will continue to use the extent as
+the source of documents to include::
+
+    >>> catalog.updateIndex(index)
+
+    >>> list(extent) == [intid.getId(root[0])]
+    True
+    >>> list(index.uids) == [intid.getId(root[0])]
+    True
+
+The `updateIndexes()` method has a similar behavior.  If we add an
+additional index to the catalog, we see that it indexes only those
+objects from the extent::
+
+    >>> index2 = DummyIndex()
+    >>> catalog['index2'] = index2
+
+    >>> catalog.updateIndexes()
+
+    >>> list(extent) == [intid.getId(root[0])]
+    True
+    >>> list(index.uids) == [intid.getId(root[0])]
+    True
+    >>> list(index2.uids) == [intid.getId(root[0])]
+    True
+
+When we have fresh catalog and extent (not yet populated), we see that
+`updateIndexes()` will cause the extent to be populated::
+
+    >>> extent = PopulatingExtent(accept_any, family=btrees_family)
+    >>> root['catalog3'] = catalog = extentcatalog.Catalog(extent)
+    >>> index1 = DummyIndex()
+    >>> index2 = DummyIndex()
+    >>> catalog['index1'] = index1
+    >>> catalog['index2'] = index2
+    >>> transaction.commit()
+
+    >>> extent.populated
+    False
+
+    >>> catalog.updateIndexes()
+
+    >>> extent.populated
+    True
+
+    >>> list(extent) == [intid.getId(root[0])]
+    True
+    >>> list(index1.uids) == [intid.getId(root[0])]
+    True
+    >>> list(index2.uids) == [intid.getId(root[0])]
+    True
+
+We'll make sure everything can be safely committed.
+
+    >>> transaction.commit()
+    >>> setSiteManager(None)
+
+
+=======
+Stemmer
+=======
+
+The stemmer uses Andreas Jung's stemmer code, which is a Python wrapper of
+M. F. Porter's Snowball project (http://snowball.tartarus.org/index.php).
+It is designed to be used as part of a pipeline in a zope/index/text/
+lexicon, after a splitter.  This enables getting the relevance ranking
+of the zope/index/text code with the splitting functionality of TextIndexNG 3.x.
+
+It requires that the TextIndexNG extensions--specifically txngstemmer--have
+been compiled and installed in your Python installation.  Inclusion of the
+textindexng package is not necessary.
+
+As of this writing (Jan 3, 2007), installing the necessary extensions can be
+done with the following steps:
+
+- `svn co https://svn.sourceforge.net/svnroot/textindexng/extension_modules/trunk ext_mod`
+- `cd ext_mod`
+- (using the python you use for Zope) `python setup.py install`
+
+Another approach is to simply install TextIndexNG (see
+http://opensource.zopyx.com/software/textindexng3)
+
+The stemmer must be instantiated with the language for which stemming is
+desired.  It defaults to 'english'.  For what it is worth, other languages
+supported as of this writing, using the strings that the stemmer expects,
+include the following: 'danish', 'dutch', 'english', 'finnish', 'french',
+'german', 'italian', 'norwegian', 'portuguese', 'russian', 'spanish', and
+'swedish'.
+
+For instance, let's build an index with an english stemmer.
+
+    >>> from zope.index.text import textindex, lexicon
+    >>> import zc.catalog.stemmer
+    >>> lex = lexicon.Lexicon(
+    ...     lexicon.Splitter(), lexicon.CaseNormalizer(),
+    ...     lexicon.StopWordRemover(), zc.catalog.stemmer.Stemmer('english'))
+    >>> ix = textindex.TextIndex(lex)
+    >>> data = [
+    ...     (0, 'consigned consistency consoles the constables'),
+    ...     (1, 'knaves kneeled and knocked knees, knowing no knights')]
+    >>> for doc_id, text in data:
+    ...     ix.index_doc(doc_id, text)
+    ...
+    >>> list(ix.apply('consoling a constable'))
+    [0]
+    >>> list(ix.apply('knightly kneel'))
+    [1]
+
+Note that query terms with globbing characters are not stemmed.
+
+    >>> list(ix.apply('constables*'))
+    []
+
+
+=======================
+Support for legacy data
+=======================
+
+Prior to the introduction of btree "families" and the
+``BTrees.Interfaces.IBTreeFamily`` interface, the indexes defined by
+the ``zc.catalog.index`` module used the instance attributes
+``btreemodule`` and ``IOBTree``, initialized in the constructor, and
+the ``BTreeAPI`` property.  These are replaced by the ``family``
+attribute in the current implementation.
+
+This is a white-box test that verifies that the supported values in
+existing data structures (loaded from pickles) can be used effectively
+with the current implementation.
+
+There are two supported sets of values; one for 32-bit btrees::
+
+  >>> import BTrees.IOBTree
+
+  >>> legacy32 = {
+  ...     "btreemodule": "BTrees.IFBTree",
+  ...     "IOBTree": BTrees.IOBTree.IOBTree,
+  ...     }
+
+and another for 64-bit btrees::
+
+  >>> import BTrees.LOBTree
+
+  >>> legacy64 = {
+  ...     "btreemodule": "BTrees.LFBTree",
+  ...     "IOBTree": BTrees.LOBTree.LOBTree,
+  ...     }
+
+In each case, actual legacy structures will also include index
+structures that match the right integer size::
+
+  >>> import BTrees.OOBTree
+  >>> import BTrees.Length
+
+  >>> legacy32["values_to_documents"] = BTrees.OOBTree.OOBTree()
+  >>> legacy32["documents_to_values"] = BTrees.IOBTree.IOBTree()
+  >>> legacy32["documentCount"] = BTrees.Length.Length(0)
+  >>> legacy32["wordCount"] = BTrees.Length.Length(0)
+
+  >>> legacy64["values_to_documents"] = BTrees.OOBTree.OOBTree()
+  >>> legacy64["documents_to_values"] = BTrees.LOBTree.LOBTree()
+  >>> legacy64["documentCount"] = BTrees.Length.Length(0)
+  >>> legacy64["wordCount"] = BTrees.Length.Length(0)
+
+What we want to do is verify that the ``family`` attribute is properly
+computed for instances loaded from legacy data, and ensure that the
+structure is updated cleanly without providing cause for a read-only
+transaction to become a write-transaction.  We'll need to create
+instances that conform to the old data structures, pickle them, and
+show that unpickling them produces instances that use the correct
+families.
+
+Let's create new instances, and force the internal data to match the
+old structures::
+
+  >>> import pickle
+  >>> import zc.catalog.index
+
+  >>> vi32 = zc.catalog.index.ValueIndex()
+  >>> vi32.__dict__ = legacy32.copy()
+  >>> legacy32_pickle = pickle.dumps(vi32)
+
+  >>> vi64 = zc.catalog.index.ValueIndex()
+  >>> vi64.__dict__ = legacy64.copy()
+  >>> legacy64_pickle = pickle.dumps(vi64)
+
+Now, let's unpickle these structures and verify the structures.  We'll
+start with the 32-bit variety::
+
+  >>> vi32 = pickle.loads(legacy32_pickle)
+
+  >>> vi32.__dict__["btreemodule"]
+  'BTrees.IFBTree'
+  >>> vi32.__dict__["IOBTree"]
+  <type 'BTrees.IOBTree.IOBTree'>
+
+  >>> "family" in vi32.__dict__
+  False
+
+  >>> vi32._p_changed
+  False
+
+The ``family`` property returns the ``BTrees.family32`` singleton::
+
+  >>> vi32.family is BTrees.family32
+  True
+
+Once accessed, the legacy values have been cleaned out from the
+instance dictionary::
+
+  >>> "btreemodule" in vi32.__dict__
+  False
+  >>> "IOBTree" in vi32.__dict__
+  False
+  >>> "BTreeAPI" in vi32.__dict__
+  False
+
+Accessing these attributes as attributes provides the proper values
+anyway::
+
+  >>> vi32.btreemodule
+  'BTrees.IFBTree'
+  >>> vi32.IOBTree
+  <type 'BTrees.IOBTree.IOBTree'>
+  >>> vi32.BTreeAPI
+  <module 'BTrees.IFBTree'...
+
+Even though the instance dictionary has been cleaned up, the change
+flag hasn't been set.  This is handled this way to avoid turning a
+read-only transaction into a write-transaction::
+
+  >>> vi32._p_changed
+  False
+
+The 64-bit variation provides equivalent behavior::
+
+  >>> vi64 = pickle.loads(legacy64_pickle)
+
+  >>> vi64.__dict__["btreemodule"]
+  'BTrees.LFBTree'
+  >>> vi64.__dict__["IOBTree"]
+  <type 'BTrees.LOBTree.LOBTree'>
+
+  >>> "family" in vi64.__dict__
+  False
+
+  >>> vi64._p_changed
+  False
+
+  >>> vi64.family is BTrees.family64
+  True
+
+  >>> "btreemodule" in vi64.__dict__
+  False
+  >>> "IOBTree" in vi64.__dict__
+  False
+  >>> "BTreeAPI" in vi64.__dict__
+  False
+
+  >>> vi64.btreemodule
+  'BTrees.LFBTree'
+  >>> vi64.IOBTree
+  <type 'BTrees.LOBTree.LOBTree'>
+  >>> vi64.BTreeAPI
+  <module 'BTrees.LFBTree'...
+
+  >>> vi64._p_changed
+  False
+
+Now, if we have a legacy structure and explicitly set the ``family``
+attribute, the old data structures will be cleared and replaced with
+the new structure.  If the object is associated with a data manager,
+the changed flag will be set as well::
+
+  >>> class DataManager(object):
+  ...     def register(self, ob):
+  ...         pass
+
+  >>> vi64 = pickle.loads(legacy64_pickle)
+  >>> vi64._p_jar = DataManager()
+  >>> vi64.family = BTrees.family64
+
+  >>> vi64._p_changed
+  True
+
+  >>> "btreemodule" in vi64.__dict__
+  False
+  >>> "IOBTree" in vi64.__dict__
+  False
+  >>> "BTreeAPI" in vi64.__dict__
+  False
+
+  >>> "family" in vi64.__dict__
+  True
+  >>> vi64.family is BTrees.family64
+  True
+
+  >>> vi64.btreemodule
+  'BTrees.LFBTree'
+  >>> vi64.IOBTree
+  <type 'BTrees.LOBTree.LOBTree'>
+  >>> vi64.BTreeAPI
+  <module 'BTrees.LFBTree'...
+
+
+=======
+Globber
+=======
+
+The globber takes a query and makes any term that isn't already a glob into
+something that ends in a star.  It was originally envisioned as a *very* low-
+rent stemming hack.  The author now questions its value, and hopes that the new
+stemming pipeline option can be used instead.  Nonetheless, here is an example
+of it at work.
+
+    >>> from zope.index.text import textindex
+    >>> index = textindex.TextIndex()
+    >>> lex = index.lexicon
+    >>> from zc.catalog import globber
+    >>> globber.glob('foo bar and baz or (b?ng not boo)', lex)
+    '(((foo* and bar*) and baz*) or (b?ng and not boo*))'
+
+
+================
+Callable Wrapper
+================
+
+If we want to index some value that is easily derivable from a
+document, we have to define an interface with this value as an
+attribute, and create an adapter that calculates this value and
+implements this interface.  All this is too much hassle if the want to
+store a single easily derivable value.   CallableWrapper solves this
+problem, by converting the document to the indexed value with a
+callable converter.
+
+Here's a contrived example.  Suppose we have cars that know their
+mileage expressed in miles per gallon, but we want to index their
+economy in litres per 100 km.
+
+    >>> class Car(object):
+    ...     def __init__(self, mpg):
+    ...         self.mpg = mpg
+
+    >>> def mpg2lp100(car):
+    ...     return 100.0/(1.609344/3.7854118 * car.mpg)
+
+Let's create an index that would index cars' l/100 km rating.
+
+    >>> from zc.catalog import index, catalogindex
+    >>> idx = catalogindex.CallableWrapper(index.ValueIndex(), mpg2lp100)
+
+Let's add a couple of cars to the index!
+
+    >>> hummer = Car(10.0)
+    >>> beamer = Car(22.0)
+    >>> civic = Car(45.0)
+
+    >>> idx.index_doc(1, hummer)
+    >>> idx.index_doc(2, beamer)
+    >>> idx.index_doc(3, civic)
+
+The indexed values should be the converted l/100 km ratings:
+
+    >>> list(idx.values()) # doctest: +ELLIPSIS
+    [5.22699076283393..., 10.691572014887601, 23.521458432752723]
+
+We can query for cars that consume fuel in some range:
+
+    >>> list(idx.apply({'between': (5.0, 7.0)}))
+    [3]
+
+
+============================
+ zc.catalog Browser Support
+============================
+
+The zc.catalog.browser package adds simple TTW addition/inspection for SetIndex
+and ValueIndex.
+
+First, we need a browser so we can test the web UI.
+
+    >>> from zope.testbrowser.wsgi import Browser
+    >>> browser = Browser()
+    >>> browser.handleErrors = False
+    >>> browser.addHeader('Authorization', 'Basic mgr:mgrpw')
+    >>> browser.addHeader('Accept-Language', 'en-US')
+    >>> browser.open('http://localhost/')
+
+Now we need to add the catalog that these indexes are going to reside within.
+
+    >>> browser.open('http://localhost/++etc++site/default/@@+/')
+    >>> browser.getControl('Catalog').click()
+    >>> browser.getControl(name='id').value = 'catalog'
+    >>> browser.getControl('Add').click()
+
+
+SetIndex
+========
+
+Add the SetIndex to the catalog.
+
+    >>> browser.open(browser.getLink('Add').url + '/')
+    >>> browser.getControl('Set Index').click()
+    >>> browser.getControl(name='id').value = 'set_index'
+    >>> browser.getControl('Add').click()
+
+The add form needs values for what interface to adapt candidate objects to, and
+what field name to use, and whether-or-not that field is a callable. (We'll use
+a simple interfaces for demonstration purposes, it's not really significant.)
+
+    >>> browser.getControl('Interface', index=0).displayValue = [
+    ...     'zope.size.interfaces.ISized']
+    >>> browser.getControl('Field Name').value = 'sizeForDisplay'
+    >>> browser.getControl('Field Callable').click()
+    >>> browser.getControl(name='add_input_name').value = 'set_index'
+    >>> browser.getControl('Add').click()
+
+Now we can look at the index and see how is is configured.
+
+    >>> browser.getLink('set_index').click()
+    >>> print(browser.contents)
+    <...
+    ...Interface...zope.size.interfaces.ISized...
+    ...Field Name...sizeForDisplay...
+    ...Field Callable...True...
+
+We need to go back to the catalog so we can add a different index.
+
+    >>> browser.open('/++etc++site/default/catalog/@@contents.html')
+
+
+ValueIndex
+==========
+
+Add the ValueIndex to the catalog.
+
+    >>> browser.open(browser.getLink('Add').url + '/')
+    >>> browser.getControl('Value Index').click()
+    >>> browser.getControl(name='id').value = 'value_index'
+    >>> browser.getControl('Add').click()
+
+The add form needs values for what interface to adapt candidate objects to, and
+what field name to use, and whether-or-not that field is a callable. (We'll use
+a simple interfaces for demonstration purposes, it's not really significant.)
+
+    >>> browser.getControl('Interface', index=0).displayValue = [
+    ...     'zope.size.interfaces.ISized']
+    >>> browser.getControl('Field Name').value = 'sizeForDisplay'
+    >>> browser.getControl('Field Callable').click()
+    >>> browser.getControl(name='add_input_name').value = 'value_index'
+    >>> browser.getControl('Add').click()
+
+Now we can look at the index and see how is is configured.
+
+    >>> browser.getLink('value_index').click()
+    >>> print(browser.contents)
+    <...
+    ...Interface...zope.size.interfaces.ISized...
+    ...Field Name...sizeForDisplay...
+    ...Field Callable...True...

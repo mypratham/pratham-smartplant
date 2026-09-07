@@ -1,0 +1,37 @@
+<configure
+  xmlns="http://namespaces.zope.org/zope"
+  xmlns:browser="http://namespaces.zope.org/browser"
+  xmlns:i18n="http://namespaces.zope.org/i18n"
+  i18n_domain="zope.errorview">
+
+  <include package="zope.errorview" file="http.zcml" />
+
+  <include package="zope.i18n" file="meta.zcml"/>
+  <include package="zope.browserpage" file="meta.zcml" />
+
+  <include package="zope.i18n"/>
+  <include package="zope.browserpage" />
+
+  <i18n:registerTranslations directory="i18n/locales" />
+
+  <browser:page
+    for="zope.interface.common.interfaces.IException"
+    class=".browser.ExceptionView"
+    name="index.html"
+    permission="zope.Public"
+  />
+
+  <browser:page
+    for="zope.security.interfaces.IUnauthorized"
+    class=".browser.UnauthorizedView"
+    name="index.html"
+    permission="zope.Public"
+  />
+
+  <browser:page
+    for="zope.publisher.interfaces.INotFound"
+    class=".browser.NotFoundView"
+    name="index.html"
+    permission="zope.Public"
+  />
+</configure>

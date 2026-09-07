@@ -1,0 +1,2 @@
+[console_scripts]
+zdaemon = zdaemon.zdctl:main

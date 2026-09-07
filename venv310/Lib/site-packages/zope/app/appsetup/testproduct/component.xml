@@ -1,0 +1,9 @@
+<component>
+  <import package="ZConfig.components.basic" file="mapping.xml"/>
+  <sectiontype
+      name="testproduct"
+      implements="zope.product.base"
+      extends="ZConfig.basic.mapping"
+      datatype="zope.app.appsetup.testproduct.sampleProductConfig"
+      />
+</component>

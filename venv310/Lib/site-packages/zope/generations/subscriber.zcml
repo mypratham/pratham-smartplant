@@ -1,0 +1,30 @@
+<configure xmlns="http://namespaces.zope.org/zope">
+
+  <include package="zope.component" file="meta.zcml" />
+
+<!--
+<subscriber
+    handler=".generations.evolveSubscriber"
+    for="zope.processlifetime.IDatabaseOpenedWithRoot"
+    >
+    Evolve to current generation on startup
+</subscriber>
+-->
+
+<!--
+<subscriber
+    handler=".generations.evolveNotSubscriber"
+    for="zope.processlifetime.IDatabaseOpenedWithRoot"
+    >
+    Don't evolve, but check for minimum generations on startup
+</subscriber>
+-->
+
+<subscriber
+    handler=".generations.evolveMinimumSubscriber"
+    for="zope.processlifetime.IDatabaseOpenedWithRoot"
+    >
+    Only evolve to minimum generations on startup
+</subscriber>
+
+</configure>

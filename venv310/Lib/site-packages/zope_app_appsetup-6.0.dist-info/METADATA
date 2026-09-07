@@ -1,0 +1,656 @@
+Metadata-Version: 2.4
+Name: zope.app.appsetup
+Version: 6.0
+Summary: Zope app setup helper
+Home-page: https://github.com/zopefoundation/zope.app.appsetup
+Author: Zope Foundation and Contributors
+Author-email: zope-dev@zope.dev
+License: ZPL-2.1
+Keywords: zope3 app setup
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Environment :: Web Environment
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: Zope Public License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Programming Language :: Python :: Implementation
+Classifier: Programming Language :: Python :: Implementation :: CPython
+Classifier: Programming Language :: Python :: Implementation :: PyPy
+Classifier: Natural Language :: English
+Classifier: Operating System :: OS Independent
+Classifier: Topic :: Internet :: WWW/HTTP
+Classifier: Framework :: Zope :: 3
+Requires-Python: >=3.9
+License-File: LICENSE.txt
+Requires-Dist: ZODB
+Requires-Dist: zdaemon
+Requires-Dist: setuptools
+Requires-Dist: zope.app.publication>=4.0
+Requires-Dist: zope.component>=3.8.0
+Requires-Dist: zope.configuration
+Requires-Dist: zope.container>=4.0.0a2
+Requires-Dist: zope.error
+Requires-Dist: zope.event
+Requires-Dist: zope.interface
+Requires-Dist: zope.processlifetime
+Requires-Dist: zope.security>=4.0.0a2
+Requires-Dist: zope.session>=4.0.0a1
+Requires-Dist: zope.site>=4.0.0a1
+Requires-Dist: zope.traversing>=4.0.0a2
+Provides-Extra: test
+Requires-Dist: zope.componentvocabulary>=2.0.0a1; extra == "test"
+Requires-Dist: zope.principalregistry>=4.0.0a1; extra == "test"
+Requires-Dist: zope.testing>=3.10; extra == "test"
+Requires-Dist: zope.testrunner>=6.4; extra == "test"
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: home-page
+Dynamic: keywords
+Dynamic: license
+Dynamic: license-file
+Dynamic: provides-extra
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
+
+zope.app.appsetup README
+========================
+
+This package provides application setup helpers for the Zope3 appserver.
+
+
+.. contents::
+
+Bootstrap helpers
+=================
+
+The bootstrap helpers provide a number of functions that help with
+bootstrapping.
+
+The bootStrapSubscriber function makes sure that there is a root
+object.  It subscribes to DatabaseOpened events:
+
+    >>> from zope.app.appsetup import bootstrap
+    >>> import zope.processlifetime
+
+    >>> from ZODB.MappingStorage import DB
+    >>> db = DB()
+    >>> bootstrap.bootStrapSubscriber(zope.processlifetime.DatabaseOpened(db))
+
+The subscriber makes sure that there is a root folder:
+
+    >>> from zope.app.publication.zopepublication import ZopePublication
+    >>> conn = db.open()
+    >>> root = conn.root()[ZopePublication.root_name]
+    >>> sm = root.getSiteManager()
+    >>> conn.close()
+
+A DatabaseOpenedWithRoot is generated with the database.
+
+    >>> from zope.component.eventtesting import getEvents
+    >>> [event] = getEvents(zope.processlifetime.IDatabaseOpenedWithRoot)
+    >>> event.database is db
+    True
+
+Generally, startup code that expects the root object and site to have
+been created will want to subscribe to this event, not
+IDataBaseOpenedEvent.
+
+The subscriber generates the event whether or not the root had to be
+set up:
+
+    >>> bootstrap.bootStrapSubscriber(zope.processlifetime.DatabaseOpened(db))
+    >>> [e, event] = getEvents(zope.processlifetime.IDatabaseOpenedWithRoot)
+    >>> event.database is db
+    True
+
+
+Check the Security Policy
+-------------------------
+
+When the security policy got refactored to be really pluggable, the
+inclusion of the security policy configuration was moved to the very
+top level, to site.zcml.  This happened in r24770, after ZopeX3 3.0
+was released, but before 3.1.
+
+Now the maintainers of existing 3.0 sites need to manually update
+their site.zcml to include securitypolicy.zcml while upgrading to 3.1.
+See also http://www.zope.org/Collectors/Zope3-dev/381 .
+
+    >>> from zope.testing.loggingsupport import InstalledHandler
+    >>> handler = InstalledHandler('zope.app.appsetup')
+
+If the security policy is unset from the default
+ParanoidSecurityPolicy, we get a warning:
+
+    >>> from zope.app.appsetup.bootstrap import checkSecurityPolicy
+    >>> event = object()
+    >>> checkSecurityPolicy(event)
+    >>> print(handler)
+    zope.app.appsetup WARNING
+      Security policy is not configured.
+    Please make sure that securitypolicy.zcml is included in site.zcml immediately
+    before principals.zcml
+
+However, if any non-default security policy is installed, no warning
+is emitted:
+
+    >>> from zope.security.management import setSecurityPolicy
+    >>> defaultPolicy = setSecurityPolicy(object())
+    >>> handler.clear()
+    >>> checkSecurityPolicy(event)
+    >>> print(handler)
+    <BLANKLINE>
+
+Clean up:
+
+    >>> handler.uninstall()
+
+
+Debug console
+=============
+
+The debug console lets you have a Python prompt with the full Zope
+environment loaded (which includes the ZCML configuration, as well as an open
+database connection).
+
+Let's define a helper to run the debug script and trap SystemExit exceptions
+that would otherwise hide the output
+
+    >>> from __future__ import print_function
+    >>> import sys
+    >>> from zope.app.appsetup import debug
+    >>> def run(*args):
+    ...     sys.argv[0] = 'debug'
+    ...     sys.stderr = sys.stdout
+    ...     try:
+    ...         debug.main(args)
+    ...     except SystemExit as e:
+    ...         print("(exited with status %d)" % e.code)
+
+If you call the script with no arguments, it displays a brief error message
+on stderr
+
+    >>> run()
+    Error: please specify a configuration file
+    For help, use debug -h
+    (exited with status 2)
+
+We need to pass a ZConfig configuration file as an argument
+
+    >>> run('-C', 'test.conf.txt')
+    The application root is known as `root`.
+
+Now you have the root object from the open database available as a global
+variable named 'root' in the __main__ module:
+
+    >>> main_module = sys.modules['__main__']
+    >>> main_module.root            # doctest: +ELLIPSIS
+    <zope.site.folder.Folder object at ...>
+
+and we have asked Python to enter interactive mode by setting the
+PYTHONINSPECT environment variable
+
+    >>> import os
+    >>> os.environ.get('PYTHONINSPECT')
+    'true'
+
+We have to do extra work to honor the PYTHONSTARTUP environment variable:
+
+    >>> pythonstartup = os.path.join(os.path.dirname(debug.__file__),
+    ...                              'testdata', 'pythonstartup.py')
+    >>> os.environ['PYTHONSTARTUP'] = pythonstartup
+    >>> run('-C', 'test.conf.txt')
+    The application root is known as `root`.
+
+You can see that our pythonstartup file was executed because it changed
+the prompt
+
+    >>> sys.ps1
+    'debug> '
+
+
+
+Product-specific configuration
+==============================
+
+The ``product`` module of this package provides a very simple way to deal with
+what has traditionally been called "product configuration", where "product"
+refers to the classic Zope 2 notion of a product.
+
+The configuration schema for the application server allows named
+<product-config> sections to be added to the configuration file, and product
+code can use the API provided by the module to retrieve configuration sections
+for given names.
+
+There are two public functions in the module that should be used in normal
+operations, and additional functions and a class that can be used to help with
+testing:
+
+    >>> from __future__ import print_function
+    >>> from zope.app.appsetup import product
+
+Let's look at the helper class first, since we'll use it in describing the
+public (application) interface.  We'll follow that with the functions for
+normal operation, then the remaining test-support functions.
+
+
+Faux configuration object
+-------------------------
+
+The ``FauxConfiguration`` class constructs objects that behave like the
+ZConfig section objects to the extent needed for the product configuration
+API.  These will be used here, and may also be used to create configurations
+for testing components that consume such configuration.
+
+The constructor requires two arguments: the name of the section, and a mapping
+of keys to values that the section should provide.  Let's create a simple
+example:
+
+    >>> one = product.FauxConfiguration("one", {})
+    >>> one.getSectionName()
+    'one'
+    >>> one.mapping
+    {}
+
+Providing a non-empty set of key/value pairs trivially behaves as expected:
+
+    >>> two = product.FauxConfiguration("two", {"abc": "def"})
+    >>> two.getSectionName()
+    'two'
+    >>> two.mapping
+    {'abc': 'def'}
+
+
+Application API
+---------------
+
+There are two functions in the application interface for this module.  One is
+used by the configuration provider, and the other is used by the consumer.
+
+The provider's API takes a sequence of configuration objects that conform to
+the behaviors exhibited by the default ZConfig section objects.  Since the
+``FauxConfiguration`` class provides these behaviors, we can easily see how
+this can be used:
+
+    >>> product.setProductConfigurations([one, two])
+
+Now that we've established some configuration, we want to be able to use it.
+We do this using the ``getProductConfiguration()`` function.  This function
+takes a name and returns a matching configuration section if there is one, of
+None if not:
+
+    >>> product.getProductConfiguration("one")
+    {}
+
+    >>> product.getProductConfiguration("not-there") is None
+    True
+
+Note that for a section that exists, only the internal mapping is provided,
+not the containing section object.  This is a historical wart; we'll just need
+to live with it until new APIs are introduced.
+
+Setting the configuration a second time will overwrite the prior
+configuration; sections previously available will no longer be:
+
+    >>> product.setProductConfigurations([two])
+    >>> product.getProductConfiguration("one") is None
+    True
+
+The new sections are available, as expected:
+
+    >>> product.getProductConfiguration("two")
+    {'abc': 'def'}
+
+
+Test support functions
+----------------------
+
+Additional functions are provided that make it easier to manage configuration
+state in testing.
+
+The first can be used to provide configuration for a single name.  The
+function takes a name and either a configuration mapping or ``None`` as
+arguments.  If ``None`` is provided as the second argument, any configuration
+settings for the name are removed, if present.  If the second argument is not
+``None``, it will be used as the return value for ``getProductConfiguration``
+for the given name.
+
+    >>> product.setProductConfiguration("first", None)
+    >>> print(product.getProductConfiguration("first"))
+    None
+
+    >>> product.setProductConfiguration("first", {"key": "value1"})
+    >>> product.getProductConfiguration("first")
+    {'key': 'value1'}
+
+    >>> product.setProductConfiguration("first", {"key": "value2"})
+    >>> product.getProductConfiguration("first")
+    {'key': 'value2'}
+
+    >>> product.setProductConfiguration("first", {"alt": "another"})
+    >>> product.getProductConfiguration("first")
+    {'alt': 'another'}
+
+    >>> product.setProductConfiguration("second", {"you": "there"})
+    >>> product.getProductConfiguration("first")
+    {'alt': 'another'}
+    >>> product.getProductConfiguration("second")
+    {'you': 'there'}
+
+    >>> product.setProductConfiguration("first", None)
+    >>> print(product.getProductConfiguration("first"))
+    None
+
+The other two functions work in concert, saving and restoring the entirety of
+the configuration state.
+
+Our current configuration includes data for the "second" key, and none for the
+"first" key:
+
+    >>> print(product.getProductConfiguration("first"))
+    None
+    >>> print(product.getProductConfiguration("second"))
+    {'you': 'there'}
+
+Let's save this state:
+
+    >>> state = product.saveConfiguration()
+
+Now let's replace the kitchen sink:
+
+    >>> product.setProductConfigurations([
+    ...     product.FauxConfiguration("x", {"a": "b"}),
+    ...     product.FauxConfiguration("y", {"c": "d"}),
+    ...     ])
+
+    >>> print(product.getProductConfiguration("first"))
+    None
+    >>> print(product.getProductConfiguration("second"))
+    None
+
+    >>> product.getProductConfiguration("x")
+    {'a': 'b'}
+    >>> product.getProductConfiguration("y")
+    {'c': 'd'}
+
+The saved configuration state can be restored:
+
+    >>> product.restoreConfiguration(state)
+
+    >>> print(product.getProductConfiguration("x"))
+    None
+    >>> print(product.getProductConfiguration("y"))
+    None
+
+    >>> print(product.getProductConfiguration("first"))
+    None
+    >>> print(product.getProductConfiguration("second"))
+    {'you': 'there'}
+
+There's an additional function that can be used to load product configuration
+from a file object; only product configuration components are accepted.  The
+function returns a mapping of names to configuration objects suitable for
+passing to ``setProductConfiguration``.  Using this with
+``setProductConfigurations`` would require constructing ``FauxConfiguration``
+objects.
+
+Let's create some sample configuration text:
+
+    >>> product_config = '''
+    ... <product-config product1>
+    ...   key1 product1-value1
+    ...   key2 product1-value2
+    ... </product-config>
+    ...
+    ... <product-config product2>
+    ...   key1 product2-value1
+    ...   key3 product2-value2
+    ... </product-config>
+    ... '''
+
+We can now load the configuration using the ``loadConfiguration`` function:
+
+    >>> import io
+    >>> import pprint
+
+    >>> sio = io.StringIO(product_config)
+    >>> config = product.loadConfiguration(sio)
+
+    >>> pprint.pprint(config, width=1)
+    {'product1': {'key1': 'product1-value1',
+                   'key2': 'product1-value2'},
+     'product2': {'key1': 'product2-value1',
+                   'key3': 'product2-value2'}}
+
+Extensions that provide product configurations can be used as well:
+
+    >>> product_config = '''
+    ... %import zope.app.appsetup.testproduct
+    ...
+    ... <testproduct foobar>
+    ... </testproduct>
+    ...
+    ... <testproduct barfoo>
+    ...   key1 value1
+    ...   key2 value2
+    ... </testproduct>
+    ... '''
+
+    >>> sio = io.StringIO(product_config)
+    >>> config = product.loadConfiguration(sio)
+
+    >>> pprint.pprint(config, width=1)
+    {'barfoo': {'key1': 'value1',
+                 'key2': 'value2',
+                 'product-name': 'barfoo'},
+     'foobar': {'product-name': 'foobar'}}
+
+
+Changelog
+=========
+
+6.0 (2025-09-12)
+----------------
+
+- Replace ``pkg_resources`` namespace with PEP 420 native namespace.
+
+
+5.1 (2025-08-07)
+----------------
+
+- Add support for Python 3.12, 3.13.
+
+- Drop support for Python 3.7, 3.8.
+
+
+5.0 (2023-02-09)
+----------------
+
+- Add support for Python 3.9, 3.10, 3.11.
+
+- Drop support for Python 2.7, 3.5, 3.6.
+
+
+4.2.0 (2020-05-20)
+------------------
+
+- Drop support for ``python setup.py test``.
+
+- Add support for Python 3.8.
+
+- Drop support for Python 3.4.
+
+
+4.1.0 (2018-12-15)
+------------------
+
+- Add support for Python 3.6, 3.7 and PyPy3.
+
+- Drop support for Python 3.3.
+
+
+4.0.0 (2016-08-08)
+------------------
+
+- Add dependency on ``zdaemon`` (split off from ``ZODB``).
+
+- Claim support for Python 3.4, 3.5 and PyPy which requires
+  ``zope.app.publication`` >= 4.0.
+
+- Drop Python 2.6 support.
+
+4.0.0a1 (2013-03-03)
+--------------------
+
+- Added support for Python 3.3.
+
+- Replaced deprecated ``zope.interface.implements`` usage with equivalent
+  ``zope.interface.implementer`` decorator.
+
+- Dropped support for Python 2.4 and 2.5.
+
+
+3.16.0 (2011-01-27)
+-------------------
+
+- Added stacking of storages for layer/test level setup separation in derived
+  ZODBLayers.
+
+
+3.15.0 (2010-09-25)
+-------------------
+
+- Updated tests to run with `zope.testing >= 3.10`, requiring at least this
+  version and `zope.testrunner`.
+
+- Switch ``IErrorReportingUtility copy_to_zlog`` field to ``True``.
+
+- Using Python's `doctest` module instead of depreacted
+  `zope.testing.doctest`.
+
+
+3.14.0 (2010-04-13)
+-------------------
+
+- Made `zope.testing` an optional (test) dependency.
+
+- Removed test dependency on `zope.app.testing`.
+
+
+3.13.0 (2009-12-24)
+-------------------
+
+- Import hooks functionality from zope.component after it was moved there from
+  zope.site.
+
+- Import ISite from zope.component after it was moved there from
+  zope.location. This lifts the dependency on zope.location.
+
+- Added missing install dependency on `zope.testing`.
+
+
+3.12.0 (2009-06-20)
+-------------------
+
+- Using ``zope.processlifetime`` interfaces and implementations
+  directly instead of BBB imports from ``zope.app.appsetup``.
+
+- Got rid of depencency on ``zope.app.component``.
+
+- Got rid of test dependency on ``zope.app.security``.
+
+
+3.11 (2009-05-13)
+-----------------
+
+- Event interfaces / implementations moved to ``zope.processlifetime``,
+  version 1.0.  Depend on this package, and add BBB imports.
+
+
+3.10.1 (2009-03-31)
+-------------------
+
+- Fixed a ``DeprecationWarning`` introduced in 3.10.0.
+
+- Added doctests to long description to show up at pypi.
+
+
+3.10.0 (2009-03-19)
+-------------------
+
+- Finally deprecate the "asObject" argument of helper functions in the
+  ``zope.app.appsetup.bootstrap`` module. If your code uses any of these
+  functions, please remove the "asObject=True" argument passing anywhere,
+  because the support for that argument will be dropped soon.
+
+- Move session utility bootstrapping logic from ``zope.session`` into this
+  package. This removes a dependency from zope.session to this package.
+
+- Remove one more deprecated function.
+
+
+3.9.0 (2009-01-31)
+------------------
+
+- Use ``zope.site`` instead of ``zope.app.folder`` and
+  ``zope.app.component``.
+
+- Use ``zope.container`` instead of ``zope.app.container``.
+
+- Move error log bootstrapping logic from ``zope.error`` into this
+  package.  This removes a dependency from zope.error to this
+  package. Also added a test for bootstrapping the error log here,
+  which was missing in ``zope.error``.
+
+
+3.8.0 (2008-08-25)
+------------------
+
+- Feature: Developed an entry point that allows you to quickly bring up an
+  application instance for debugging purposes. (Implemented by Marius Gedminas
+  and Stephan Richter.)
+
+
+3.7.0 (2008-08-19)
+------------------
+
+- Added ``.product.loadConfiguration`` test-support function; loads product
+  configuration (only) from a file object, allowing test code (including
+  setup) to make use of the same configuration schema support used by normal
+  startup.
+
+
+3.6.0 (2008-07-23)
+------------------
+
+- Added additional test support functions to set the configuration for a
+  single section, and save/restore the entire configuration.
+
+
+3.5.0 (2008-06-17)
+------------------
+
+- Added helper class for supporting product configuration tests.
+
+- Added documentation for the product configuration API, with tests.
+
+
+3.4.1 (2007-09-27)
+------------------
+
+- Egg was faulty, re-released.
+
+
+3.4.0 (2007-09-25)
+------------------
+
+- Initial documented release.
+
+- Reflect changes form zope.app.error refactoring.

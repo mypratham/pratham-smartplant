@@ -1,0 +1,17 @@
+<html>
+<body>
+This template knows about the following vars:
+
+  template (the template instance):
+   ${template}
+
+  view (the associated view):
+   ${view}
+
+  context (the context of the view):
+   ${context}
+
+  request (the current request):
+   ${request}
+</body>
+</html>

@@ -1,0 +1,23 @@
+<configure xmlns="http://namespaces.zope.org/zope">
+
+  <subscriber
+      handler=".bootstrap.bootStrapSubscriber"
+      for="zope.processlifetime.IDatabaseOpened"
+      />
+
+  <subscriber
+      handler=".bootstrap.checkSecurityPolicy"
+      for="zope.processlifetime.IDatabaseOpened"
+      />
+
+  <subscriber
+      handler=".errorlog.bootStrapSubscriber"
+      for="zope.processlifetime.IDatabaseOpenedWithRoot"
+      />
+
+  <subscriber
+      handler=".session.bootStrapSubscriber"
+      for="zope.processlifetime.IDatabaseOpenedWithRoot"
+      />
+
+</configure>

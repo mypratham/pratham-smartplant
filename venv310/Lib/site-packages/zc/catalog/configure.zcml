@@ -1,0 +1,72 @@
+<configure
+    xmlns="http://namespaces.zope.org/zope"
+    xmlns:browser="http://namespaces.zope.org/browser"
+    xmlns:zcml="http://namespaces.zope.org/zcml"
+    i18n_domain="zope"
+    >
+
+  <class class=".extentcatalog.Catalog">
+    <factory
+        id="zc.catalog.extentcatalog"
+        />
+    <require
+        interface="zope.catalog.interfaces.ICatalogQuery"
+        permission="zope.Public"
+        />
+    <require
+        interface="zope.catalog.interfaces.ICatalogEdit"
+        permission="zope.ManageServices"
+        />
+    <require
+        interface="zope.container.interfaces.IContainer"
+        permission="zope.ManageServices"
+        />
+  </class>
+
+  <class class=".extentcatalog.FilterExtent">
+    <require
+        attributes="addable __iter__ __or__ __ror__ union __and__ __rand__
+                    intersection __sub__ difference __rsub__ rdifference
+                    __nonzero__ __contains__"
+        permission="zope.View"/>
+    <require
+        attributes="add remove discard clear"
+        permission="zope.ManageServices"
+        />
+  </class>
+
+  <class class=".catalogindex.ValueIndex">
+    <require
+        permission="zope.ManageServices"
+        interface="zope.catalog.interfaces.IAttributeIndex
+                   zope.index.interfaces.IStatistics"
+        set_schema="zope.catalog.interfaces.IAttributeIndex"
+        />
+  </class>
+
+  <class class=".catalogindex.SetIndex">
+    <require
+        permission="zope.ManageServices"
+        interface="zope.catalog.interfaces.IAttributeIndex
+                   zope.index.interfaces.IStatistics"
+        set_schema="zope.catalog.interfaces.IAttributeIndex"
+        />
+  </class>
+
+  <class class=".catalogindex.NormalizationWrapper">
+    <require
+        permission="zope.ManageServices"
+        interface="zope.catalog.interfaces.IAttributeIndex
+                   zope.index.interfaces.IStatistics"
+        set_schema="zope.catalog.interfaces.IAttributeIndex"
+        />
+  </class>
+
+  <class class="BTrees.Length.Length">
+    <require
+        permission="zope.ManageServices"
+        attributes="__call__"
+        />
+  </class>
+
+</configure>

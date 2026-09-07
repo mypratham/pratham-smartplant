@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<schema>
+
+  <abstracttype name="zope.product.base">
+    <!-- Poor name inherited from Zope 2.
+         This can't be changed since components refer to this in a
+         similar way as to public base classes.  Components that want
+         to work with both Zope 2 and Zope 3 need this to match the
+         existing Zope 2 name.
+         -->
+    <description>
+      Base type for component-specific configuration sections.
+
+      Specific products should implement configuration sections by
+      defining sections types that implement this abstract type and
+      using their own schema component to define meaningful settings.
+
+    </description>
+  </abstracttype>
+
+  <sectiontype name="product-config" implements="zope.product.base">
+    <description>
+    Component-specific configuration, expressed as arbitrary name-value pairs.
+    </description>
+
+    <key name="+"
+         attribute="mapping"
+         required="no"
+         />
+  </sectiontype>
+
+  <multisection type="zope.product.base" name="+"
+                attribute="product_config">
+    <description>
+      Component-specific configuration stanzas.
+
+      Products may use the &lt;product-config&gt; section type, or may supply
+      a component.xml which defines section types with their own schemas.
+
+      All sections for this multisection will be collected together into the
+      'product_config' attribute of the configuration object.
+    </description>
+  </multisection>
+
+</schema>

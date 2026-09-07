@@ -1,0 +1,14 @@
+<configure>
+  <include package="zope.component" file="meta.zcml" />
+  <include package="zope.component" />
+
+  <include package="zope.security" file="meta.zcml" />
+  <include package="zope.site" />
+  <include package="zope.componentvocabulary" />
+  <include package="zope.security" />
+  <include package="zope.authentication" />
+  <include package="zope.principalregistry" />
+ <include package="zope.traversing" />
+
+  <include package="zope.app.appsetup" />
+</configure>

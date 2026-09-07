@@ -1,0 +1,195 @@
+Metadata-Version: 2.4
+Name: zope.principalregistry
+Version: 6.0
+Summary: Global principal registry component for Zope3
+Home-page: https://github.com/zopefoundation/zope.principalregistry
+Author: Zope Foundation and Contributors
+Author-email: zope-dev@zope.dev
+License: ZPL-2.1
+Keywords: zope security authentication principal registry
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Environment :: Web Environment
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: Zope Public License
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Programming Language :: Python :: Implementation :: CPython
+Classifier: Programming Language :: Python :: Implementation :: PyPy
+Classifier: Natural Language :: English
+Classifier: Operating System :: OS Independent
+Classifier: Topic :: Internet :: WWW/HTTP
+Classifier: Framework :: Zope :: 3
+Requires-Python: >=3.9
+License-File: LICENSE.txt
+Requires-Dist: setuptools
+Requires-Dist: zope.authentication
+Requires-Dist: zope.component
+Requires-Dist: zope.interface
+Requires-Dist: zope.password
+Requires-Dist: zope.security
+Provides-Extra: test
+Requires-Dist: zope.testing; extra == "test"
+Requires-Dist: zope.testrunner>=6.4; extra == "test"
+Provides-Extra: docs
+Requires-Dist: Sphinx; extra == "docs"
+Requires-Dist: repoze.sphinx.autointerface; extra == "docs"
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: home-page
+Dynamic: keywords
+Dynamic: license
+Dynamic: license-file
+Dynamic: provides-extra
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
+
+============================
+ ``zope.principalregistry``
+============================
+
+.. image:: https://img.shields.io/pypi/v/zope.principalregistry.svg
+        :target: https://pypi.python.org/pypi/zope.principalregistry/
+        :alt: Latest release
+
+.. image:: https://img.shields.io/pypi/pyversions/zope.principalregistry.svg
+        :target: https://pypi.org/project/zope.principalregistry/
+        :alt: Supported Python versions
+
+.. image:: https://github.com/zopefoundation/zope.principalregistry/actions/workflows/tests.yml/badge.svg
+        :target: https://github.com/zopefoundation/zope.principalregistry/actions/workflows/tests.yml
+
+.. image:: https://coveralls.io/repos/github/zopefoundation/zope.principalregistry/badge.svg?branch=master
+        :target: https://coveralls.io/github/zopefoundation/zope.principalregistry?branch=master
+
+.. image:: https://readthedocs.org/projects/zopeprincipalregistry/badge/?version=latest
+        :target: https://zopeprincipalregistry.readthedocs.io/en/latest/
+        :alt: Documentation Status
+
+This package provides an authentication utility for ``zope.authentication``
+that uses a simple non-persistent principal registry. This is
+typically registered as a global utility, and it is usually configured
+in ZCML.
+
+Documentation is hosted at https://zopeprincipalregistry.readthedocs.io
+
+
+=========
+ Changes
+=========
+
+6.0 (2025-09-12)
+================
+
+- Replace ``pkg_resources`` namespace with PEP 420 native namespace.
+
+
+5.1 (2025-02-14)
+================
+
+- Add support for Python 3.12, 3.13.
+
+- Drop support for Python 3.7, 3.8.
+
+
+5.0 (2023-07-06)
+================
+
+- Drop support for Python 2.7, 3.5, 3.6.
+
+- Drop support for deprecated ``python setup.py test``.
+
+- Add support for Python 3.11.
+
+
+4.3 (2022-07-14)
+================
+
+- Drop support for Python 3.4.
+
+- Add support for Python 3.7, 3.8, 3.9, 3.10.
+
+
+4.2.0 (2017-10-01)
+==================
+
+- Fix principal and group objects registered in ZCML or directly with
+  the principalregistry being invalid under Python 2 (having byte
+  strings for ``id`` instead of text strings).
+  See https://github.com/zopefoundation/zope.principalregistry/issues/7
+
+
+4.1.0 (2017-09-04)
+==================
+
+- Add support for Python 3.5 and 3.6.
+
+- Drop support for Python 2.6 and 3.3.
+
+- Host documentation at https://zopeprincipalregistry.readthedocs.io
+
+- Reach 100% test coverage and ensure we remain there.
+
+- Test PyPy3 on Travis CI.
+
+4.0.0 (2014-12-24)
+==================
+
+- Add support for PyPy.  (PyPy3 is pending release of a fix for:
+  https://bitbucket.org/pypy/pypy/issue/1946)
+
+- Add support for Python 3.4.
+
+- Add support for testing under Travis.
+
+
+4.0.0a2 (2013-03-03)
+====================
+
+- Make sure that the password is always bytes when passed into the principal
+  registry.
+
+- Fix deprecation warnings.
+
+
+4.0.0a1 (2013-02-22)
+====================
+
+- Add support for Python 3.3.
+
+- Replace deprecated ``zope.interface.implements`` usage with equivalent
+  ``zope.interface.implementer`` decorator.
+
+- Dropd support for Python 2.4 and 2.5.
+
+
+3.7.1 (2010-09-25)
+==================
+
+- Add test extra to declare test dependency on ``zope.component [test]``.
+
+- Use Python's ``doctest`` module instead of deprecated
+  ``zope.testing.doctest``.
+
+
+3.7.0 (2009-03-14)
+==================
+
+- Remove ``zope.container`` dependency, as contained principals didn't make any
+  sense, since PrincipalRegistry never provided IContainer. Also, zope.container
+  pulls a number dependencies, that are not needed for non-persistent principal
+  registry (like, ZCML, for example).
+
+  Set ``__name__`` and ``__parent__`` by hand to provide some backward-compatibility and
+  to save a pointer to registry from principal objects.
+
+- Initial release. This package was split from zope.app.security as a part
+  of the refactoring process to provide global principal registry without extra
+  dependencies.

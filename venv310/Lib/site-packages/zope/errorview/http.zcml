@@ -1,0 +1,51 @@
+<configure
+  xmlns="http://namespaces.zope.org/zope"
+  xmlns:browser="http://namespaces.zope.org/browser">
+
+  <include package="zope.component" file="meta.zcml" />
+  <include package="zope.security" file="meta.zcml"/>
+  <include package="zope.publisher" file="meta.zcml" />
+
+  <include package="zope.component"/>
+  <include package="zope.security"/>
+  <include package="zope.publisher"/>
+
+  <view
+    factory=".http.ExceptionView"
+    for="zope.interface.common.interfaces.IException"
+    type="zope.publisher.interfaces.http.IHTTPRequest"
+    name="index.html"
+    permission="zope.Public"
+  />
+
+  <view
+    factory=".http.UnauthorizedView"
+    for="zope.security.interfaces.IUnauthorized"
+    type="zope.publisher.interfaces.http.IHTTPRequest"
+    name="index.html"
+    permission="zope.Public"
+  />
+
+  <view
+    factory=".http.TraversalExceptionView"
+    for="zope.publisher.interfaces.ITraversalException"
+    type="zope.publisher.interfaces.http.IHTTPRequest"
+    name="index.html"
+    permission="zope.Public"
+  />
+
+  <view
+    factory=".http.MethodNotAllowedView"
+    for="zope.publisher.interfaces.http.IMethodNotAllowed"
+    type="zope.publisher.interfaces.http.IHTTPRequest"
+    name="index.html"
+    permission="zope.Public"
+  />
+
+  <browser:defaultView
+    for="zope.interface.common.interfaces.IException"
+    layer="zope.publisher.interfaces.http.IHTTPRequest"
+    name="index.html"
+  />
+
+</configure>

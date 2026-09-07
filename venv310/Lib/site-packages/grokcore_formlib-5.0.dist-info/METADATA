@@ -1,0 +1,354 @@
+Metadata-Version: 2.4
+Name: grokcore.formlib
+Version: 5.0
+Summary: Grok-like configuration for zope.formlib components
+Home-page: https://github.com/zopefoundation/grokcore.formlib
+Download-URL: https://pypi.org/project/grokcore.formlib
+Author: Grok Team
+Author-email: zope-dev@zope.dev
+License: ZPL
+Classifier: Development Status :: 6 - Mature
+Classifier: Environment :: Web Environment
+Classifier: Framework :: Zope :: 3
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: Zope Public License
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Programming Language :: Python :: Implementation
+Classifier: Programming Language :: Python :: Implementation :: CPython
+Classifier: Programming Language :: Python :: Implementation :: PyPy
+Requires-Python: >=3.9
+License-File: LICENSE.txt
+Requires-Dist: setuptools
+Requires-Dist: grokcore.component>=2.1
+Requires-Dist: grokcore.content>=1.2
+Requires-Dist: grokcore.security>=1.5
+Requires-Dist: grokcore.view>=2.0
+Requires-Dist: martian>=0.13
+Requires-Dist: pytz
+Requires-Dist: zope.container
+Requires-Dist: zope.event
+Requires-Dist: zope.formlib>=4.3.0
+Requires-Dist: zope.interface
+Requires-Dist: zope.lifecycleevent
+Requires-Dist: zope.publisher
+Requires-Dist: zope.schema
+Provides-Extra: test
+Requires-Dist: zope.app.wsgi[test]; extra == "test"
+Requires-Dist: zope.configuration; extra == "test"
+Requires-Dist: zope.testbrowser; extra == "test"
+Requires-Dist: zope.testing; extra == "test"
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: download-url
+Dynamic: home-page
+Dynamic: license
+Dynamic: license-file
+Dynamic: provides-extra
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
+
+This package provides support for writing forms using the Zope Formlib
+library and registering them directly in Python (without ZCML).
+
+.. contents::
+
+Setting up ``grokcore.formlib``
+===============================
+
+This package is essentially set up like the `grokcore.component`_
+package, please refer to its documentation for details.  The
+additional ZCML lines you will need are::
+
+  <include package="grokcore.formlib" file="meta.zcml" />
+  <include package="grokcore.formlib" />
+
+Put the first line somewhere near the top of your root ZCML file.
+
+Examples
+========
+
+We need an example interface::
+
+  from zope import interface, schema
+
+  class IMammoth(interface.Interface):
+
+     name = schema.TextLine(title=u"Name")
+     age = schema.Int(title=u"Age", min=0)
+
+Edit forms
+----------
+
+You can provide an edit form for ``IMammoth`` like this::
+
+
+  from grokcore import formlib
+
+  class Edit(formlib.EditForm):
+
+     formlib.context(IMammoth)
+
+
+If your content object is defined in the same Python file and
+implements ``grokcore.formlib.IContext``, then it will be the default
+context for your form.
+
+
+Display forms
+-------------
+
+Display forms are as easy as edit forms::
+
+  class Index(formlib.DisplayForm):
+
+     formlib.context(IMammoth)
+
+
+Generic forms
+-------------
+
+
+You can build more generic forms, providing your own actions for a form::
+
+
+   class ISearch(interface.Interface):
+
+       search = schema.TextLine(title=u"Text")
+
+
+After this, you define your form. It's applied to a mammoth, but uses
+the ``ISearch`` interface to generate fields::
+
+   class Search(formlib.Form):
+
+       formlib.context(IMammoth)
+
+       form_fields = formlib.Fields(ISearch)
+
+       def update(self):
+           # Default search results are None
+           self.search_result = None
+
+       @formlib.action(u"Search")
+       def search(self, text):
+           self.search_result = 'something found with text'
+
+
+
+Create a custom template ``search.pt`` to render your form (in a
+directory ``modulename_templates``).
+
+
+Add forms
+---------
+
+Add forms work like generic forms, you have to provide your action
+``Add``.
+
+Customization
+-------------
+
+Since a Grok form is a Grok view, all configuration directives and
+attributes available on a Grok view are available as well on a Grok
+form.
+
+This means that you can customize your form by associating a template
+with it. The template is responsible for displaying widgets and
+actions. The API to access them is the same as on a Zope Formlib form.
+
+You can't customize a form by providing a ``render()`` method on it,
+but you can still use the ``update()`` method if you want.
+
+Please refer to the documentation of `grokcore.view`_ for more
+details.
+
+API Overview
+============
+
+Base classes
+------------
+
+``EditForm``
+  Extends ``Form`` to create an edit form for your content.
+
+``DisplayForm``
+  Creates simple display forms.
+
+``Form``
+  Is a base class to create generic forms.
+
+``AddForm``
+  Extends ``Form`` to create add forms. You have to provide the *add*
+  action which is going to create the new object.
+
+Decorators
+----------
+
+``action``
+  Is a decorator to create an action on the form. Your action only has
+  to accept values from the form as parameters.
+
+Helpers
+-------
+
+``AutoFields``
+  Create form fields from the given context. If the context is an
+  interface, Zope fields defined in that interface are going to be
+  used to build form fields.
+  If the context is a regular object, Zope fields of all implemented
+  interfaces of that object are going to used to build form fields.
+
+``Fields``
+  Create and reorder fields on the form.
+
+
+Additionally, the ``grokcore.formlib`` package exposes the
+`grokcore.component`_, `grokcore.security`_ and `grokcore.view`_ APIs.
+
+.. _grokcore.component: https://pypi.org/project/grokcore.component
+.. _grokcore.formlib: https://pypi.org/project/grokcore.formlib
+.. _grokcore.security: https://pypi.org/project/grokcore.security
+.. _grokcore.view: https://pypi.org/project/grokcore.view
+
+
+
+Changes
+=======
+
+5.0 (2025-06-18)
+----------------
+
+- Replace ``pkg_resources`` namespace with PEP 420 native namespace.
+
+
+4.1 (2025-06-04)
+----------------
+
+- Add support for Python 3.12, 3.13.
+
+- Drop support for Python 3.7, 3.8.
+
+
+4.0 (2023-08-28)
+----------------
+
+- Add support for Python 3.7, 3.8, 3.9, 3.10, 3.11.
+
+- Drop support for Python 2.7, 3.4, 3.5, 3.6.
+
+
+3.0.1 (2018-01-12)
+------------------
+
+- Rearrange tests such that Travis CI can pick up all functional tests too.
+
+3.0.0 (2018-01-04)
+------------------
+
+- Python 3 compatibility.
+
+1.11 (2016-06-20)
+-----------------
+
+- ``grok.action`` will now trigger validation errors
+  ``RequiredMissing`` for required fields that not present at all in
+  the request.
+
+1.10.1 (2016-02-15)
+-------------------
+
+- Update tests.
+
+1.10 (2015-04-01)
+-----------------
+
+- Forms now notify the ObjectEditedEvent instead of the ObjectModifiedEvent.
+
+1.10a1 (2013-11-22)
+-------------------
+
+- Add compatibility for CSRF protection feature in zope.formlib.
+
+1.9 (2012-05-01)
+----------------
+
+- Nothing changed yet.
+
+1.8 (2010-11-03)
+----------------
+
+- The context directive now has its own default computation.
+
+1.7 (2010-11-01)
+----------------
+
+- Update version requirements for martian, grokcore.component, grokcore.security
+  grokcore.view.
+
+1.6 (2010-10-18)
+----------------
+
+- Made package comply to zope.org repository policy.
+
+- Update functional tests to zope.app.wsgi Browser instead of zope.app.testing
+  one.
+
+- Don't depend anymore on zope.app.zcmlfiles for tests.
+
+1.5 (2009-12-13)
+----------------
+
+- Use zope.container instead of zope.app.container (in tests and in the
+  configure.zcml).
+
+- Fixed up missing dependencies and splitted regular and test dependencies.
+
+
+1.4 (2009-09-17)
+----------------
+
+* Reflect the changes in ``grokcore.view`` 1.12 where ``View`` and ``CodeView``
+  become a single ``View`` again. This reverts to the View situation of
+  ``grokcore.formlib`` 1.1.
+
+1.3 (2009-09-16)
+----------------
+
+* Remove the reference to the grok.View permission that is no longer in
+  grokcore.security 1.2
+
+* Use 1.0b1 versions.cfg in Grok's release info instead of a local
+  copy; a local copy for all grokcore packages is just too hard to
+  maintain.
+
+1.2 (2009-07-20)
+----------------
+
+* Adapted tests to the grokcore.view split of View and CodeView.
+
+* Fixed forms to use self.template.render() directly instead of using a
+  removed private method from grokcore.view.
+
+* Add grok.View permissions for functional tests.
+
+1.1 (2009-01-07)
+----------------
+
+* Have GrokForm define an empty actions attribute by default, in order
+  for "action-less" forms to work easily.
+
+1.0 (2008-09-25)
+----------------
+
+* Created ``grokcore.formlib`` in July 2008 by factoring
+  ``zope.formlib``-based components, grokkers and directives out of
+  Grok.

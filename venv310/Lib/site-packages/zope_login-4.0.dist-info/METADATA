@@ -1,0 +1,144 @@
+Metadata-Version: 2.4
+Name: zope.login
+Version: 4.0
+Summary: Login helpers for zope.publisher / authentication.
+Home-page: http://github.com/zopefoundation/zope.login
+Author: Zope Foundation and Contributors
+Author-email: zope-dev@zope.dev
+License: ZPL-2.1
+Keywords: zope login authentication
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Environment :: Web Environment
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: Zope Public License
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Programming Language :: Python :: Implementation :: CPython
+Classifier: Programming Language :: Python :: Implementation :: PyPy
+Classifier: Natural Language :: English
+Classifier: Operating System :: OS Independent
+Classifier: Topic :: Internet :: WWW/HTTP
+Classifier: Framework :: Zope :: 3
+Requires-Python: >=3.9
+License-File: LICENSE.txt
+Requires-Dist: setuptools
+Requires-Dist: zope.authentication
+Requires-Dist: zope.component
+Requires-Dist: zope.interface
+Requires-Dist: zope.publisher>=4.0.0
+Provides-Extra: test
+Requires-Dist: zope.testrunner>=6.4; extra == "test"
+Requires-Dist: zope.testing; extra == "test"
+Provides-Extra: docs
+Requires-Dist: Sphinx; extra == "docs"
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: home-page
+Dynamic: keywords
+Dynamic: license
+Dynamic: license-file
+Dynamic: provides-extra
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
+
+================
+ ``zope.login``
+================
+
+.. image:: https://img.shields.io/pypi/v/zope.login.svg
+        :target: https://pypi.python.org/pypi/zope.login/
+        :alt: Latest release
+
+.. image:: https://img.shields.io/pypi/pyversions/zope.login.svg
+        :target: https://pypi.org/project/zope.login/
+        :alt: Supported Python versions
+
+.. image:: https://github.com/zopefoundation/zope.login/actions/workflows/tests.yml/badge.svg
+        :target: https://github.com/zopefoundation/zope.login/actions/workflows/tests.yml
+
+.. image:: https://coveralls.io/repos/github/zopefoundation/zope.login/badge.svg?branch=master
+        :target: https://coveralls.io/github/zopefoundation/zope.login?branch=master
+
+.. image:: https://readthedocs.org/projects/zopelogin/badge/?version=latest
+        :target: https://zopelogin.readthedocs.io/en/latest/
+        :alt: Documentation Status
+
+This package provides login helpers for `zope.publisher
+<https://zopepublisher.readethedocs.io/>`_ based on the concepts of
+`zope.authentication <https://zopeauthentication.readthedocs.io>`_.
+This includes support for HTTP password logins and FTP logins.
+
+Documentation is hosted at https://zopelogin.readthedocs.io
+
+
+=========
+ Changes
+=========
+
+4.0 (2025-09-12)
+================
+
+- Replace ``pkg_resources`` namespace with PEP 420 native namespace.
+
+
+3.1 (2025-02-14)
+================
+
+- Add support for Python 3.12, 3.13.
+
+- Drop support for Python 3.7, 3.8.
+
+
+3.0 (2023-08-23)
+================
+
+- Drop support for Python 2.7, 3.5, 3.6.
+
+- Add support for Python 3.11.
+
+
+2.2 (2022-04-29)
+================
+
+- Add support for Python 3.7, 3.8, 3.9, 3.10.
+
+
+2.1.0 (2017-09-01)
+==================
+
+- Add support for Python 3.5 and 3.6.
+
+- Drop support for Python 2.6 and 3.3.
+
+- Host documentation at https://zopelogin.readthedocs.io/
+
+2.0.0 (2014-12-24)
+==================
+
+- Add support for PyPy and PyPy3.
+
+- Add support for Python 3.4.
+
+- Add support for testing on Travis.
+
+- Add support for Python 3.3.
+
+- Replace deprecated ``zope.interface.implements`` usage with equivalent
+  ``zope.interface.implementer`` decorator.
+
+- Drop support for Python 2.4 and 2.5.
+
+
+1.0.0 (2009-12-31)
+==================
+
+- Extracted BasicAuthAdapter and FTPAuth adapters from zope.publisher. They
+  should have never gone into that package in the first place.

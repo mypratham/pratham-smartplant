@@ -1,0 +1,15 @@
+<html xmlns:metal="http://xml.zope.org/namespaces/metal">
+<body>
+  <p metal:define-macro="hello">
+    Hi there from macro user!
+  </p>
+  <div metal:use-macro="template.macros['hello']">
+    Fill this
+  </div>
+
+  <div metal:use-macro="path: context/@@macromaster/template/macros/hello">
+    <b metal:fill-slot="name">user slot</b>
+    Fill this too
+  </div>
+</body>
+</html>

@@ -1,0 +1,108 @@
+<configure
+    xmlns="http://namespaces.zope.org/zope"
+    xmlns:zcml="http://namespaces.zope.org/zcml"
+    >
+
+  <include package="zope.component" file="meta.zcml" />
+
+  <utility
+      name="Plain Text"
+      provides=".interfaces.IMatchingPasswordManager"
+      factory=".password.PlainTextPasswordManager"
+      />
+
+  <utility
+      name="MD5"
+      provides=".interfaces.IMatchingPasswordManager"
+      factory=".password.MD5PasswordManager"
+      />
+
+  <utility
+      name="SMD5"
+      provides=".interfaces.IMatchingPasswordManager"
+      factory=".password.SMD5PasswordManager"
+      />
+
+  <utility
+      name="SHA1"
+      provides=".interfaces.IMatchingPasswordManager"
+      factory=".password.SHA1PasswordManager"
+      />
+
+  <utility
+      name="SSHA"
+      provides=".interfaces.IMatchingPasswordManager"
+      factory=".password.SSHAPasswordManager"
+      />
+
+  <utility
+      name="MySQL"
+      provides=".interfaces.IMatchingPasswordManager"
+      factory=".legacy.MySQLPasswordManager"
+      />
+
+  <configure zcml:condition="installed bcrypt">
+    <utility
+       name="BCRYPT"
+       provides=".interfaces.IMatchingPasswordManager"
+       factory=".password.BCRYPTPasswordManager"
+       />
+    <!--
+    Also install it under the same name as z3c.bcrypt does
+    for compatibility with that library.
+    -->
+    <utility
+       zcml:condition="not-installed z3c.bcrypt"
+       name="bcrypt"
+       provides=".interfaces.IMatchingPasswordManager"
+       factory=".password.BCRYPTPasswordManager"
+       />
+    <utility
+       name="BCRYPTKDF"
+       provides=".interfaces.IMatchingPasswordManager"
+       factory=".password.BCRYPTKDFPasswordManager"
+       />
+  </configure>
+
+  <utility
+      component=".vocabulary.PasswordManagerNamesVocabulary"
+      provides="zope.schema.interfaces.IVocabularyFactory"
+      name="Password Manager Names"
+      />
+
+  <configure zcml:condition="installed zope.security">
+    <include package="zope.security" file="meta.zcml" />
+
+    <class class=".password.PlainTextPasswordManager">
+      <allow interface=".interfaces.IMatchingPasswordManager" />
+    </class>
+
+    <class class=".password.MD5PasswordManager">
+      <allow interface=".interfaces.IMatchingPasswordManager" />
+    </class>
+
+    <class class=".password.SMD5PasswordManager">
+      <allow interface=".interfaces.IMatchingPasswordManager" />
+    </class>
+
+    <class class=".password.SHA1PasswordManager">
+      <allow interface=".interfaces.IMatchingPasswordManager" />
+    </class>
+
+    <class class=".password.SSHAPasswordManager">
+      <allow interface=".interfaces.IMatchingPasswordManager" />
+    </class>
+
+    <class class=".legacy.MySQLPasswordManager">
+      <allow interface=".interfaces.IMatchingPasswordManager" />
+    </class>
+
+    <configure zcml:condition="installed bcrypt">
+      <class class=".password.BCRYPTPasswordManager">
+        <allow interface=".interfaces.IMatchingPasswordManager" />
+      </class>
+    </configure>
+
+  </configure>
+
+</configure>

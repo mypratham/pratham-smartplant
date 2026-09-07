@@ -1,0 +1,11 @@
+<html xmlns:i18n="http://xml.zope.org/namespaces/i18n"
+      xmlns:tal="http://xml.zope.org/namespaces/tal"
+      i18n:domain="grokcore-chameleon-tests">
+<body>
+  <h1>Menu</h1>
+  <ol>
+    <li i18n:translate="">Deepfried breaded veal cutlets</li>
+    <li>Variants: <tal:v i18n:translate="" tal:content="view.variants"></tal:v></li>
+  </ol>
+</body>
+</html>

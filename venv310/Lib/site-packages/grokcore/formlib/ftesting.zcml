@@ -1,0 +1,21 @@
+<configure
+   xmlns="http://namespaces.zope.org/zope"
+   xmlns:grok="http://namespaces.zope.org/grok"
+   xmlns:browser="http://namespaces.zope.org/browser"
+   i18n_domain="grok"
+   package="grokcore.formlib">
+
+  <include package="zope.app.wsgi" file="ftesting.zcml" />
+
+  <include package="grokcore.formlib" file="meta.zcml" />
+  <grok:grok package="grokcore.formlib.testing" />
+
+  <include package="grokcore.formlib" />
+  <grok:grok package="grokcore.formlib.tests.functional" />
+
+  <browser:defaultView
+      for="grokcore.component.interfaces.IContext"
+      name="index"
+      />
+
+</configure>

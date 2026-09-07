@@ -1,0 +1,23 @@
+<configure xmlns="http://namespaces.zope.org/zope">
+
+  <include package="zope.component" file="meta.zcml" />
+
+  <adapter
+      factory=".session.ClientId"
+      provides=".interfaces.IClientId"
+      permission="zope.Public"
+      />
+
+  <adapter
+      factory=".session.Session"
+      provides=".interfaces.ISession"
+      permission="zope.Public"
+      />
+
+  <adapter
+      factory=".session.Session"
+      provides="zope.traversing.interfaces.IPathAdapter"
+      name="session"
+      />
+
+</configure>

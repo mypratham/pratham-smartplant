@@ -1,0 +1,6 @@
+<configure xmlns="http://namespaces.zope.org/zope">
+
+  <!-- Include zope.app.appsetup so there is an Application in our DB -->
+  <include package="zope.app.appsetup" file="ftesting.zcml" />
+
+</configure>
