@@ -9,7 +9,7 @@ import requests
 from amqtt.broker import Broker
 from amqtt.client import MQTTClient
 from amqtt.mqtt.constants import QOS_1
-
+from dotenv import load_dotenv
 
 # =========================================================
 # PRATHAM PLANT AI BRAIN
@@ -37,10 +37,13 @@ logger = logging.getLogger("PRATHAM-AI")
 # Gemini API key environment variable se aayegi.
 # Code me actual API key mat rakhein.
 
-GEMINI_API_KEY = os.environ.get(
-    "GEMINI_API_KEY",
-    "AQ.Ab8RN6IPkUk-ahkm5dGBWrcpW7u6aHue1_macOe7ZEFcepQ_LQ"
-)
+load_dotenv()
+
+# Gemini API Key (.env file se fetch hogi)
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+if not GEMINI_API_KEY:
+    raise ValueError("GEMINI_API_KEY nahi mila! Kripya .env file check karein.")
 
 GEMINI_MODEL = "gemini-3.6-flash"
 
