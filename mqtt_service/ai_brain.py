@@ -11,6 +11,7 @@ from amqtt.broker import Broker
 from amqtt.client import MQTTClient
 from amqtt.mqtt.constants import QOS_1
 
+
 # =========================================================
 # PRATHAM PLANT AI BRAIN
 # AMQTT + DJANGO + GEMINI REST API + ESP32
@@ -41,10 +42,10 @@ logger = logging.getLogger("PRATHAM-AI")
 #
 # Code me actual API key mat rakho.
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-
-if not GEMINI_API_KEY:
-    raise ValueError("GEMINI_API_KEY nahi mila! Kripya .env file check karein.")
+GEMINI_API_KEY = os.environ.get(
+    "GEMINI_API_KEY",
+    "AQ.Ab8RN6IPkUk-ahkm5dGBWrcpW7u6aHue1_macOe7ZEFcepQ_LQ"
+)
 
 GEMINI_MODEL = os.environ.get(
     "GEMINI_MODEL",
