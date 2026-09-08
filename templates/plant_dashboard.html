@@ -1,265 +1,267 @@
-HTML_TOP = """<!DOCTYPE html>
+HTML_TOP = """
+<!DOCTYPE html>
 <html>
+
 <head>
 
-<meta name="viewport"
-content="width=device-width,initial-scale=1">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
 
-<title>Pratham Plant Pro</title>
+    <title>Pratham Plant Pro</title>
 
-<style>
+    <style>
+        :root {
+            --bg-color: #0b131f;
+            --card-bg: #131d2e;
+            --card-border: #1e293b;
+            --accent-green: #10b981;
+            --accent-cyan: #06b6d4;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --btn-primary: #059669;
+            --btn-primary-hover: #047857;
+            --btn-warning: #d97706;
+            --btn-danger: #ef4444;
+        }
 
-:root {
-  --bg-color:#0b131f;
-  --card-bg:#131d2e;
-  --card-border:#1e293b;
-  --accent-green:#10b981;
-  --accent-cyan:#06b6d4;
-  --text-main:#f8fafc;
-  --text-muted:#94a3b8;
-  --btn-primary:#059669;
-  --btn-primary-hover:#047857;
-  --btn-warning:#d97706;
-  --btn-danger:#ef4444;
-}
+        * {
+            box-sizing: border-box
+        }
 
-*{box-sizing:border-box}
+        body {
+            font-family: -apple-system, BlinkMacSystemFont,
+                "Segoe UI", Roboto, sans-serif;
+            background: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 16px
+        }
 
-body{
-font-family:-apple-system,BlinkMacSystemFont,
-"Segoe UI",Roboto,sans-serif;
-background:var(--bg-color);
-color:var(--text-main);
-margin:0;
-padding:16px
-}
+        .container {
+            max-width: 440px;
+            margin: auto
+        }
 
-.container{
-max-width:440px;
-margin:auto
-}
+        .card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, .3);
+            border: 1px solid var(--card-border)
+        }
 
-.card{
-background:var(--card-bg);
-border-radius:16px;
-padding:20px;
-margin-bottom:16px;
-box-shadow:0 10px 25px -5px rgba(0,0,0,.3);
-border:1px solid var(--card-border)
-}
+        h2 {
+            text-align: center;
+            color: var(--accent-green);
+            font-size: 24px;
+            margin: 10px 0 20px;
+            font-weight: 700
+        }
 
-h2{
-text-align:center;
-color:var(--accent-green);
-font-size:24px;
-margin:10px 0 20px;
-font-weight:700
-}
+        h3 {
+            color: var(--accent-cyan);
+            font-size: 16px;
+            margin-top: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            border-bottom: 1px solid var(--card-border);
+            padding-bottom: 8px
+        }
 
-h3{
-color:var(--accent-cyan);
-font-size:16px;
-margin-top:0;
-display:flex;
-align-items:center;
-gap:8px;
-font-weight:600;
-border-bottom:1px solid var(--card-border);
-padding-bottom:8px
-}
+        button {
+            background: var(--btn-primary);
+            color: #fff;
+            border: 0;
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-weight: 600;
+            width: 100%;
+            margin-top: 10px;
+            cursor: pointer;
+            font-size: 14px
+        }
 
-button{
-background:var(--btn-primary);
-color:#fff;
-border:0;
-padding:12px 16px;
-border-radius:12px;
-font-weight:600;
-width:100%;
-margin-top:10px;
-cursor:pointer;
-font-size:14px
-}
+        .btn-danger {
+            background: var(--btn-danger)
+        }
 
-.btn-danger{
-background:var(--btn-danger)
-}
+        .btn-warning {
+            background: var(--btn-warning)
+        }
 
-.btn-warning{
-background:var(--btn-warning)
-}
+        .btn-del {
+            background: var(--btn-danger);
+            padding: 6px 10px;
+            font-size: 11px;
+            width: auto;
+            margin: 0;
+            border-radius: 8px
+        }
 
-.btn-del{
-background:var(--btn-danger);
-padding:6px 10px;
-font-size:11px;
-width:auto;
-margin:0;
-border-radius:8px
-}
+        input,
+        select {
+            background: #080d16;
+            color: var(--text-main);
+            border: 1px solid #283548;
+            padding: 12px;
+            margin: 6px 0 12px;
+            border-radius: 10px;
+            width: 100%;
+            font-size: 14px;
+            outline: none
+        }
 
-input,select{
-background:#080d16;
-color:var(--text-main);
-border:1px solid #283548;
-padding:12px;
-margin:6px 0 12px;
-border-radius:10px;
-width:100%;
-font-size:14px;
-outline:none
-}
+        .status-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 10px
+        }
 
-.status-grid{
-display:grid;
-grid-template-columns:1fr 1fr;
-gap:12px;
-margin-top:10px
-}
+        .status-box {
+            background: #080d16;
+            border: 1px solid var(--card-border);
+            padding: 14px;
+            border-radius: 12px;
+            font-size: 13px
+        }
 
-.status-box{
-background:#080d16;
-border:1px solid var(--card-border);
-padding:14px;
-border-radius:12px;
-font-size:13px
-}
+        .status-box b {
+            color: var(--accent-cyan);
+            display: block;
+            margin-bottom: 4px;
+            font-size: 11px
+        }
 
-.status-box b{
-color:var(--accent-cyan);
-display:block;
-margin-bottom:4px;
-font-size:11px
-}
+        .row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px
+        }
 
-.row{
-display:flex;
-justify-content:space-between;
-align-items:center;
-margin-bottom:8px
-}
+        .action-item {
+            background: #080d16;
+            padding: 14px;
+            border-radius: 12px;
+            margin-bottom: 10px;
+            border: 1px solid var(--card-border)
+        }
 
-.action-item{
-background:#080d16;
-padding:14px;
-border-radius:12px;
-margin-bottom:10px;
-border:1px solid var(--card-border)
-}
+        .rem-card {
+            background: #080d16;
+            border-left: 4px solid var(--accent-green);
+            padding: 14px;
+            margin-bottom: 12px;
+            border-radius: 12px;
+            border-top: 1px solid var(--card-border);
+            border-right: 1px solid var(--card-border);
+            border-bottom: 1px solid var(--card-border)
+        }
 
-.rem-card{
-background:#080d16;
-border-left:4px solid var(--accent-green);
-padding:14px;
-margin-bottom:12px;
-border-radius:12px;
-border-top:1px solid var(--card-border);
-border-right:1px solid var(--card-border);
-border-bottom:1px solid var(--card-border)
-}
+        .rem-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px
+        }
 
-.rem-header{
-display:flex;
-justify-content:space-between;
-align-items:center;
-margin-bottom:8px
-}
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 48px;
+            height: 24px
+        }
 
-.switch{
-position:relative;
-display:inline-block;
-width:48px;
-height:24px
-}
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0
+        }
 
-.switch input{
-opacity:0;
-width:0;
-height:0
-}
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #283548;
+            border-radius: 24px
+        }
 
-.slider{
-position:absolute;
-cursor:pointer;
-top:0;
-left:0;
-right:0;
-bottom:0;
-background:#283548;
-border-radius:24px
-}
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background: white;
+            border-radius: 50%
+        }
 
-.slider:before{
-position:absolute;
-content:"";
-height:18px;
-width:18px;
-left:3px;
-bottom:3px;
-background:white;
-border-radius:50%
-}
+        input:checked+.slider {
+            background-color: var(--accent-green)
+        }
 
-input:checked+.slider{
-background-color:var(--accent-green)
-}
+        input:checked+.slider:before {
+            transform: translateX(24px)
+        }
 
-input:checked+.slider:before{
-transform:translateX(24px)
-}
+        .power-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #080d16;
+            padding: 12px 16px;
+            border-radius: 12px;
+            margin-top: 8px;
+            border: 1px solid var(--card-border)
+        }
+    </style>
 
-.power-row{
-display:flex;
-justify-content:space-between;
-align-items:center;
-background:#080d16;
-padding:12px 16px;
-border-radius:12px;
-margin-top:8px;
-border:1px solid var(--card-border)
-}
+    <script>
 
-</style>
+        function api(path, options = {}) {
 
-<script>
+            options.headers = options.headers || {};
 
-function api(path,options={}){
+            options.headers["Content-Type"] = "application/json";
 
-options.headers=options.headers||{};
+            return fetch(path, options)
+                .then(async r => {
 
-options.headers["Content-Type"]="application/json";
+                    let d = {};
 
-return fetch(path,options)
-.then(async r=>{
+                    try {
+                        d = await r.json();
+                    } catch (e) { }
 
-let d={};
+                    if (!r.ok) {
+                        throw new Error(
+                            d.message ||
+                            d.reply ||
+                            "Backend error " + r.status
+                        );
+                    }
 
-try{
-d=await r.json();
-}catch(e){}
+                    return d;
 
-if(!r.ok){
-throw new Error(
-d.message ||
-d.reply ||
-"Backend error "+r.status
-);
-}
+                });
 
-return d;
-
-});
-
-}
+        }
 
 
-function addActionCard(id){
+        function addActionCard(id) {
 
-document.getElementById(id)
-.insertAdjacentHTML(
-"beforeend",
+            document.getElementById(id)
+                .insertAdjacentHTML(
+                    "beforeend",
 
-`<div class="action-item">
+                    `<div class="action-item">
 
 <div class="row">
 <b>Action Item</b>
@@ -298,84 +300,84 @@ Expression:
 <input class="act-expr" value="happy">
 
 </div>`
-);
+                );
 
-}
-
-
-function collectTouch(id){
-
-let a=[];
-
-document
-.querySelectorAll("#"+id+" .action-item")
-.forEach(c=>{
-
-a.push({
-
-type:
-c.querySelector(".act-type").value,
-
-value:
-c.querySelector(".act-val").value,
-
-text:
-c.querySelector(".act-txt").value,
-
-expr:
-c.querySelector(".act-expr").value
-
-});
-
-});
-
-return a;
-
-}
+        }
 
 
-function saveTouch(){
+        function collectTouch(id) {
 
-let data={
+            let a = [];
 
-single:
-collectTouch("single-touch-list"),
+            document
+                .querySelectorAll("#" + id + " .action-item")
+                .forEach(c => {
 
-double:
-collectTouch("double-touch-list")
+                    a.push({
 
-};
+                        type:
+                            c.querySelector(".act-type").value,
 
+                        value:
+                            c.querySelector(".act-val").value,
 
-api(
-"/save-touch",
-{
-method:"POST",
-body:JSON.stringify(data)
-}
-)
-.then(()=>{
+                        text:
+                            c.querySelector(".act-txt").value,
 
-alert(
-"Touch Configurations Saved!"
-);
+                        expr:
+                            c.querySelector(".act-expr").value
 
-})
-.catch(e=>alert(e.message));
+                    });
 
-}
+                });
+
+            return a;
+
+        }
 
 
-function addReminder(){
+        function saveTouch() {
 
-let d=new Date();
+            let data = {
 
-document
-.getElementById("rems")
-.insertAdjacentHTML(
-"beforeend",
+                single:
+                    collectTouch("single-touch-list"),
 
-`<div class="rem-card">
+                double:
+                    collectTouch("double-touch-list")
+
+            };
+
+
+            api(
+                "/save-touch",
+                {
+                    method: "POST",
+                    body: JSON.stringify(data)
+                }
+            )
+                .then(() => {
+
+                    alert(
+                        "Touch Configurations Saved!"
+                    );
+
+                })
+                .catch(e => alert(e.message));
+
+        }
+
+
+        function addReminder() {
+
+            let d = new Date();
+
+            document
+                .getElementById("rems")
+                .insertAdjacentHTML(
+                    "beforeend",
+
+                    `<div class="rem-card">
 
 <div class="rem-header">
 <b>New Reminder</b>
@@ -398,7 +400,7 @@ value="${d.getFullYear()}">
 
 <input class="smo"
 type="number"
-value="${d.getMonth()+1}">
+value="${d.getMonth() + 1}">
 
 <input class="sd"
 type="number"
@@ -416,7 +418,7 @@ value="${d.getFullYear()}">
 
 <input class="emo"
 type="number"
-value="${d.getMonth()+1}">
+value="${d.getMonth() + 1}">
 
 <input class="ed"
 type="number"
@@ -475,343 +477,343 @@ checked>
 </div>
 
 </div>`
-);
+                );
 
-}
+        }
 
 
-function saveReminders(){
+        function saveReminders() {
 
-let a=[];
+            let a = [];
 
-document
-.querySelectorAll(".rem-card")
-.forEach(c=>{
+            document
+                .querySelectorAll(".rem-card")
+                .forEach(c => {
 
-a.push({
+                    a.push({
 
-start_year:
-+c.querySelector(".sy").value,
+                        start_year:
+                            +c.querySelector(".sy").value,
 
-start_month:
-+c.querySelector(".smo").value,
+                        start_month:
+                            +c.querySelector(".smo").value,
 
-start_day:
-+c.querySelector(".sd").value,
+                        start_day:
+                            +c.querySelector(".sd").value,
 
-end_year:
-+c.querySelector(".ey").value,
+                        end_year:
+                            +c.querySelector(".ey").value,
 
-end_month:
-+c.querySelector(".emo").value,
+                        end_month:
+                            +c.querySelector(".emo").value,
 
-end_day:
-+c.querySelector(".ed").value,
+                        end_day:
+                            +c.querySelector(".ed").value,
 
-hour:
-+c.querySelector(".rh").value,
+                        hour:
+                            +c.querySelector(".rh").value,
 
-minute:
-+c.querySelector(".rm").value,
+                        minute:
+                            +c.querySelector(".rm").value,
 
-task:
-c.querySelector(".rt").value,
+                        task:
+                            c.querySelector(".rt").value,
 
-track:
-+c.querySelector(".rk").value,
+                        track:
+                            +c.querySelector(".rk").value,
 
-duration:
-+c.querySelector(".rdu").value,
+                        duration:
+                            +c.querySelector(".rdu").value,
 
-active:
-c.querySelector(".ra").checked
+                        active:
+                            c.querySelector(".ra").checked
 
-});
+                    });
 
-});
+                });
 
 
-api(
-"/save-reminders",
-{
-method:"POST",
-body:JSON.stringify(a)
-}
-)
-.then(()=>{
+            api(
+                "/save-reminders",
+                {
+                    method: "POST",
+                    body: JSON.stringify(a)
+                }
+            )
+                .then(() => {
 
-alert(
-"Reminders Saved!"
-);
+                    alert(
+                        "Reminders Saved!"
+                    );
 
-})
-.catch(e=>alert(e.message));
+                })
+                .catch(e => alert(e.message));
 
-}
+        }
 
 
-function saveCfg(){
+        function saveCfg() {
 
-let data={
+            let data = {
 
-ssid:
-document.getElementById("s").value,
+                ssid:
+                    document.getElementById("s").value,
 
-pass:
-document.getElementById("p").value,
+                pass:
+                    document.getElementById("p").value,
 
-mypratham_token:
-document.getElementById("mp").value,
+                mypratham_token:
+                    document.getElementById("mp").value,
 
-ai_token:
-document.getElementById("ai").value
+                ai_token:
+                    document.getElementById("ai").value
 
-};
+            };
 
 
-api(
-"/save-config",
-{
-method:"POST",
-body:JSON.stringify(data)
-}
-)
-.then(()=>{
+            api(
+                "/save-config",
+                {
+                    method: "POST",
+                    body: JSON.stringify(data)
+                }
+            )
+                .then(() => {
 
-alert(
-"Config Saved! Reboot device."
-);
+                    alert(
+                        "Config Saved! Reboot device."
+                    );
 
-})
-.catch(e=>alert(e.message));
+                })
+                .catch(e => alert(e.message));
 
-}
+        }
 
 
-function restartESP(){
+        function restartESP() {
 
-if(
-!confirm("Restart Device?")
-)return;
+            if (
+                !confirm("Restart Device?")
+            ) return;
 
 
-api(
-"/restart",
-{
-method:"POST"
-}
-)
-.then(()=>{
+            api(
+                "/restart",
+                {
+                    method: "POST"
+                }
+            )
+                .then(() => {
 
-alert("Restarting...");
+                    alert("Restarting...");
 
-})
-.catch(e=>alert(e.message));
+                })
+                .catch(e => alert(e.message));
 
-}
+        }
 
 
-function powerToggle(){
+        function powerToggle() {
 
-api(
-"/power-toggle",
-{
-method:"POST"
-}
-)
-.then(d=>{
+            api(
+                "/power-toggle",
+                {
+                    method: "POST"
+                }
+            )
+                .then(d => {
 
-location.reload();
+                    location.reload();
 
-})
-.catch(e=>alert(e.message));
+                })
+                .catch(e => alert(e.message));
 
-}
+        }
 
 
-function sendAIChat(){
+        function sendAIChat() {
 
-let i=
-document.getElementById("ai-msg");
+            let i =
+                document.getElementById("ai-msg");
 
-let msg=i.value.trim();
+            let msg = i.value.trim();
 
-if(!msg)return;
+            if (!msg) return;
 
 
-let b=
-document.getElementById(
-"ai-chat-box"
-);
+            let b =
+                document.getElementById(
+                    "ai-chat-box"
+                );
 
 
-b.innerHTML+=
-'<div style="background:#080d16;padding:10px;border-radius:10px;margin-top:8px;text-align:right"><b>You:</b> '
-+
-msg
-+
-'</div>';
+            b.innerHTML +=
+                '<div style="background:#080d16;padding:10px;border-radius:10px;margin-top:8px;text-align:right"><b>You:</b> '
+                +
+                msg
+                +
+                '</div>';
 
 
-b.innerHTML+=
-'<div id="ai-thinking" style="background:#131d2e;padding:10px;border-radius:10px;margin-top:8px;color:#d97706;border:1px solid #283548"><b>Plant:</b> Thinking...</div>';
+            b.innerHTML +=
+                '<div id="ai-thinking" style="background:#131d2e;padding:10px;border-radius:10px;margin-top:8px;color:#d97706;border:1px solid #283548"><b>Plant:</b> Thinking...</div>';
 
 
-i.value="";
+            i.value = "";
 
-b.scrollTop=b.scrollHeight;
+            b.scrollTop = b.scrollHeight;
 
 
-api(
-"/ai-chat",
-{
-method:"POST",
-body:JSON.stringify({
-message:msg
-})
-}
-)
-.then(d=>{
+            api(
+                "/ai-chat",
+                {
+                    method: "POST",
+                    body: JSON.stringify({
+                        message: msg
+                    })
+                }
+            )
+                .then(d => {
 
-if(!d.success){
+                    if (!d.success) {
 
-throw new Error(
-d.reply ||
-"AI failed"
-);
+                        throw new Error(
+                            d.reply ||
+                            "AI failed"
+                        );
 
-}
+                    }
 
-pollAI();
+                    pollAI();
 
-})
-.catch(e=>{
+                })
+                .catch(e => {
 
-let x=
-document.getElementById(
-"ai-thinking"
-);
+                    let x =
+                        document.getElementById(
+                            "ai-thinking"
+                        );
 
-if(x){
+                    if (x) {
 
-x.innerHTML=
-'<b style="color:#ef4444">Error:</b> '
-+
-e.message;
+                        x.innerHTML =
+                            '<b style="color:#ef4444">Error:</b> '
+                            +
+                            e.message;
 
-}
+                    }
 
-});
+                });
 
-}
+        }
 
 
-function pollAI(){
+        function pollAI() {
 
-let n=0;
+            let n = 0;
 
 
-let t=setInterval(()=>{
+            let t = setInterval(() => {
 
-api(
-"/ai-status"
-)
-.then(d=>{
+                api(
+                    "/ai-status"
+                )
+                    .then(d => {
 
-if(d.reply){
+                        if (d.reply) {
 
-clearInterval(t);
+                            clearInterval(t);
 
 
-let x=
-document.getElementById(
-"ai-thinking"
-);
+                            let x =
+                                document.getElementById(
+                                    "ai-thinking"
+                                );
 
 
-if(x){
+                            if (x) {
 
-x.outerHTML=
-'<div style="background:#131d2e;padding:10px;border-radius:10px;margin-top:8px;color:#06b6d4;border:1px solid #283548"><b>Plant:</b> '
-+
-d.reply
-+
-'</div>';
+                                x.outerHTML =
+                                    '<div style="background:#131d2e;padding:10px;border-radius:10px;margin-top:8px;color:#06b6d4;border:1px solid #283548"><b>Plant:</b> '
+                                    +
+                                    d.reply
+                                    +
+                                    '</div>';
 
-}
+                            }
 
-}
+                        }
 
-})
-.catch(()=>{});
+                    })
+                    .catch(() => { });
 
 
-n++;
+                n++;
 
 
-if(n>=30){
+                if (n >= 30) {
 
-clearInterval(t);
+                    clearInterval(t);
 
-let x=
-document.getElementById(
-"ai-thinking"
-);
+                    let x =
+                        document.getElementById(
+                            "ai-thinking"
+                        );
 
-if(x){
+                    if (x) {
 
-x.innerHTML=
-'<b style="color:#d97706">Plant:</b> Taking longer.';
+                        x.innerHTML =
+                            '<b style="color:#d97706">Plant:</b> Taking longer.';
 
-}
+                    }
 
-}
+                }
 
-},500);
+            }, 500);
 
-}
+        }
 
 
-document.addEventListener(
-"DOMContentLoaded",
-()=>{
+        document.addEventListener(
+            "DOMContentLoaded",
+            () => {
 
-let input=
-document.getElementById(
-"ai-msg"
-);
+                let input =
+                    document.getElementById(
+                        "ai-msg"
+                    );
 
-if(input){
+                if (input) {
 
-input.addEventListener(
-"keydown",
-e=>{
+                    input.addEventListener(
+                        "keydown",
+                        e => {
 
-if(e.key==="Enter"){
+                            if (e.key === "Enter") {
 
-e.preventDefault();
+                                e.preventDefault();
 
-sendAIChat();
+                                sendAIChat();
 
-}
+                            }
 
-}
-);
+                        }
+                    );
 
-}
+                }
 
-}
-);
+            }
+        );
 
-</script>
+    </script>
 
 </head>
 
 <body>
 
-<div class="container">
+    <div class="container">
 
-<h2>
-🌿 Pratham Plant Pro
-</h2>
-"""
+        <h2>
+            🌿 Pratham Plant Pro
+        </h2>
+        """
