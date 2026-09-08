@@ -26,13 +26,54 @@ logger = logging.getLogger(__name__)
 
 
 # =========================================================
-# CONFIG
+# CONFIGURATION
 # =========================================================
 
-MQTT_HOST = "127.0.0.1"
-MQTT_PORT = 1883
+MQTT_HOST = os.environ.get(
+    "MQTT_HOST",
+    "127.0.0.1"
+)
 
-AI_REQUEST_TOPIC = "pratham/plant01/ai/request"
+MQTT_PORT = int(
+    os.environ.get(
+        "MQTT_PORT",
+        "1883"
+    )
+)
+
+# MUST match the Device.plant_id in database
+DEFAULT_PLANT_ID = os.environ.get(
+    "PLANT_ID",
+    "pratham_plant_01"
+)
+
+
+# =========================================================
+# MQTT TOPICS
+# =========================================================
+#
+# IMPORTANT:
+# Django + AI Brain + ESP32 must use SAME topics.
+#
+# pratham/pratham_plant_01/status
+# pratham/pratham_plant_01/command
+# pratham/pratham_plant_01/ai/request
+#
+
+def get_mqtt_base(plant_id):
+    return f"pratham/{plant_id}"
+
+
+def get_status_topic(plant_id):
+    return f"{get_mqtt_base(plant_id)}/status"
+
+
+def get_command_topic(plant_id):
+    return f"{get_mqtt_base(plant_id)}/command"
+
+
+def get_ai_request_topic(plant_id):
+    return f"{get_mqtt_base(plant_id)}/ai/request"
 
 
 # =========================================================
@@ -52,28 +93,54 @@ async def mqtt_publish(topic, payload):
     client = MQTTClient()
 
     try:
+
         await client.connect(
-            "mqtt://" + MQTT_HOST + ":" + str(MQTT_PORT)
+            "mqtt://"
+            + MQTT_HOST
+            + ":"
+            + str(MQTT_PORT)
         )
 
         if isinstance(payload, dict):
-            payload = json.dumps(payload)
+
+            payload = json.dumps(
+                payload,
+                ensure_ascii=False
+            )
+
+        if isinstance(payload, str):
+
+            payload = payload.encode(
+                "utf-8"
+            )
 
         await client.publish(
             topic,
-            payload.encode("utf-8"),
+            payload,
             QOS_1
+        )
+
+        logger.info(
+            "[MQTT] Published -> %s",
+            topic
         )
 
         return True
 
     except Exception as e:
-        logger.exception("[MQTT] Error: %s", e)
+
+        logger.exception(
+            "[MQTT] Error: %s",
+            e
+        )
+
         return False
 
     finally:
+
         try:
             await client.disconnect()
+
         except Exception:
             pass
 
@@ -81,11 +148,21 @@ async def mqtt_publish(topic, payload):
 def publish_mqtt(topic, payload):
 
     try:
+
         return asyncio.run(
-            mqtt_publish(topic, payload)
+            mqtt_publish(
+                topic,
+                payload
+            )
         )
+
     except Exception as e:
-        logger.exception("[MQTT] Run error: %s", e)
+
+        logger.exception(
+            "[MQTT] Run error: %s",
+            e
+        )
+
         return False
 
 
@@ -93,19 +170,33 @@ def publish_mqtt(topic, payload):
 # AI MQTT
 # =========================================================
 
-async def publish_ai_request_mqtt(plant_id, message):
+async def publish_ai_request_mqtt(
+    plant_id,
+    message
+):
+
+    topic = get_ai_request_topic(
+        plant_id
+    )
+
+    payload = {
+        "type": "ai_request",
+        "plant_id": plant_id,
+        "message": message,
+        "source": "django",
+        "timestamp": int(
+            timezone.now().timestamp()
+        )
+    }
+
+    logger.info(
+        "[AI] Publishing request -> %s",
+        topic
+    )
 
     return await mqtt_publish(
-        AI_REQUEST_TOPIC,
-        {
-            "type": "ai_request",
-            "plant_id": plant_id,
-            "message": message,
-            "source": "django",
-            "timestamp": int(
-                timezone.now().timestamp()
-            )
-        }
+        topic,
+        payload
     )
 
 
@@ -115,18 +206,25 @@ async def publish_ai_request_mqtt(plant_id, message):
 
 class DeviceListCreateView(APIView):
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [
+        IsAuthenticated
+    ]
 
     def get(self, request):
 
         if request.user.is_staff:
+
             devices = Device.objects.all()
+
         else:
+
             devices = Device.objects.filter(
                 user=request.user
             )
 
-        devices = devices.order_by("-created_at")
+        devices = devices.order_by(
+            "-created_at"
+        )
 
         return Response(
             DeviceSerializer(
@@ -140,6 +238,7 @@ class DeviceListCreateView(APIView):
         data = request.data.copy()
 
         if not request.user.is_staff:
+
             data["user"] = request.user.id
 
         serializer = DeviceSerializer(
@@ -157,7 +256,9 @@ class DeviceListCreateView(APIView):
         )
 
         return Response(
-            DeviceSerializer(device).data,
+            DeviceSerializer(
+                device
+            ).data,
             status=status.HTTP_201_CREATED
         )
 
@@ -168,7 +269,9 @@ class DeviceListCreateView(APIView):
 
 class DeviceDetailView(APIView):
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [
+        IsAuthenticated
+    ]
 
     def get_object(self, plant_id):
 
@@ -178,43 +281,72 @@ class DeviceDetailView(APIView):
 
     def get(self, request, plant_id):
 
-        device = self.get_object(plant_id)
+        device = self.get_object(
+            plant_id
+        )
 
         if not device:
+
             return Response(
-                {"detail": "Device not found."},
+                {
+                    "detail":
+                    "Device not found."
+                },
                 status=404
             )
 
-        if not can_manage(request.user, device):
+        if not can_manage(
+            request.user,
+            device
+        ):
+
             return Response(
-                {"detail": "Forbidden."},
+                {
+                    "detail":
+                    "Forbidden."
+                },
                 status=403
             )
 
         return Response(
-            DeviceSerializer(device).data
+            DeviceSerializer(
+                device
+            ).data
         )
 
     def put(self, request, plant_id):
 
-        device = self.get_object(plant_id)
+        device = self.get_object(
+            plant_id
+        )
 
         if not device:
+
             return Response(
-                {"detail": "Device not found."},
+                {
+                    "detail":
+                    "Device not found."
+                },
                 status=404
             )
 
-        if not can_manage(request.user, device):
+        if not can_manage(
+            request.user,
+            device
+        ):
+
             return Response(
-                {"detail": "Forbidden."},
+                {
+                    "detail":
+                    "Forbidden."
+                },
                 status=403
             )
 
         data = request.data.copy()
 
         if not request.user.is_staff:
+
             data["user"] = request.user.id
 
         serializer = DeviceSerializer(
@@ -230,22 +362,37 @@ class DeviceDetailView(APIView):
         device = serializer.save()
 
         return Response(
-            DeviceSerializer(device).data
+            DeviceSerializer(
+                device
+            ).data
         )
 
     def delete(self, request, plant_id):
 
-        device = self.get_object(plant_id)
+        device = self.get_object(
+            plant_id
+        )
 
         if not device:
+
             return Response(
-                {"detail": "Device not found."},
+                {
+                    "detail":
+                    "Device not found."
+                },
                 status=404
             )
 
-        if not can_manage(request.user, device):
+        if not can_manage(
+            request.user,
+            device
+        ):
+
             return Response(
-                {"detail": "Forbidden."},
+                {
+                    "detail":
+                    "Forbidden."
+                },
                 status=403
             )
 
@@ -262,7 +409,9 @@ class DeviceDetailView(APIView):
 
 class DeviceHeartbeatView(APIView):
 
-    permission_classes = [AllowAny]
+    permission_classes = [
+        AllowAny
+    ]
 
     def post(self, request, plant_id):
 
@@ -271,24 +420,32 @@ class DeviceHeartbeatView(APIView):
         ).first()
 
         if not device:
+
             return Response(
                 {
                     "success": False,
-                    "message": "Unknown device."
+                    "message":
+                    "Unknown device."
                 },
                 status=404
             )
 
         supplied_token = (
-            request.data.get("device_token")
-            or request.headers.get("X-Device-Token")
+            request.data.get(
+                "device_token"
+            )
+            or request.headers.get(
+                "X-Device-Token"
+            )
         )
 
         if supplied_token != device.qr_code_token:
+
             return Response(
                 {
                     "success": False,
-                    "message": "Invalid device token."
+                    "message":
+                    "Invalid device token."
                 },
                 status=401
             )
@@ -303,18 +460,27 @@ class DeviceHeartbeatView(APIView):
             ]
         )
 
-        config, _ = DeviceConfig.objects.get_or_create(
-            device=device
+        config, _ = (
+            DeviceConfig.objects.get_or_create(
+                device=device
+            )
         )
 
         return Response(
             {
                 "success": True,
-                "plant_id": device.plant_id,
-                "device_name": device.device_name,
-                "is_active": device.is_active,
-                "last_seen": device.last_seen,
-                "config": DeviceConfigSerializer(config).data
+                "plant_id":
+                    device.plant_id,
+                "device_name":
+                    device.device_name,
+                "is_active":
+                    device.is_active,
+                "last_seen":
+                    device.last_seen,
+                "config":
+                    DeviceConfigSerializer(
+                        config
+                    ).data
             }
         )
 
@@ -325,7 +491,9 @@ class DeviceHeartbeatView(APIView):
 
 class DeviceStatusView(APIView):
 
-    permission_classes = [AllowAny]
+    permission_classes = [
+        AllowAny
+    ]
 
     def get(self, request, plant_id):
 
@@ -334,10 +502,12 @@ class DeviceStatusView(APIView):
         ).first()
 
         if not device:
+
             return Response(
                 {
                     "success": False,
-                    "detail": "Device not found."
+                    "detail":
+                    "Device not found."
                 },
                 status=404
             )
@@ -345,10 +515,14 @@ class DeviceStatusView(APIView):
         return Response(
             {
                 "success": True,
-                "plant_id": device.plant_id,
-                "device_name": device.device_name,
-                "is_active": device.is_active,
-                "last_seen": device.last_seen
+                "plant_id":
+                    device.plant_id,
+                "device_name":
+                    device.device_name,
+                "is_active":
+                    device.is_active,
+                "last_seen":
+                    device.last_seen
             }
         )
 
@@ -359,58 +533,69 @@ class DeviceStatusView(APIView):
 
 class DeviceConfigView(APIView):
 
-    permission_classes = [AllowAny]
+    permission_classes = [
+        AllowAny
+    ]
 
     def get_device(self, plant_id):
 
-        device = Device.objects.filter(
+        return Device.objects.filter(
             plant_id=plant_id
         ).first()
 
-        if not device:
-            return None
-
-        return device
-
     def get(self, request, plant_id):
 
-        device = self.get_device(plant_id)
+        device = self.get_device(
+            plant_id
+        )
 
         if not device:
+
             return Response(
                 {
                     "success": False,
-                    "detail": "Device not found."
+                    "detail":
+                    "Device not found."
                 },
                 status=404
             )
 
-        config, _ = DeviceConfig.objects.get_or_create(
-            device=device
+        config, _ = (
+            DeviceConfig.objects.get_or_create(
+                device=device
+            )
         )
 
         return Response(
             {
                 "success": True,
-                **DeviceConfigSerializer(config).data
+                **DeviceConfigSerializer(
+                    config
+                ).data
             }
         )
 
     def put(self, request, plant_id):
 
-        device = self.get_device(plant_id)
+        device = self.get_device(
+            plant_id
+        )
 
         if not device:
+
             return Response(
                 {
                     "success": False,
-                    "detail": "Device not found."
+                    "detail":
+                    "Device not found."
                 },
                 status=404
             )
 
-        config, _ = DeviceConfig.objects.get_or_create(
-            device=device
+        config, _ = (
+            DeviceConfig.objects.get_or_create(
+                device=device
+            )
         )
 
         serializer = DeviceConfigSerializer(
@@ -428,7 +613,9 @@ class DeviceConfigView(APIView):
         return Response(
             {
                 "success": True,
-                **DeviceConfigSerializer(config).data
+                **DeviceConfigSerializer(
+                    config
+                ).data
             }
         )
 
@@ -439,7 +626,9 @@ class DeviceConfigView(APIView):
 
 class DeviceAIChatView(APIView):
 
-    permission_classes = [AllowAny]
+    permission_classes = [
+        AllowAny
+    ]
 
     def post(self, request, plant_id):
 
@@ -450,24 +639,32 @@ class DeviceAIChatView(APIView):
             ).first()
 
             if not device:
+
                 return Response(
                     {
                         "success": False,
-                        "reply": "Device not found."
+                        "reply":
+                        "Device not found."
                     },
                     status=404
                 )
 
             device_token = (
-                request.headers.get("X-Device-Token")
-                or request.data.get("device_token")
+                request.headers.get(
+                    "X-Device-Token"
+                )
+                or request.data.get(
+                    "device_token"
+                )
             )
 
             if device_token != device.qr_code_token:
+
                 return Response(
                     {
                         "success": False,
-                        "reply": "Invalid device token."
+                        "reply":
+                        "Invalid device token."
                     },
                     status=401
                 )
@@ -483,15 +680,28 @@ class DeviceAIChatView(APIView):
             ).strip()
 
             if not message:
+
                 return Response(
                     {
                         "success": False,
-                        "reply": "Message is empty."
+                        "reply":
+                        "Message is empty."
                     },
                     status=400
                 )
 
             message = message[:500]
+
+            # Set pending BEFORE publishing
+            cache.set(
+                "ai_status_" + plant_id,
+                {
+                    "pending": True,
+                    "reply":
+                    "Plant AI is thinking..."
+                },
+                timeout=300
+            )
 
             mqtt_ok = asyncio.run(
                 publish_ai_request_mqtt(
@@ -501,30 +711,34 @@ class DeviceAIChatView(APIView):
             )
 
             if not mqtt_ok:
+
+                cache.set(
+                    "ai_status_" + plant_id,
+                    {
+                        "pending": False,
+                        "reply":
+                        "AI service unavailable."
+                    },
+                    timeout=300
+                )
+
                 return Response(
                     {
                         "success": False,
-                        "reply": "AI service unavailable.",
+                        "reply":
+                        "AI service unavailable.",
                         "pending": False
                     },
                     status=503
                 )
 
-            # Pending state
-            cache.set(
-                "ai_status_" + plant_id,
-                {
-                    "pending": True,
-                    "reply": "Message received. Plant AI is thinking..."
-                },
-                timeout=300
-            )
-
             return Response(
                 {
                     "success": True,
-                    "reply": "Message received. Plant AI is thinking...",
-                    "plant_id": plant_id,
+                    "reply":
+                    "Message received. Plant AI is thinking...",
+                    "plant_id":
+                    plant_id,
                     "pending": True
                 },
                 status=202
@@ -540,7 +754,8 @@ class DeviceAIChatView(APIView):
             return Response(
                 {
                     "success": False,
-                    "reply": "AI service error.",
+                    "reply":
+                    "AI service error.",
                     "pending": False
                 },
                 status=500
@@ -553,7 +768,9 @@ class DeviceAIChatView(APIView):
 
 class DeviceAIStatusView(APIView):
 
-    permission_classes = [AllowAny]
+    permission_classes = [
+        AllowAny
+    ]
 
     def get(self, request, plant_id):
 
@@ -562,6 +779,7 @@ class DeviceAIStatusView(APIView):
         )
 
         if not result:
+
             return Response(
                 {
                     "success": True,
@@ -579,14 +797,14 @@ class DeviceAIStatusView(APIView):
 
     def post(self, request, plant_id):
 
-        data = request.data
-
-        reply = data.get(
-            "reply",
-            ""
+        reply = str(
+            request.data.get(
+                "reply",
+                ""
+            )
         )
 
-        pending = data.get(
+        pending = request.data.get(
             "pending",
             False
         )
@@ -594,10 +812,17 @@ class DeviceAIStatusView(APIView):
         cache.set(
             "ai_status_" + plant_id,
             {
-                "pending": pending,
-                "reply": reply
+                "pending":
+                    bool(pending),
+                "reply":
+                    reply
             },
             timeout=300
+        )
+
+        logger.info(
+            "[AI STATUS] Updated for %s",
+            plant_id
         )
 
         return Response(
@@ -613,7 +838,9 @@ class DeviceAIStatusView(APIView):
 
 class SaveTouchView(APIView):
 
-    permission_classes = [AllowAny]
+    permission_classes = [
+        AllowAny
+    ]
 
     def post(self, request, plant_id):
 
@@ -622,29 +849,42 @@ class SaveTouchView(APIView):
         ).first()
 
         if not device:
+
             return Response(
                 {
                     "success": False,
-                    "message": "Device not found."
+                    "message":
+                    "Device not found."
                 },
                 status=404
             )
 
-        config, _ = DeviceConfig.objects.get_or_create(
-            device=device
+        config, _ = (
+            DeviceConfig.objects.get_or_create(
+                device=device
+            )
         )
 
-        settings_data = config.custom_settings or {}
+        settings_data = (
+            config.custom_settings or {}
+        )
 
         touch_data = request.data
 
-        settings_data["touch"] = touch_data
+        settings_data["touch"] = (
+            touch_data
+        )
 
-        config.custom_settings = settings_data
+        config.custom_settings = (
+            settings_data
+        )
+
         config.save()
 
-        publish_mqtt(
-            "pratham/" + plant_id + "/command",
+        mqtt_ok = publish_mqtt(
+            get_command_topic(
+                plant_id
+            ),
             {
                 "type": "touch",
                 "plant_id": plant_id,
@@ -655,8 +895,11 @@ class SaveTouchView(APIView):
         return Response(
             {
                 "success": True,
-                "message": "Touch settings saved.",
-                "data": touch_data
+                "mqtt": mqtt_ok,
+                "message":
+                "Touch settings saved.",
+                "data":
+                touch_data
             }
         )
 
@@ -667,7 +910,9 @@ class SaveTouchView(APIView):
 
 class SaveRemindersView(APIView):
 
-    permission_classes = [AllowAny]
+    permission_classes = [
+        AllowAny
+    ]
 
     def post(self, request, plant_id):
 
@@ -676,29 +921,42 @@ class SaveRemindersView(APIView):
         ).first()
 
         if not device:
+
             return Response(
                 {
                     "success": False,
-                    "message": "Device not found."
+                    "message":
+                    "Device not found."
                 },
                 status=404
             )
 
-        config, _ = DeviceConfig.objects.get_or_create(
-            device=device
+        config, _ = (
+            DeviceConfig.objects.get_or_create(
+                device=device
+            )
         )
 
-        settings_data = config.custom_settings or {}
+        settings_data = (
+            config.custom_settings or {}
+        )
 
         reminders = request.data
 
-        settings_data["reminders"] = reminders
+        settings_data["reminders"] = (
+            reminders
+        )
 
-        config.custom_settings = settings_data
+        config.custom_settings = (
+            settings_data
+        )
+
         config.save()
 
-        publish_mqtt(
-            "pratham/" + plant_id + "/command",
+        mqtt_ok = publish_mqtt(
+            get_command_topic(
+                plant_id
+            ),
             {
                 "type": "reminders",
                 "plant_id": plant_id,
@@ -709,8 +967,11 @@ class SaveRemindersView(APIView):
         return Response(
             {
                 "success": True,
-                "message": "Reminders saved.",
-                "data": reminders
+                "mqtt": mqtt_ok,
+                "message":
+                "Reminders saved.",
+                "data":
+                reminders
             }
         )
 
@@ -721,7 +982,9 @@ class SaveRemindersView(APIView):
 
 class SaveConfigView(APIView):
 
-    permission_classes = [AllowAny]
+    permission_classes = [
+        AllowAny
+    ]
 
     def post(self, request, plant_id):
 
@@ -730,28 +993,41 @@ class SaveConfigView(APIView):
         ).first()
 
         if not device:
+
             return Response(
                 {
                     "success": False,
-                    "message": "Device not found."
+                    "message":
+                    "Device not found."
                 },
                 status=404
             )
 
-        config, _ = DeviceConfig.objects.get_or_create(
-            device=device
+        config, _ = (
+            DeviceConfig.objects.get_or_create(
+                device=device
+            )
         )
 
         data = request.data.copy()
 
-        custom = config.custom_settings or {}
-
-        custom.update(
-            data.get(
-                "custom_settings",
-                {}
-            )
+        custom = (
+            config.custom_settings or {}
         )
+
+        incoming_custom = data.get(
+            "custom_settings",
+            {}
+        )
+
+        if isinstance(
+            incoming_custom,
+            dict
+        ):
+
+            custom.update(
+                incoming_custom
+            )
 
         config.webhook_url = data.get(
             "webhook_url",
@@ -767,8 +1043,10 @@ class SaveConfigView(APIView):
 
         config.save()
 
-        publish_mqtt(
-            "pratham/" + plant_id + "/command",
+        mqtt_ok = publish_mqtt(
+            get_command_topic(
+                plant_id
+            ),
             {
                 "type": "config",
                 "plant_id": plant_id,
@@ -779,8 +1057,13 @@ class SaveConfigView(APIView):
         return Response(
             {
                 "success": True,
-                "message": "Configuration saved.",
-                "config": DeviceConfigSerializer(config).data
+                "mqtt": mqtt_ok,
+                "message":
+                "Configuration saved.",
+                "config":
+                    DeviceConfigSerializer(
+                        config
+                    ).data
             }
         )
 
@@ -791,7 +1074,9 @@ class SaveConfigView(APIView):
 
 class PowerToggleView(APIView):
 
-    permission_classes = [AllowAny]
+    permission_classes = [
+        AllowAny
+    ]
 
     def post(self, request, plant_id):
 
@@ -800,10 +1085,12 @@ class PowerToggleView(APIView):
         ).first()
 
         if not device:
+
             return Response(
                 {
                     "success": False,
-                    "message": "Device not found."
+                    "message":
+                    "Device not found."
                 },
                 status=404
             )
@@ -816,37 +1103,50 @@ class PowerToggleView(APIView):
             )
         )
 
-        if isinstance(state, str):
+        if isinstance(
+            state,
+            str
+        ):
+
             state = state.lower() in [
                 "true",
                 "1",
                 "on"
             ]
 
-        config, _ = DeviceConfig.objects.get_or_create(
-            device=device
+        state = bool(state)
+
+        config, _ = (
+            DeviceConfig.objects.get_or_create(
+                device=device
+            )
         )
 
-        custom = config.custom_settings or {}
+        custom = (
+            config.custom_settings or {}
+        )
 
-        custom["power"] = bool(state)
+        custom["power"] = state
 
         config.custom_settings = custom
+
         config.save()
 
         mqtt_ok = publish_mqtt(
-            "pratham/" + plant_id + "/command",
+            get_command_topic(
+                plant_id
+            ),
             {
                 "type": "power",
                 "plant_id": plant_id,
-                "state": bool(state)
+                "state": state
             }
         )
 
         return Response(
             {
                 "success": True,
-                "power": bool(state),
+                "power": state,
                 "mqtt": mqtt_ok
             }
         )
@@ -858,7 +1158,9 @@ class PowerToggleView(APIView):
 
 class RestartView(APIView):
 
-    permission_classes = [AllowAny]
+    permission_classes = [
+        AllowAny
+    ]
 
     def post(self, request, plant_id):
 
@@ -867,16 +1169,20 @@ class RestartView(APIView):
         ).first()
 
         if not device:
+
             return Response(
                 {
                     "success": False,
-                    "message": "Device not found."
+                    "message":
+                    "Device not found."
                 },
                 status=404
             )
 
         mqtt_ok = publish_mqtt(
-            "pratham/" + plant_id + "/command",
+            get_command_topic(
+                plant_id
+            ),
             {
                 "type": "restart",
                 "plant_id": plant_id
@@ -886,11 +1192,12 @@ class RestartView(APIView):
         return Response(
             {
                 "success": mqtt_ok,
+                "mqtt": mqtt_ok,
                 "message":
-                    "Restart command sent."
-                    if mqtt_ok
-                    else
-                    "MQTT unavailable."
+                "Restart command sent."
+                if mqtt_ok
+                else
+                "MQTT unavailable."
             }
         )
 
@@ -901,7 +1208,9 @@ class RestartView(APIView):
 
 class QROnboardView(APIView):
 
-    permission_classes = [AllowAny]
+    permission_classes = [
+        AllowAny
+    ]
 
     def post(self, request):
 
@@ -910,11 +1219,12 @@ class QROnboardView(APIView):
         )
 
         if not qr_token:
+
             return Response(
                 {
                     "success": False,
                     "message":
-                        "qr_code_token is required."
+                    "qr_code_token is required."
                 },
                 status=400
             )
@@ -924,11 +1234,12 @@ class QROnboardView(APIView):
         ).first()
 
         if not device:
+
             return Response(
                 {
                     "success": False,
                     "message":
-                        "Invalid QR token."
+                    "Invalid QR token."
                 },
                 status=404
             )
@@ -936,8 +1247,10 @@ class QROnboardView(APIView):
         return Response(
             {
                 "success": True,
-                "plant_id": device.plant_id,
-                "device_name": device.device_name,
+                "plant_id":
+                    device.plant_id,
+                "device_name":
+                    device.device_name,
                 "device_token":
                     device.qr_code_token,
                 "message":
@@ -951,7 +1264,10 @@ class QROnboardView(APIView):
 # =========================================================
 
 @csrf_exempt
-def plant_dashboard_view(request, plant_id):
+def plant_dashboard_view(
+    request,
+    plant_id
+):
 
     html_path = os.path.join(
         settings.BASE_DIR,

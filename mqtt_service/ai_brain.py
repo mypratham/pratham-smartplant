@@ -1,3 +1,4 @@
+
 import asyncio
 import json
 import logging
@@ -9,7 +10,7 @@ import requests
 from amqtt.broker import Broker
 from amqtt.client import MQTTClient
 from amqtt.mqtt.constants import QOS_1
-from dotenv import load_dotenv
+
 
 # =========================================================
 # PRATHAM PLANT AI BRAIN
@@ -35,17 +36,21 @@ logger = logging.getLogger("PRATHAM-AI")
 
 # IMPORTANT:
 # Gemini API key environment variable se aayegi.
-# Code me actual API key mat rakhein.
+#
+# Linux:
+# export GEMINI_API_KEY="YOUR_NEW_KEY"
+#
+# Code me actual API key mat rakho.
 
-load_dotenv()
+GEMINI_API_KEY = os.environ.get(
+    "GEMINI_API_KEY",
+    "AQ.Ab8RN6IPkUk-ahkm5dGBWrcpW7u6aHue1_macOe7ZEFcepQ_LQ"
+)
 
-# Gemini API Key (.env file se fetch hogi)
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-
-if not GEMINI_API_KEY:
-    raise ValueError("GEMINI_API_KEY nahi mila! Kripya .env file check karein.")
-
-GEMINI_MODEL = "gemini-3.6-flash"
+GEMINI_MODEL = os.environ.get(
+    "GEMINI_MODEL",
+    "gemini-3.6-flash"
+)
 
 GEMINI_API_URL = (
     "https://generativelanguage.googleapis.com/"
@@ -79,24 +84,68 @@ DEVICE_TOKEN = os.environ.get(
 # MQTT CONFIGURATION
 # =========================================================
 
-MQTT_HOST = "0.0.0.0"
+# Broker local machine par listen karega.
+# ESP32 public IP se connect karega.
 
-MQTT_PORT = 1883
+MQTT_HOST = os.environ.get(
+    "MQTT_HOST",
+    "0.0.0.0"
+)
 
-MQTT_CLIENT_HOST = "127.0.0.1"
+MQTT_PORT = int(
+    os.environ.get(
+        "MQTT_PORT",
+        "1883"
+    )
+)
 
-MQTT_CLIENT_PORT = 1883
+# AI Brain broker ke local instance ko connect karega.
+
+MQTT_CLIENT_HOST = os.environ.get(
+    "MQTT_CLIENT_HOST",
+    "127.0.0.1"
+)
+
+MQTT_CLIENT_PORT = int(
+    os.environ.get(
+        "MQTT_CLIENT_PORT",
+        "1883"
+    )
+)
 
 
 # =========================================================
 # MQTT TOPICS
 # =========================================================
+#
+# IMPORTANT:
+# Django + AI Brain + ESP32
+# SAME PLANT_ID use karenge.
+#
+# Example:
+#
+# PLANT_ID = pratham_plant_01
+#
+# Topics:
+#
+# pratham/pratham_plant_01/status
+# pratham/pratham_plant_01/command
+# pratham/pratham_plant_01/ai/request
+#
 
-STATUS_TOPIC = "pratham/plant01/status"
+MQTT_BASE = f"pratham/{PLANT_ID}"
 
-COMMAND_TOPIC = "pratham/plant01/command"
+STATUS_TOPIC = (
+    f"{MQTT_BASE}/status"
+)
 
-AI_REQUEST_TOPIC = "pratham/plant01/ai/request"
+COMMAND_TOPIC = (
+    f"{MQTT_BASE}/command"
+)
+
+AI_REQUEST_TOPIC = (
+    f"{MQTT_BASE}/ai/request"
+)
 
 
 # =========================================================
@@ -122,6 +171,9 @@ BROKER_CONFIG = {
     "sys_interval": 10,
 
     "auth": {
+
+        # Development/testing ke liye.
+        # Production me MQTT authentication/TLS lagana better hai.
 
         "allow-anonymous": True
     }
@@ -159,6 +211,18 @@ DJANGO_HEARTBEAT_URL = (
     + "/api/devices/"
     + PLANT_ID
     + "/heartbeat/"
+)
+
+
+# =========================================================
+# DJANGO AI STATUS URL
+# =========================================================
+
+DJANGO_AI_STATUS_URL = (
+    DJANGO_URL.rstrip("/")
+    + "/api/devices/"
+    + PLANT_ID
+    + "/ai-status/"
 )
 
 
@@ -367,10 +431,11 @@ Rules:
 
     headers = {
 
-        "Content-Type": "application/json",
+        "Content-Type":
+            "application/json",
 
-        "x-goog-api-key": GEMINI_API_KEY
-
+        "x-goog-api-key":
+            GEMINI_API_KEY
     }
 
 
@@ -511,7 +576,10 @@ Rules:
 
         for part in parts:
 
-            if isinstance(part, dict):
+            if isinstance(
+                part,
+                dict
+            ):
 
                 part_text = part.get(
                     "text",
@@ -520,8 +588,9 @@ Rules:
 
                 if part_text:
 
-                    ai_reply += " " + str(
-                        part_text
+                    ai_reply += (
+                        " "
+                        + str(part_text)
                     )
 
 
@@ -555,10 +624,6 @@ Rules:
         return ai_reply
 
 
-    # =====================================================
-    # TIMEOUT
-    # =====================================================
-
     except requests.exceptions.Timeout:
 
         logger.error(
@@ -567,10 +632,6 @@ Rules:
 
         return "AI Timeout"
 
-
-    # =====================================================
-    # CONNECTION ERROR
-    # =====================================================
 
     except requests.exceptions.ConnectionError as e:
 
@@ -581,10 +642,6 @@ Rules:
 
         return "AI Offline"
 
-
-    # =====================================================
-    # GENERAL ERROR
-    # =====================================================
 
     except Exception as e:
 
@@ -606,7 +663,6 @@ async def ai_brain_process(
 ):
 
     global last_ai_request
-
 
     now = time.time()
 
@@ -775,19 +831,24 @@ async def send_command_to_esp32(
 
         payload = {
 
-            "type": "ai",
+            "type":
+                "ai",
 
-            "plant_id": PLANT_ID,
+            "plant_id":
+                PLANT_ID,
 
-            "text": clean_ai_response(
-                text
-            ),
+            "text":
+                clean_ai_response(
+                    text
+                ),
 
-            "expr": expression,
+            "expr":
+                expression,
 
-            "timestamp": int(
-                time.time()
-            )
+            "timestamp":
+                int(
+                    time.time()
+                )
 
         }
 
@@ -831,6 +892,127 @@ async def send_command_to_esp32(
 
         logger.exception(
             "MQTT publish error: %s",
+            e
+        )
+
+        return False
+
+
+# =========================================================
+# SEND AI RESULT TO DJANGO
+# =========================================================
+
+def send_ai_result_to_django(
+    reply,
+    pending=False
+):
+
+    if not DEVICE_TOKEN:
+
+        logger.warning(
+            "DEVICE_TOKEN not configured."
+        )
+
+        return False
+
+
+    try:
+
+        headers = {
+
+            "Content-Type":
+                "application/json",
+
+            "X-Device-Token":
+                DEVICE_TOKEN
+        }
+
+
+        payload = {
+
+            "reply":
+                clean_ai_response(
+                    reply
+                ),
+
+            "pending":
+                pending,
+
+            "plant_id":
+                PLANT_ID,
+
+            "timestamp":
+                int(
+                    time.time()
+                )
+
+        }
+
+
+        logger.info(
+            "Sending AI result to Django..."
+        )
+
+
+        response = requests.post(
+
+            DJANGO_AI_STATUS_URL,
+
+            headers=headers,
+
+            json=payload,
+
+            timeout=10
+
+        )
+
+
+        logger.info(
+            "Django AI status HTTP: %s",
+            response.status_code
+        )
+
+
+        if response.status_code == 200:
+
+            logger.info(
+                "AI result saved to Django."
+            )
+
+            return True
+
+
+        logger.error(
+            "Django AI status FAILED: %s",
+            response.text[:500]
+        )
+
+        return False
+
+
+    except requests.exceptions.Timeout:
+
+        logger.error(
+            "Django AI status timeout."
+        )
+
+        return False
+
+
+    except requests.exceptions.ConnectionError as e:
+
+        logger.error(
+            "Django AI status connection error: %s",
+            e
+        )
+
+        return False
+
+
+    except Exception as e:
+
+        logger.exception(
+            "Django AI status error: %s",
             e
         )
 
@@ -959,7 +1141,6 @@ async def django_heartbeat_loop():
 
             )
 
-
         except Exception as e:
 
             logger.exception(
@@ -993,20 +1174,6 @@ async def process_ai_request(
 
 
     # =====================================================
-    # MESSAGE
-    # =====================================================
-
-    user_message = str(
-
-        data.get(
-            "message",
-            ""
-        )
-
-    ).strip()
-
-
-    # =====================================================
     # PLANT ID
     # =====================================================
 
@@ -1018,6 +1185,32 @@ async def process_ai_request(
         )
 
     )
+
+
+    # Security / routing check
+
+    if request_plant_id != PLANT_ID:
+
+        logger.warning(
+            "Ignoring AI request for plant: %s",
+            request_plant_id
+        )
+
+        return
+
+
+    # =====================================================
+    # MESSAGE
+    # =====================================================
+
+    user_message = str(
+
+        data.get(
+            "message",
+            ""
+        )
+
+    ).strip()
 
 
     # =====================================================
@@ -1075,12 +1268,34 @@ async def process_ai_request(
     # SEND TO ESP32
     # =====================================================
 
-    await send_command_to_esp32(
+    esp_ok = await send_command_to_esp32(
 
         ai_reply,
 
         expression
 
+    )
+
+
+    # =====================================================
+    # SEND RESULT TO DJANGO
+    # =====================================================
+
+    django_ok = await asyncio.to_thread(
+
+        send_ai_result_to_django,
+
+        ai_reply,
+
+        False
+
+    )
+
+
+    logger.info(
+        "AI REQUEST COMPLETE | ESP32=%s | DJANGO=%s",
+        esp_ok,
+        django_ok
     )
 
 
@@ -1101,6 +1316,29 @@ async def process_esp32_status(
     data = parse_json_message(
         decoded_msg
     )
+
+
+    # =====================================================
+    # PLANT ID CHECK
+    # =====================================================
+
+    message_plant_id = str(
+
+        data.get(
+            "plant_id",
+            PLANT_ID
+        )
+
+    )
+
+    if message_plant_id != PLANT_ID:
+
+        logger.warning(
+            "Ignoring ESP32 status for plant: %s",
+            message_plant_id
+        )
+
+        return
 
 
     # =====================================================
@@ -1144,15 +1382,10 @@ async def process_esp32_status(
     sensor_keys = [
 
         "temperature",
-
         "humidity",
-
         "soil_moisture",
-
         "soil",
-
         "light",
-
         "light_level"
 
     ]
@@ -1181,16 +1414,38 @@ async def process_esp32_status(
 
         or bool(message_text)
 
-        or has_sensor_data
-
     )
 
 
+    # -----------------------------------------------------
+    # IMPORTANT:
+    #
+    # Normal sensor status ko automatically Gemini par
+    # baar-baar nahi bhejenge.
+    #
+    # AI tab chalega jab:
+    #
+    # touch
+    # ask_ai
+    # message
+    #
+    # aaye.
+    # -----------------------------------------------------
+
     if not ai_trigger:
 
-        logger.info(
-            "ESP32 event does not require AI."
-        )
+        if has_sensor_data:
+
+            logger.info(
+                "Sensor status received. "
+                "No AI request."
+            )
+
+        else:
+
+            logger.info(
+                "ESP32 event does not require AI."
+            )
 
         return
 
@@ -1259,7 +1514,7 @@ async def process_esp32_status(
     # ESP32
     # =====================================================
 
-    await send_command_to_esp32(
+    esp_ok = await send_command_to_esp32(
 
         ai_reply,
 
@@ -1268,16 +1523,35 @@ async def process_esp32_status(
     )
 
 
+    # =====================================================
+    # DJANGO
+    # =====================================================
+
+    django_ok = await asyncio.to_thread(
+
+        send_ai_result_to_django,
+
+        ai_reply,
+
+        False
+
+    )
+
+
+    logger.info(
+        "ESP32 AI COMPLETE | ESP32=%s | DJANGO=%s",
+        esp_ok,
+        django_ok
+    )
+
+
 # =========================================================
 # PROCESS MQTT EVENT
 # =========================================================
 
 async def process_esp32_event(
-
     topic,
-
     decoded_msg
-
 ):
 
     logger.info(
@@ -1341,23 +1615,31 @@ async def mqtt_receive_loop():
             )
 
 
-            message = await mqtt_client.deliver_message()
+            message = (
+                await mqtt_client.deliver_message()
+            )
 
 
             # =================================================
             # AMQTT MESSAGE
             # =================================================
 
-            packet = message.publish_packet
+            packet = (
+                message.publish_packet
+            )
 
 
             topic = (
-                packet.variable_header.topic_name
+                packet
+                .variable_header
+                .topic_name
             )
 
 
             payload = (
-                packet.payload.data
+                packet
+                .payload
+                .data
             )
 
 
@@ -1533,15 +1815,23 @@ async def start_broker():
     )
 
     logger.info(
-        "MQTT HOST: 0.0.0.0"
+        "MQTT HOST: %s",
+        MQTT_HOST
     )
 
     logger.info(
-        "MQTT PORT: 1883"
+        "MQTT PORT: %s",
+        MQTT_PORT
     )
 
     logger.info(
-        "ESP32 MQTT ADDRESS: PC_IP:1883"
+        "PLANT ID: %s",
+        PLANT_ID
+    )
+
+    logger.info(
+        "STATUS TOPIC: %s",
+        STATUS_TOPIC
     )
 
     logger.info(
@@ -1580,9 +1870,7 @@ async def broker_controller():
     # =====================================================
 
     asyncio.create_task(
-
         django_heartbeat_loop()
-
     )
 
 
@@ -1592,7 +1880,9 @@ async def broker_controller():
 
     while True:
 
-        connected = await connect_mqtt_client()
+        connected = (
+            await connect_mqtt_client()
+        )
 
 
         if not connected:
@@ -1683,6 +1973,11 @@ def main():
     )
 
     logger.info(
+        "MQTT Base: %s",
+        MQTT_BASE
+    )
+
+    logger.info(
         "Status Topic: %s",
         STATUS_TOPIC
     )
@@ -1700,6 +1995,16 @@ def main():
     logger.info(
         "Django URL: %s",
         DJANGO_URL
+    )
+
+    logger.info(
+        "Django Heartbeat: %s",
+        DJANGO_HEARTBEAT_URL
+    )
+
+    logger.info(
+        "Django AI Status: %s",
+        DJANGO_AI_STATUS_URL
     )
 
     logger.info(
@@ -1749,9 +2054,7 @@ def main():
     try:
 
         asyncio.run(
-
             broker_controller()
-
         )
 
 
