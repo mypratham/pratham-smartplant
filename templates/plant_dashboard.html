@@ -1,473 +1,1860 @@
+```html
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
 
-    <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Pratham Plant Pro</title>
+<title>Pratham Plant Pro</title>
 
-    <style>
-        :root {
-            --bg-color: #0b131f;
-            --card-bg: #131d2e;
-            --card-border: #1e293b;
-            --accent-green: #10b981;
-            --accent-cyan: #06b6d4;
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
-            --btn-primary: #059669;
-            --btn-primary-hover: #047857;
-            --btn-warning: #d97706;
-            --btn-danger: #ef4444;
+<style>
+
+:root {
+  --bg-color:#0b131f;
+  --card-bg:#131d2e;
+  --card-border:#1e293b;
+  --accent-green:#10b981;
+  --accent-cyan:#06b6d4;
+  --text-main:#f8fafc;
+  --text-muted:#94a3b8;
+  --btn-primary:#059669;
+  --btn-warning:#d97706;
+  --btn-danger:#ef4444;
+}
+
+* {
+  box-sizing:border-box
+}
+
+body {
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  background:var(--bg-color);
+  color:var(--text-main);
+  margin:0;
+  padding:16px
+}
+
+.container {
+  max-width:440px;
+  margin:auto
+}
+
+.card {
+  background:var(--card-bg);
+  border-radius:16px;
+  padding:20px;
+  margin-bottom:16px;
+  box-shadow:0 10px 25px -5px rgba(0,0,0,.3);
+  border:1px solid var(--card-border)
+}
+
+h2 {
+  text-align:center;
+  color:var(--accent-green);
+  font-size:24px;
+  margin:10px 0 20px;
+  font-weight:700
+}
+
+h3 {
+  color:var(--accent-cyan);
+  font-size:16px;
+  margin-top:0;
+  border-bottom:1px solid var(--card-border);
+  padding-bottom:8px
+}
+
+button {
+  background:var(--btn-primary);
+  color:#fff;
+  border:0;
+  padding:12px 16px;
+  border-radius:12px;
+  font-weight:600;
+  width:100%;
+  margin-top:10px;
+  cursor:pointer;
+  font-size:14px
+}
+
+button:active {
+  transform:scale(.98)
+}
+
+.btn-danger {
+  background:var(--btn-danger)
+}
+
+.btn-warning {
+  background:var(--btn-warning)
+}
+
+.btn-del {
+  background:var(--btn-danger);
+  padding:6px 10px;
+  font-size:11px;
+  width:auto;
+  margin:0;
+  border-radius:8px
+}
+
+input,select {
+  background:#080d16;
+  color:var(--text-main);
+  border:1px solid #283548;
+  padding:12px;
+  margin:6px 0 12px;
+  border-radius:10px;
+  width:100%;
+  font-size:14px;
+  outline:none
+}
+
+input:focus,
+select:focus {
+  border-color:var(--accent-green)
+}
+
+.status-grid {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+  margin-top:10px
+}
+
+.status-box {
+  background:#080d16;
+  border:1px solid var(--card-border);
+  padding:14px;
+  border-radius:12px;
+  font-size:13px
+}
+
+.status-box b {
+  color:var(--accent-cyan);
+  display:block;
+  margin-bottom:4px;
+  font-size:11px;
+  text-transform:uppercase
+}
+
+.row {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:8px
+}
+
+.action-item {
+  background:#080d16;
+  padding:14px;
+  border-radius:12px;
+  margin-bottom:10px;
+  border:1px solid var(--card-border)
+}
+
+.rem-card {
+  background:#080d16;
+  border-left:4px solid var(--accent-green);
+  padding:14px;
+  margin-bottom:12px;
+  border-radius:12px;
+  border-top:1px solid var(--card-border);
+  border-right:1px solid var(--card-border);
+  border-bottom:1px solid var(--card-border)
+}
+
+.rem-header {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:8px
+}
+
+.switch {
+  position:relative;
+  display:inline-block;
+  width:48px;
+  height:24px
+}
+
+.switch input {
+  opacity:0;
+  width:0;
+  height:0
+}
+
+.slider {
+  position:absolute;
+  cursor:pointer;
+  top:0;
+  left:0;
+  right:0;
+  bottom:0;
+  background:#283548;
+  border-radius:24px
+}
+
+.slider:before {
+  position:absolute;
+  content:"";
+  height:18px;
+  width:18px;
+  left:3px;
+  bottom:3px;
+  background:white;
+  border-radius:50%
+}
+
+input:checked + .slider {
+  background:var(--accent-green)
+}
+
+input:checked + .slider:before {
+  transform:translateX(24px)
+}
+
+.power-row {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  background:#080d16;
+  padding:12px 16px;
+  border-radius:12px;
+  margin-top:8px;
+  border:1px solid var(--card-border)
+}
+
+</style>
+
+
+<script>
+
+/* =====================================================
+   DEVICE
+===================================================== */
+
+const PLANT_ID = "pratham_plant_01";
+
+const API_BASE =
+    "/api/devices/" + PLANT_ID;
+
+
+/* =====================================================
+   TOKEN
+===================================================== */
+
+function getDeviceToken() {
+
+    const params =
+        new URLSearchParams(
+            window.location.search
+        );
+
+    const urlToken =
+        params.get("device_token");
+
+    if (urlToken) {
+
+        localStorage.setItem(
+            "device_token",
+            urlToken
+        );
+
+        return urlToken;
+    }
+
+    return (
+        localStorage.getItem("device_token") ||
+        localStorage.getItem("qr_code_token") ||
+        "Pa4njodWH_pM7zGnswVhq-R6KRzLQClyMGB0aP2xhpw"
+    );
+}
+
+
+/* =====================================================
+   CSRF
+===================================================== */
+
+function getCookie(name) {
+
+    let value = null;
+
+    document.cookie
+        .split(";")
+        .forEach(function(cookie) {
+
+            cookie = cookie.trim();
+
+            if (
+                cookie.startsWith(
+                    name + "="
+                )
+            ) {
+
+                value =
+                    decodeURIComponent(
+                        cookie.substring(
+                            name.length + 1
+                        )
+                    );
+
+            }
+
+        });
+
+    return value;
+}
+
+
+/* =====================================================
+   API
+===================================================== */
+
+async function api(url, options = {}) {
+
+    const headers = {
+        "Accept":"application/json"
+    };
+
+    if (options.body) {
+
+        headers["Content-Type"] =
+            "application/json";
+
+    }
+
+    const token =
+        getDeviceToken();
+
+    if (token) {
+
+        headers["X-Device-Token"] =
+            token;
+
+    }
+
+    const csrf =
+        getCookie("csrftoken");
+
+    if (csrf) {
+
+        headers["X-CSRFToken"] =
+            csrf;
+
+    }
+
+    const response =
+        await fetch(
+            url,
+            {
+                ...options,
+                headers:{
+                    ...headers,
+                    ...(options.headers || {})
+                },
+                credentials:"same-origin"
+            }
+        );
+
+    const text =
+        await response.text();
+
+    let data = {};
+
+    if (text) {
+
+        try {
+
+            data =
+                JSON.parse(text);
+
+        } catch (e) {
+
+            console.error(
+                "SERVER RESPONSE:",
+                text
+            );
+
+            throw new Error(
+                "Server ne JSON nahi diya. HTTP " +
+                response.status
+            );
+
         }
 
-        * {
-            box-sizing: border-box
+    }
+
+    if (!response.ok) {
+
+        throw new Error(
+            data.detail ||
+            data.message ||
+            data.reply ||
+            data.error ||
+            ("HTTP " + response.status)
+        );
+
+    }
+
+    return data;
+}
+
+
+/* =====================================================
+   STATUS
+===================================================== */
+
+async function loadStatus() {
+
+    try {
+
+        const data =
+            await api(
+                API_BASE + "/status/"
+            );
+
+        document.getElementById(
+            "connection-status"
+        ).innerText =
+            data.is_active
+            ? "Connected"
+            : "Offline";
+
+        document.getElementById(
+            "power-status"
+        ).innerText =
+            data.is_active
+            ? "ONLINE"
+            : "OFFLINE";
+
+
+    } catch (e) {
+
+        console.error(
+            "STATUS:",
+            e.message
+        );
+
+        document.getElementById(
+            "connection-status"
+        ).innerText =
+            "Unavailable";
+    }
+}
+
+
+/* =====================================================
+   CONFIG LOAD
+===================================================== */
+
+async function loadConfig() {
+
+    try {
+
+        const data =
+            await api(
+                API_BASE + "/config/"
+            );
+
+        const custom =
+            data.custom_settings || {};
+
+        const system =
+            custom.system || {};
+
+        document.getElementById("s").value =
+            system.ssid || "";
+
+        document.getElementById("p").value =
+            system.pass || "";
+
+        document.getElementById("mp").value =
+            system.mypratham_token || "";
+
+        document.getElementById("ai").value =
+            system.ai_token || "";
+
+
+        /* POWER */
+
+        const power =
+            custom.power;
+
+        const powerInput =
+            document.querySelector(
+                ".power-row input"
+            );
+
+        if (typeof power === "boolean") {
+
+            powerInput.checked =
+                power;
+
+            document.querySelector(
+                ".power-row small"
+            ).innerText =
+                "State: " +
+                (power ? "ON" : "OFF");
         }
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont,
-                "Segoe UI", Roboto, sans-serif;
-            background: var(--bg-color);
-            color: var(--text-main);
-            margin: 0;
-            padding: 16px
+
+        /* TOUCH */
+
+        loadTouchFromConfig(
+            custom.touch || {}
+        );
+
+
+        /* REMINDERS */
+
+        loadRemindersFromConfig(
+            custom.reminders || []
+        );
+
+
+    } catch (e) {
+
+        console.error(
+            "CONFIG LOAD:",
+            e.message
+        );
+    }
+}
+
+
+/* =====================================================
+   SAVE SYSTEM CONFIG
+===================================================== */
+
+async function saveCfg() {
+
+    try {
+
+        const data = {
+
+            webhook_url:"",
+            api_endpoint:"",
+
+            custom_settings:{
+
+                system:{
+
+                    ssid:
+                        document.getElementById("s")
+                        .value.trim(),
+
+                    pass:
+                        document.getElementById("p")
+                        .value,
+
+                    mypratham_token:
+                        document.getElementById("mp")
+                        .value.trim(),
+
+                    ai_token:
+                        document.getElementById("ai")
+                        .value.trim()
+                }
+            }
+        };
+
+
+        await api(
+            API_BASE + "/save-config/",
+            {
+                method:"POST",
+                body:JSON.stringify(data)
+            }
+        );
+
+
+        alert(
+            "Config Saved Successfully!"
+        );
+
+
+    } catch (e) {
+
+        alert(
+            "Config Save Error:\n" +
+            e.message
+        );
+    }
+}
+
+
+/* =====================================================
+   AI CHAT
+===================================================== */
+
+async function sendAIChat() {
+
+    const input =
+        document.getElementById(
+            "ai-msg"
+        );
+
+    const msg =
+        input.value.trim();
+
+    if (!msg) return;
+
+
+    const box =
+        document.getElementById(
+            "ai-chat-box"
+        );
+
+
+    box.innerHTML +=
+
+        `<div
+            style="
+            background:#080d16;
+            padding:10px;
+            border-radius:10px;
+            margin-top:8px;
+            text-align:right">
+
+            <b>You:</b>
+            ${escapeHTML(msg)}
+
+        </div>`;
+
+
+    const thinking =
+        document.createElement("div");
+
+    thinking.style.cssText =
+        "background:#131d2e;" +
+        "padding:10px;" +
+        "border-radius:10px;" +
+        "margin-top:8px;" +
+        "color:#d97706;" +
+        "border:1px solid #283548";
+
+
+    thinking.innerHTML =
+        "<b>Plant:</b> Thinking...";
+
+    box.appendChild(
+        thinking
+    );
+
+
+    input.value = "";
+
+    box.scrollTop =
+        box.scrollHeight;
+
+
+    try {
+
+        const data =
+            await api(
+                API_BASE + "/ai-chat/",
+                {
+                    method:"POST",
+
+                    body:JSON.stringify({
+
+                        message:msg
+
+                    })
+                }
+            );
+
+
+        thinking.innerHTML =
+            "<b>Plant:</b> " +
+            escapeHTML(
+                data.reply ||
+                "Message received."
+            );
+
+
+        if (data.pending) {
+
+            pollAIStatus(
+                thinking
+            );
+
         }
 
-        .container {
-            max-width: 440px;
-            margin: auto
-        }
 
-        .card {
-            background: var(--card-bg);
-            border-radius: 16px;
-            padding: 20px;
-            margin-bottom: 16px;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, .3);
-            border: 1px solid var(--card-border)
-        }
+    } catch (e) {
 
-        h2 {
-            text-align: center;
-            color: var(--accent-green);
-            font-size: 24px;
-            margin: 10px 0 20px;
-            font-weight: 700
-        }
+        thinking.innerHTML =
+            `<b style="color:#ef4444">
+                Error:
+            </b> ` +
+            escapeHTML(
+                e.message
+            );
+    }
+}
 
-        h3 {
-            color: var(--accent-cyan);
-            font-size: 16px;
-            margin-top: 0;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-weight: 600;
-            border-bottom: 1px solid var(--card-border);
-            padding-bottom: 8px
-        }
 
-        button {
-            background: var(--btn-primary);
-            color: #fff;
-            border: 0;
-            padding: 12px 16px;
-            border-radius: 12px;
-            font-weight: 600;
-            width: 100%;
-            margin-top: 10px;
-            cursor: pointer;
-            font-size: 14px
-        }
+/* =====================================================
+   AI STATUS POLLING
+===================================================== */
 
-        .btn-danger {
-            background: var(--btn-danger)
-        }
+async function pollAIStatus(
+    element
+) {
 
-        .btn-warning {
-            background: var(--btn-warning)
-        }
+    let count = 0;
 
-        .btn-del {
-            background: var(--btn-danger);
-            padding: 6px 10px;
-            font-size: 11px;
-            width: auto;
-            margin: 0;
-            border-radius: 8px
-        }
+    const timer =
+        setInterval(
+            async function() {
 
-        input,
-        select {
-            background: #080d16;
-            color: var(--text-main);
-            border: 1px solid #283548;
-            padding: 12px;
-            margin: 6px 0 12px;
-            border-radius: 10px;
-            width: 100%;
-            font-size: 14px;
-            outline: none
-        }
+                count++;
 
-        .status-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin-top: 10px
-        }
+                if (count > 30) {
 
-        .status-box {
-            background: #080d16;
-            border: 1px solid var(--card-border);
-            padding: 14px;
-            border-radius: 12px;
-            font-size: 13px
-        }
+                    clearInterval(timer);
+                    return;
 
-        .status-box b {
-            color: var(--accent-cyan);
-            display: block;
-            margin-bottom: 4px;
-            font-size: 11px
-        }
+                }
 
-        .row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px
-        }
+                try {
 
-        .action-item {
-            background: #080d16;
-            padding: 14px;
-            border-radius: 12px;
-            margin-bottom: 10px;
-            border: 1px solid var(--card-border)
-        }
+                    const data =
+                        await api(
+                            API_BASE +
+                            "/ai-status/"
+                        );
 
-        .rem-card {
-            background: #080d16;
-            border-left: 4px solid var(--accent-green);
-            padding: 14px;
-            margin-bottom: 12px;
-            border-radius: 12px;
-            border-top: 1px solid var(--card-border);
-            border-right: 1px solid var(--card-border);
-            border-bottom: 1px solid var(--card-border)
-        }
+                    if (
+                        data.reply &&
+                        !data.pending
+                    ) {
 
-        .rem-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px
-        }
+                        element.innerHTML =
+                            "<b>Plant:</b> " +
+                            escapeHTML(
+                                data.reply
+                            );
 
-        .switch {
-            position: relative;
-            display: inline-block;
-            width: 48px;
-            height: 24px
-        }
-
-        .switch input {
-            opacity: 0;
-            width: 0;
-            height: 0
-        }
-
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: #283548;
-            border-radius: 24px
-        }
-
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 18px;
-            width: 18px;
-            left: 3px;
-            bottom: 3px;
-            background: white;
-            border-radius: 50%
-        }
-
-        input:checked+.slider {
-            background-color: var(--accent-green)
-        }
-
-        input:checked+.slider:before {
-            transform: translateX(24px)
-        }
-
-        .power-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: #080d16;
-            padding: 12px 16px;
-            border-radius: 12px;
-            margin-top: 8px;
-            border: 1px solid var(--card-border)
-        }
-    </style>
-
-    <script>
-
-        function api(path, options = {}) {
-
-            options.headers = options.headers || {};
-
-            options.headers["Content-Type"] = "application/json";
-
-            return fetch(path, options)
-                .then(async r => {
-
-                    let d = {};
-
-                    try {
-                        d = await r.json();
-                    } catch (e) { }
-
-                    if (!r.ok) {
-                        throw new Error(
-                            d.message ||
-                            d.reply ||
-                            "Backend error " + r.status
+                        clearInterval(
+                            timer
                         );
                     }
 
-                    return d;
+                } catch (e) {
 
-                });
+                    console.error(
+                        "AI STATUS:",
+                        e.message
+                    );
+                }
 
-        }
-
-
-        function addActionCard(id) {
-
-            document.getElementById(id)
-                .insertAdjacentHTML(
-                    "beforeend",
-
-                    `<div class="action-item">
-
-<div class="row">
-<b>Action Item</b>
-
-<button type="button"
-class="btn-del"
-onclick="this.parentElement.parentElement.remove()">
-Delete
-</button>
-
-</div>
-
-Type:
-
-<select class="act-type">
-<option value="track">
-DFPlayer Track
-</option>
-
-<option value="tts">
-Text to Speech
-</option>
-
-</select>
-
-Value / Text:
-
-<input class="act-val" value="1">
-
-Display Label:
-
-<input class="act-txt" value="Tulsi">
-
-Expression:
-
-<input class="act-expr" value="happy">
-
-</div>`
-                );
-
-        }
+            },
+            2000
+        );
+}
 
 
-        function collectTouch(id) {
+/* =====================================================
+   TOUCH ACTION CARD
+===================================================== */
 
-            let a = [];
+function addActionCard(
+    id,
+    data = null
+) {
 
-            document
-                .querySelectorAll("#" + id + " .action-item")
-                .forEach(c => {
+    const type =
+        data && data.type
+        ? data.type
+        : "track";
 
-                    a.push({
+    const value =
+        data && data.value !== undefined
+        ? data.value
+        : "1";
 
-                        type:
-                            c.querySelector(".act-type").value,
+    const text =
+        data && data.text
+        ? data.text
+        : "Tulsi";
 
-                        value:
-                            c.querySelector(".act-val").value,
-
-                        text:
-                            c.querySelector(".act-txt").value,
-
-                        expr:
-                            c.querySelector(".act-expr").value
-
-                    });
-
-                });
-
-            return a;
-
-        }
-
-
-        function saveTouch() {
-
-            let data = {
-
-                single:
-                    collectTouch("single-touch-list"),
-
-                double:
-                    collectTouch("double-touch-list")
-
-            };
+    const expr =
+        data && data.expression
+        ? data.expression
+        : "happy";
 
 
-            api(
-                "/save-touch",
+    document
+    .getElementById(id)
+    .insertAdjacentHTML(
+        "beforeend",
+
+        `<div class="action-item">
+
+            <div class="row">
+
+                <b>Action Item</b>
+
+                <button
+                    type="button"
+                    class="btn-del"
+                    onclick="
+                    this.parentElement
+                    .parentElement
+                    .remove()">
+
+                    Delete
+
+                </button>
+
+            </div>
+
+            Type:
+
+            <select class="act-type">
+
+                <option
+                    value="track"
+                    ${type === "track" ? "selected" : ""}>
+
+                    DFPlayer Track
+
+                </option>
+
+                <option
+                    value="tts"
+                    ${type === "tts" ? "selected" : ""}>
+
+                    Text to Speech
+
+                </option>
+
+            </select>
+
+            Value / Text:
+
+            <input
+                class="act-val"
+                value="${escapeAttr(value)}">
+
+            Display Label:
+
+            <input
+                class="act-txt"
+                value="${escapeAttr(text)}">
+
+            Expression:
+
+            <input
+                class="act-expr"
+                value="${escapeAttr(expr)}">
+
+        </div>`
+    );
+}
+
+
+/* =====================================================
+   READ TOUCH ACTIONS
+===================================================== */
+
+function readActionList(id) {
+
+    const list = [];
+
+    
+document
+        .querySelectorAll("#" + id + " .action-item")
+        .forEach(function(card) {
+
+            const typeEl =
+                card.querySelector(".act-type");
+
+            const valueEl =
+                card.querySelector(".act-val");
+
+            const textEl =
+                card.querySelector(".act-txt");
+
+            const exprEl =
+                card.querySelector(".act-expr");
+
+            list.push({
+                type: typeEl ? typeEl.value : "track",
+                value: valueEl ? valueEl.value : "",
+                text: textEl ? textEl.value : "",
+                expression: exprEl ? exprEl.value : ""
+            });
+
+        });
+
+    return list;
+}
+
+
+
+/* =====================================================
+   SAVE TOUCH CONFIG
+===================================================== */
+
+async function saveTouch() {
+
+    const singleTap =
+        readActionList("single-touch-list");
+
+    const doubleTap =
+        readActionList("double-touch-list");
+
+    const token =
+        getDeviceToken();
+
+    const touchData = {
+        single_tap: singleTap,
+        double_tap: doubleTap
+    };
+
+    console.log("[TOUCH] Saving:", touchData);
+    console.log("[TOUCH] Token:", token);
+
+
+    try {
+
+        const response =
+            await api(
+                API_BASE + "/save-touch/",
                 {
                     method: "POST",
-                    body: JSON.stringify(data)
+
+                    body: JSON.stringify({
+
+                        device_token: token,
+
+                        touch: touchData,
+
+                        single_tap: singleTap,
+
+                        double_tap: doubleTap
+
+                    })
                 }
-            )
-                .then(() => {
+            );
 
-                    alert(
-                        "Touch Configurations Saved!"
-                    );
 
-                })
-                .catch(e => alert(e.message));
+        console.log(
+            "[TOUCH] Server response:",
+            response
+        );
+
+
+        if (!response.success) {
+
+            throw new Error(
+                response.message ||
+                response.error ||
+                "Touch configuration save failed"
+            );
 
         }
 
 
-        function addReminder() {
+        /*
+         * Backend ne jo save kiya hai
+         * usko immediately verify karo.
+         */
 
-            let d = new Date();
+        const verify =
+            await api(
+                API_BASE + "/config/"
+            );
 
-            document
-                .getElementById("rems")
-                .insertAdjacentHTML(
-                    "beforeend",
 
-                    `<div class="rem-card">
+        const saved =
+            (
+                verify.custom_settings &&
+                verify.custom_settings.touch
+            ) || {};
 
-<div class="rem-header">
-<b>New Reminder</b>
 
-<button type="button"
-class="btn-del"
-onclick="this.parentElement.parentElement.remove()">
-Delete
-</button>
+        console.log(
+            "[TOUCH] Saved config:",
+            saved
+        );
+
+
+        alert(
+            "Touch Configuration Saved Successfully!"
+        );
+
+
+    } catch (e) {
+
+        console.error(
+            "[TOUCH SAVE ERROR]",
+            e
+        );
+
+        alert(
+            "Touch Save Error:\n" +
+            e.message
+        );
+
+    }
+
+}
+
+
+/* =====================================================
+   LOAD TOUCH CONFIG
+===================================================== */
+
+function loadTouchFromConfig(touch) {
+
+    const singleList =
+        document.getElementById(
+            "single-touch-list"
+        );
+
+    const doubleList =
+        document.getElementById(
+            "double-touch-list"
+        );
+
+
+    if (!singleList || !doubleList) {
+        return;
+    }
+
+
+    singleList.innerHTML = "";
+    doubleList.innerHTML = "";
+
+
+    /*
+     * Backend ke possible formats handle karo.
+     */
+
+    let single = [];
+    let double = [];
+
+
+    if (Array.isArray(touch)) {
+
+        single = touch;
+
+    } else {
+
+        single =
+            Array.isArray(touch.single_tap)
+            ? touch.single_tap
+            : [];
+
+        double =
+            Array.isArray(touch.double_tap)
+            ? touch.double_tap
+            : [];
+
+    }
+
+
+    console.log(
+        "[TOUCH] Loading single:",
+        single
+    );
+
+    console.log(
+        "[TOUCH] Loading double:",
+        double
+    );
+
+
+    single.forEach(function(item) {
+
+        addActionCard(
+            "single-touch-list",
+            item
+        );
+
+    });
+
+
+    double.forEach(function(item) {
+
+        addActionCard(
+            "double-touch-list",
+            item
+        );
+
+    });
+
+}
+
+
+
+/* =====================================================
+   REMINDER
+===================================================== */
+
+function addReminder(
+    data = null
+) {
+
+    const d =
+        new Date();
+
+
+    const sy =
+        data && data.start
+        ? data.start.year
+        : d.getFullYear();
+
+    const smo =
+        data && data.start
+        ? data.start.month
+        : d.getMonth() + 1;
+
+    const sd =
+        data && data.start
+        ? data.start.day
+        : d.getDate();
+
+
+    const ey =
+        data && data.end
+        ? data.end.year
+        : d.getFullYear();
+
+    const emo =
+        data && data.end
+        ? data.end.month
+        : d.getMonth() + 1;
+
+    const ed =
+        data && data.end
+        ? data.end.day
+        : d.getDate();
+
+
+    const hour =
+        data && data.time
+        ? data.time.hour
+        : 12;
+
+    const minute =
+        data && data.time
+        ? data.time.minute
+        : 0;
+
+
+    const task =
+        data && data.task
+        ? data.task
+        : "Water Plant";
+
+
+    const track =
+        data && data.track !== undefined
+        ? data.track
+        : 1;
+
+
+    const duration =
+        data && data.duration !== undefined
+        ? data.duration
+        : 1;
+
+
+    const active =
+        data && data.active !== undefined
+        ? data.active
+        : true;
+
+
+    document
+    .getElementById("rems")
+    .insertAdjacentHTML(
+        "beforeend",
+
+        `<div class="rem-card">
+
+            <div class="rem-header">
+
+                <b>New Reminder</b>
+
+                <button
+                    type="button"
+                    class="btn-del"
+                    onclick="
+                    this.parentElement
+                    .parentElement
+                    .remove()">
+
+                    Delete
+
+                </button>
+
+            </div>
+
+            Start Date:
+
+            <div
+                style="display:flex;gap:6px">
+
+                <input
+                    class="sy"
+                    type="number"
+                    value="${sy}">
+
+                <input
+                    class="smo"
+                    type="number"
+                    value="${smo}">
+
+                <input
+                    class="sd"
+                    type="number"
+                    value="${sd}">
+
+            </div>
+
+            End Date:
+
+            <div
+                style="display:flex;gap:6px">
+
+                <input
+                    class="ey"
+                    type="number"
+                    value="${ey}">
+
+                <input
+                    class="emo"
+                    type="number"
+                    value="${emo}">
+
+                <input
+                    class="ed"
+                    type="number"
+                    value="${ed}">
+
+            </div>
+
+            Time (HH:MM):
+
+            <div
+                style="display:flex;gap:6px">
+
+                <input
+                    class="rh"
+                    type="number"
+                    value="${hour}">
+
+                <input
+                    class="rm"
+                    type="number"
+                    value="${minute}">
+
+            </div>
+
+            Task:
+
+            <input
+                class="rt"
+                value="${escapeAttr(task)}">
+
+            Track:
+
+            <input
+                class="rk"
+                type="number"
+                value="${track}">
+
+            Duration (Mins):
+
+            <input
+                class="rdu"
+                type="number"
+                value="${duration}">
+
+            <div
+                style="
+                display:flex;
+                justify-content:space-between;
+                align-items:center;
+                margin-top:8px">
+
+                <span>
+                    Active Reminder
+                </span>
+
+                <label class="switch">
+
+                    <input
+                        class="ra"
+                        type="checkbox"
+                        ${active ? "checked" : ""}>
+
+                    <span class="slider"></span>
+
+                </label>
+
+            </div>
+
+        </div>`
+    );
+}
+
+
+/* =====================================================
+   READ REMINDERS
+===================================================== */
+
+function readReminders() {
+
+    const result = [];
+
+
+    document
+    .querySelectorAll(
+        "#rems .rem-card"
+    )
+    .forEach(function(card) {
+
+        result.push({
+
+            start:{
+
+                year:
+                    Number(
+                        card.querySelector(
+                            ".sy"
+                        ).value
+                    ),
+
+                month:
+                    Number(
+                        card.querySelector(
+                            ".smo"
+                        ).value
+                    ),
+
+                day:
+                    Number(
+                        card.querySelector(
+                            ".sd"
+                        ).value
+                    )
+            },
+
+
+            end:{
+
+                year:
+                    Number(
+                        card.querySelector(
+                            ".ey"
+                        ).value
+                    ),
+
+                month:
+                    Number(
+                        card.querySelector(
+                            ".emo"
+                        ).value
+                    ),
+
+                day:
+                    Number(
+                        card.querySelector(
+                            ".ed"
+                        ).value
+                    )
+            },
+
+
+            time:{
+
+                hour:
+                    Number(
+                        card.querySelector(
+                            ".rh"
+                        ).value
+                    ),
+
+                minute:
+                    Number(
+                        card.querySelector(
+                            ".rm"
+                        ).value
+                    )
+            },
+
+
+            task:
+                card.querySelector(
+                    ".rt"
+                ).value,
+
+
+            track:
+                Number(
+                    card.querySelector(
+                        ".rk"
+                    ).value
+                ),
+
+
+            duration:
+                Number(
+                    card.querySelector(
+                        ".rdu"
+                    ).value
+                ),
+
+
+            active:
+                card.querySelector(
+                    ".ra"
+                ).checked
+
+        });
+
+    });
+
+
+    return result;
+}
+
+
+/* =====================================================
+   SAVE REMINDERS
+===================================================== */
+
+async function saveReminders() {
+
+    try {
+
+        const reminders =
+            readReminders();
+
+
+        await api(
+            API_BASE + "/save-reminders/",
+            {
+                method:"POST",
+
+                body:JSON.stringify(
+                    reminders
+                )
+            }
+        );
+
+
+        alert(
+            "Reminders Saved Successfully!"
+        );
+
+
+    } catch (e) {
+
+        alert(
+            "Reminder Save Error:\n" +
+            e.message
+        );
+    }
+}
+
+
+/* =====================================================
+   LOAD REMINDERS
+===================================================== */
+
+function loadRemindersFromConfig(
+    reminders
+) {
+
+    document.getElementById(
+        "rems"
+    ).innerHTML = "";
+
+
+    if (!Array.isArray(reminders))
+        return;
+
+
+    reminders.forEach(
+        function(item) {
+
+            addReminder(item);
+
+        }
+    );
+}
+
+
+/* =====================================================
+   POWER TOGGLE
+===================================================== */
+
+async function powerToggle() {
+
+    const input =
+        document.querySelector(
+            ".power-row input"
+        );
+
+
+    const state =
+        input.checked;
+
+
+    try {
+
+        const data =
+            await api(
+                API_BASE +
+                "/power-toggle/",
+                {
+                    method:"POST",
+
+                    body:JSON.stringify({
+
+                        power:state
+
+                    })
+                }
+            );
+
+
+        document.querySelector(
+            ".power-row small"
+        ).innerText =
+            "State: " +
+            (
+                data.power
+                ? "ON"
+                : "OFF"
+            );
+
+
+        alert(
+            data.mqtt
+            ? "Power command sent!"
+            : "Power saved, MQTT unavailable."
+        );
+
+
+    } catch (e) {
+
+        input.checked =
+            !state;
+
+        alert(
+            "Power Error:\n" +
+            e.message
+        );
+    }
+}
+
+
+/* =====================================================
+   RESTART
+===================================================== */
+
+async function restartESP() {
+
+    if (
+        !confirm(
+            "Restart device?"
+        )
+    ) {
+        return;
+    }
+
+
+    try {
+
+        const data =
+            await api(
+                API_BASE +
+                "/restart/",
+                {
+                    method:"POST",
+
+                    body:JSON.stringify({})
+                }
+            );
+
+
+        if (data.success) {
+
+            alert(
+                "Restart command sent!"
+            );
+
+        } else {
+
+            alert(
+                data.message ||
+                "Restart failed."
+            );
+        }
+
+
+    } catch (e) {
+
+        alert(
+            "Restart Error:\n" +
+            e.message
+        );
+    }
+}
+
+
+/* =====================================================
+   ESCAPE
+===================================================== */
+
+function escapeHTML(text) {
+
+    const div =
+        document.createElement(
+            "div"
+        );
+
+    div.textContent =
+        String(text);
+
+    return div.innerHTML;
+}
+
+
+function escapeAttr(text) {
+
+    return String(text)
+        .replace(/&/g,"&amp;")
+        .replace(/"/g,"&quot;")
+        .replace(/</g,"&lt;")
+        .replace(/>/g,"&gt;");
+}
+
+
+/* =====================================================
+   PAGE LOAD
+===================================================== */
+
+document.addEventListener(
+    "DOMContentLoaded",
+    function() {
+
+        document
+        .getElementById("ai-msg")
+        .addEventListener(
+            "keydown",
+            function(e) {
+
+                if (
+                    e.key === "Enter"
+                ) {
+
+                    e.preventDefault();
+
+                    sendAIChat();
+
+                }
+
+            }
+        );
+
+
+        loadStatus();
+
+        loadConfig();
+
+    }
+);
+/* =====================================================
+   ADD ACTION CARD
+===================================================== */
+
+function addActionCard(id, data = null) {
+
+    const type =
+        data && data.type
+        ? data.type
+        : "track";
+
+    const value =
+        data && data.value !== undefined
+        ? data.value
+        : "1";
+
+    const text =
+        data && data.text
+        ? data.text
+        : "Tulsi";
+
+    const expr =
+        data && data.expression
+        ? data.expression
+        : "happy";
+
+
+    const container =
+        document.getElementById(id);
+
+
+    if (!container) {
+        console.error(
+            "[TOUCH] Container not found:",
+            id
+        );
+        return;
+    }
+
+
+    container.insertAdjacentHTML(
+        "beforeend",
+
+        `<div class="action-item">
+
+            <div class="row">
+
+                <b>Action Item</b>
+
+                <button
+                    type="button"
+                    class="btn-del"
+                    onclick="
+                    this.parentElement
+                    .parentElement
+                    .remove()">
+
+                    Delete
+
+                </button>
+
+            </div>
+
+            Type:
+
+            <select class="act-type">
+
+                <option
+                    value="track"
+                    ${type === "track" ? "selected" : ""}>
+
+                    DFPlayer Track
+
+                </option>
+
+                <option
+                    value="tts"
+                    ${type === "tts" ? "selected" : ""}>
+
+                    Text to Speech
+
+                </option>
+
+            </select>
+
+            Value / Text:
+
+            <input
+                class="act-val"
+                value="${escapeAttr(value)}">
+
+            Display Label:
+
+            <input
+                class="act-txt"
+                value="${escapeAttr(text)}">
+
+            Expression:
+
+            <input
+                class="act-expr"
+                value="${escapeAttr(expr)}">
+
+        </div>`
+    );
+
+}
+</script>
+
+</head>
+
+
+<body>
+
+<div class="container">
+
+<h2>🌿 Pratham Plant Pro</h2>
+
+
+<!-- DEVICE STATUS -->
+
+<div class="card">
+
+<h3>🔌 Device Status</h3>
+
+<div class="status-grid">
+
+<div class="status-box">
+
+<b>Connection</b>
+
+<span id="connection-status">
+Checking...
+</span>
 
 </div>
 
-Start Date:
+<div class="status-box">
 
-<div style="display:flex;gap:6px">
+<b>Battery / Power</b>
 
-<input class="sy"
-type="number"
-value="${d.getFullYear()}">
-
-<input class="smo"
-type="number"
-value="${d.getMonth() + 1}">
-
-<input class="sd"
-type="number"
-value="${d.getDate()}">
+<span id="power-status">
+Checking...
+</span>
 
 </div>
 
-End Date:
-
-<div style="display:flex;gap:6px">
-
-<input class="ey"
-type="number"
-value="${d.getFullYear()}">
-
-<input class="emo"
-type="number"
-value="${d.getMonth() + 1}">
-
-<input class="ed"
-type="number"
-value="${d.getDate()}">
+</div>
 
 </div>
 
-Time:
 
-<div style="display:flex;gap:6px">
+<!-- QUICK CONTROLS -->
 
-<input class="rh"
-type="number"
-value="12">
+<div class="card">
 
-<input class="rm"
-type="number"
-value="0">
+<h3>⚡ Quick Controls</h3>
 
-</div>
+<div class="power-row">
 
-Task:
+<span>
 
-<input class="rt"
-value="Water Plant">
+<b>Device Power</b>
 
-Track:
+<br>
 
-<input class="rk"
-type="number"
-value="1">
+<small style="color:var(--text-muted)">
+State: ON
+</small>
 
-Duration:
-
-<input class="rdu"
-type="number"
-value="1">
-
-<div style="display:flex;
-justify-content:space-between;
-align-items:center;
-margin-top:8px">
-
-<span>Active Reminder</span>
+</span>
 
 <label class="switch">
 
-<input class="ra"
+<input
 type="checkbox"
-checked>
+checked
+onchange="powerToggle()">
 
 <span class="slider"></span>
 
@@ -475,343 +1862,215 @@ checked>
 
 </div>
 
-</div>`
-                );
 
-        }
+<button
+class="btn-danger"
+onclick="restartESP()">
 
+🔄 Restart Device
 
-        function saveReminders() {
+</button>
 
-            let a = [];
+</div>
 
-            document
-                .querySelectorAll(".rem-card")
-                .forEach(c => {
 
-                    a.push({
+<!-- AI -->
 
-                        start_year:
-                            +c.querySelector(".sy").value,
+<div class="card">
 
-                        start_month:
-                            +c.querySelector(".smo").value,
+<h3>🤖 AI Plant Companion</h3>
 
-                        start_day:
-                            +c.querySelector(".sd").value,
+<div
+id="ai-chat-box"
+style="
+background:#080d16;
+padding:12px;
+border-radius:12px;
+margin-bottom:10px;
+min-height:110px;
+max-height:220px;
+overflow-y:auto;
+font-size:13px;
+border:1px solid var(--card-border)">
 
-                        end_year:
-                            +c.querySelector(".ey").value,
+<div
+style="
+background:#131d2e;
+padding:10px;
+border-radius:10px;
+color:var(--accent-cyan);
+border:1px solid var(--card-border)">
 
-                        end_month:
-                            +c.querySelector(".emo").value,
+<b>Plant:</b>
 
-                        end_day:
-                            +c.querySelector(".ed").value,
+Hi! I am Tulsi,
+your plant pro.
+Ask me anything!
 
-                        hour:
-                            +c.querySelector(".rh").value,
+</div>
 
-                        minute:
-                            +c.querySelector(".rm").value,
+</div>
 
-                        task:
-                            c.querySelector(".rt").value,
 
-                        track:
-                            +c.querySelector(".rk").value,
+<input
+type="text"
+id="ai-msg"
+placeholder="Ask Tulsi anything...">
 
-                        duration:
-                            +c.querySelector(".rdu").value,
 
-                        active:
-                            c.querySelector(".ra").checked
+<button
+onclick="sendAIChat()">
 
-                    });
+💬 Send to Plant AI
 
-                });
+</button>
 
+</div>
 
-            api(
-                "/save-reminders",
-                {
-                    method: "POST",
-                    body: JSON.stringify(a)
-                }
-            )
-                .then(() => {
 
-                    alert(
-                        "Reminders Saved!"
-                    );
+<!-- TOUCH -->
 
-                })
-                .catch(e => alert(e.message));
+<div class="card">
 
-        }
+<h3>👆 Touch Configurations</h3>
 
 
-        function saveCfg() {
+<h4
+style="
+color:var(--text-muted);
+font-size:13px;
+margin:10px 0 6px">
 
-            let data = {
+Single Tap
 
-                ssid:
-                    document.getElementById("s").value,
+</h4>
 
-                pass:
-                    document.getElementById("p").value,
 
-                mypratham_token:
-                    document.getElementById("mp").value,
+<div id="single-touch-list"></div>
 
-                ai_token:
-                    document.getElementById("ai").value
 
-            };
+<button
+class="btn-warning"
+onclick="addActionCard('single-touch-list')">
 
+* Add Action
 
-            api(
-                "/save-config",
-                {
-                    method: "POST",
-                    body: JSON.stringify(data)
-                }
-            )
-                .then(() => {
+</button>
 
-                    alert(
-                        "Config Saved! Reboot device."
-                    );
 
-                })
-                .catch(e => alert(e.message));
+<h4
+style="
+color:var(--text-muted);
+font-size:13px;
+margin:16px 0 6px">
 
-        }
+Double Tap
 
+</h4>
 
-        function restartESP() {
 
-            if (
-                !confirm("Restart Device?")
-            ) return;
+<div id="double-touch-list"></div>
 
 
-            api(
-                "/restart",
-                {
-                    method: "POST"
-                }
-            )
-                .then(() => {
+<button
+class="btn-warning"
+onclick="addActionCard('double-touch-list')">
 
-                    alert("Restarting...");
+* Add Action
 
-                })
-                .catch(e => alert(e.message));
+</button>
 
-        }
 
+<button
+onclick="saveTouch()"
+style="margin-top:16px">
 
-        function powerToggle() {
+💾 Save Touch Config
 
-            api(
-                "/power-toggle",
-                {
-                    method: "POST"
-                }
-            )
-                .then(d => {
+</button>
 
-                    location.reload();
+</div>
 
-                })
-                .catch(e => alert(e.message));
 
-        }
+<!-- REMINDERS -->
 
+<div class="card">
 
-        function sendAIChat() {
+<h3>⏰ Reminders</h3>
 
-            let i =
-                document.getElementById("ai-msg");
+<div id="rems"></div>
 
-            let msg = i.value.trim();
 
-            if (!msg) return;
+<button
+class="btn-warning"
+onclick="addReminder()">
 
+* Add Reminder
 
-            let b =
-                document.getElementById(
-                    "ai-chat-box"
-                );
+</button>
 
 
-            b.innerHTML +=
-                '<div style="background:#080d16;padding:10px;border-radius:10px;margin-top:8px;text-align:right"><b>You:</b> '
-                +
-                msg
-                +
-                '</div>';
+<button
+onclick="saveReminders()"
+style="margin-top:16px">
 
+💾 Save Reminders
 
-            b.innerHTML +=
-                '<div id="ai-thinking" style="background:#131d2e;padding:10px;border-radius:10px;margin-top:8px;color:#d97706;border:1px solid #283548"><b>Plant:</b> Thinking...</div>';
+</button>
 
+</div>
 
-            i.value = "";
 
-            b.scrollTop = b.scrollHeight;
+<!-- CONFIG -->
 
+<div class="card">
 
-            api(
-                "/ai-chat",
-                {
-                    method: "POST",
-                    body: JSON.stringify({
-                        message: msg
-                    })
-                }
-            )
-                .then(d => {
+<h3>⚙️ WiFi & System Config</h3>
 
-                    if (!d.success) {
+WiFi SSID:
 
-                        throw new Error(
-                            d.reply ||
-                            "AI failed"
-                        );
+<input
+id="s"
+value="">
 
-                    }
 
-                    pollAI();
+WiFi Password:
 
-                })
-                .catch(e => {
+<input
+type="password"
+id="p"
+value="">
 
-                    let x =
-                        document.getElementById(
-                            "ai-thinking"
-                        );
 
-                    if (x) {
+MyPratham Token:
 
-                        x.innerHTML =
-                            '<b style="color:#ef4444">Error:</b> '
-                            +
-                            e.message;
+<input
+id="mp"
+value="">
 
-                    }
 
-                });
+AI Token:
 
-        }
+<input
+type="password"
+id="ai"
+value="">
 
 
-        function pollAI() {
+<button
+class="btn-warning"
+onclick="saveCfg()">
 
-            let n = 0;
+💾 Save & Connect
 
+</button>
 
-            let t = setInterval(() => {
+</div>
 
-                api(
-                    "/ai-status"
-                )
-                    .then(d => {
 
-                        if (d.reply) {
+</div>
 
-                            clearInterval(t);
+</body>
 
-
-                            let x =
-                                document.getElementById(
-                                    "ai-thinking"
-                                );
-
-
-                            if (x) {
-
-                                x.outerHTML =
-                                    '<div style="background:#131d2e;padding:10px;border-radius:10px;margin-top:8px;color:#06b6d4;border:1px solid #283548"><b>Plant:</b> '
-                                    +
-                                    d.reply
-                                    +
-                                    '</div>';
-
-                            }
-
-                        }
-
-                    })
-                    .catch(() => { });
-
-
-                n++;
-
-
-                if (n >= 30) {
-
-                    clearInterval(t);
-
-                    let x =
-                        document.getElementById(
-                            "ai-thinking"
-                        );
-
-                    if (x) {
-
-                        x.innerHTML =
-                            '<b style="color:#d97706">Plant:</b> Taking longer.';
-
-                    }
-
-                }
-
-            }, 500);
-
-        }
-
-
-        document.addEventListener(
-            "DOMContentLoaded",
-            () => {
-
-                let input =
-                    document.getElementById(
-                        "ai-msg"
-                    );
-
-                if (input) {
-
-                    input.addEventListener(
-                        "keydown",
-                        e => {
-
-                            if (e.key === "Enter") {
-
-                                e.preventDefault();
-
-                                sendAIChat();
-
-                            }
-
-                        }
-                    );
-
-                }
-
-            }
-        );
-
-    </script>
-
-</head>
-
-<body>
-
-    <div class="container">
-
-        <h2>
-            🌿 Pratham Plant Pro
-        </h2>
+</html>
+```
