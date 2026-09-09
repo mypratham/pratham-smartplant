@@ -24,6 +24,7 @@ from .serializers import DeviceSerializer, DeviceConfigSerializer
 
 logger = logging.getLogger(__name__)
 
+HARDCODED_DEVICE_TOKEN = "Pa4njodWH_pM7zGnswVhq-R6KRzLQClyMGB0aP2xhpw"
 
 # =========================================================
 # CONFIGURATION
@@ -408,106 +409,66 @@ class DeviceDetailView(APIView):
 # =========================================================
 
 class DeviceHeartbeatView(APIView):
-
-    permission_classes = [
-        AllowAny
-    ]
+    permission_classes = [AllowAny]
 
     def post(self, request, plant_id):
-
-        device = Device.objects.filter(
-            plant_id=plant_id
-        ).first()
+        device = Device.objects.filter(plant_id=plant_id).first()
 
         if not device:
-
             return Response(
                 {
                     "success": False,
-                    "message":
-                    "Unknown device."
+                    "message": "Unknown device."
                 },
                 status=404
             )
 
         supplied_token = (
-            request.data.get(
-                "device_token"
-            )
-            or request.headers.get(
-                "X-Device-Token"
-            )
+            request.data.get("device_token")
+            or request.headers.get("X-Device-Token")
         )
 
-        if supplied_token != device.qr_code_token:
-
+        # Allow if token matches hardcoded token OR database qr_code_token
+        if supplied_token != HARDCODED_DEVICE_TOKEN and supplied_token != device.qr_code_token:
             return Response(
                 {
                     "success": False,
-                    "message":
-                    "Invalid device token."
+                    "message": "Invalid device token."
                 },
                 status=401
             )
 
         device.is_active = True
         device.last_seen = timezone.now()
+        device.save(update_fields=["is_active", "last_seen"])
 
-        device.save(
-            update_fields=[
-                "is_active",
-                "last_seen"
-            ]
-        )
-
-        config, _ = (
-            DeviceConfig.objects.get_or_create(
-                device=device
-            )
-        )
+        config, _ = DeviceConfig.objects.get_or_create(device=device)
 
         return Response(
             {
                 "success": True,
-                "plant_id":
-                    device.plant_id,
-                "device_name":
-                    device.device_name,
-                "is_active":
-                    device.is_active,
-                "last_seen":
-                    device.last_seen,
-                "config":
-                    DeviceConfigSerializer(
-                        config
-                    ).data
+                "plant_id": device.plant_id,
+                "device_name": device.device_name,
+                "is_active": device.is_active,
+                "last_seen": device.last_seen,
+                "config": DeviceConfigSerializer(config).data
             }
         )
-
 
 # =========================================================
 # STATUS
 # =========================================================
-
 class DeviceStatusView(APIView):
-
-    permission_classes = [
-        AllowAny
-    ]
+    permission_classes = [AllowAny]
 
     def get(self, request, plant_id):
-
-        device = Device.objects.filter(
-            plant_id=plant_id
-        ).first()
+        device = Device.objects.filter(plant_id=plant_id).first()
 
         if not device:
-
             return Response(
                 {
                     "success": False,
-                    "detail":
-                    "Device not found."
+                    "detail": "Device not found."
                 },
                 status=404
             )
@@ -515,17 +476,12 @@ class DeviceStatusView(APIView):
         return Response(
             {
                 "success": True,
-                "plant_id":
-                    device.plant_id,
-                "device_name":
-                    device.device_name,
-                "is_active":
-                    device.is_active,
-                "last_seen":
-                    device.last_seen
+                "plant_id": device.plant_id,
+                "device_name": device.device_name,
+                "is_active": device.is_active,
+                "last_seen": device.last_seen
             }
         )
-
 
 # =========================================================
 # CONFIG
@@ -633,7 +589,10 @@ class DeviceAIChatView(APIView):
 
             if not device:
                 return Response(
-                    {"success": False, "reply": "Device not found."}, 
+                    {
+                        "success": False,
+                        "reply": "Device not found."
+                    },
                     status=404
                 )
 
@@ -642,21 +601,29 @@ class DeviceAIChatView(APIView):
                 or request.data.get("device_token")
             )
 
-            # Hardcoded Token Check (allows provided token OR DB token)
-            HARDCODED_TOKEN = "Pa4njodWH_pM7zGnswVhq-R6KRzLQClyMGB0aP2xhpw"
-            if device_token != HARDCODED_TOKEN and device_token != device.qr_code_token:
+            # Allow if token matches hardcoded token OR database qr_code_token
+            if device_token != HARDCODED_DEVICE_TOKEN and device_token != device.qr_code_token:
                 return Response(
-                    {"success": False, "reply": "Invalid device token."},
+                    {
+                        "success": False,
+                        "reply": "Invalid device token."
+                    },
                     status=401
                 )
 
             message = str(
-                request.data.get("message", request.data.get("user_message", ""))
+                request.data.get(
+                    "message",
+                    request.data.get("user_message", "")
+                )
             ).strip()
 
             if not message:
                 return Response(
-                    {"success": False, "reply": "Message is empty."}, 
+                    {
+                        "success": False,
+                        "reply": "Message is empty."
+                    },
                     status=400
                 )
 
@@ -665,7 +632,10 @@ class DeviceAIChatView(APIView):
             # Set pending BEFORE publishing
             cache.set(
                 "ai_status_" + plant_id,
-                {"pending": True, "reply": "Plant AI is thinking..."},
+                {
+                    "pending": True,
+                    "reply": "Plant AI is thinking..."
+                },
                 timeout=300
             )
 
@@ -676,7 +646,10 @@ class DeviceAIChatView(APIView):
             if not mqtt_ok:
                 cache.set(
                     "ai_status_" + plant_id,
-                    {"pending": False, "reply": "AI service unavailable."},
+                    {
+                        "pending": False,
+                        "reply": "AI service unavailable."
+                    },
                     timeout=300
                 )
 
