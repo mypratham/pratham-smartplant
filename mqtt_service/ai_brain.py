@@ -33,10 +33,8 @@ logger = logging.getLogger("PRATHAM-AI")
 # GEMINI CONFIGURATION
 # =========================================================
 
-GEMINI_API_KEY = os.environ.get(
-    "GEMINI_API_KEY",
-    "AQ.Ab8RN6IZ4NxpBe2wkqgKPV0YHWBqRlQphcy5RnLtCUYZEz254w"
-)
+
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 GEMINI_MODEL = os.environ.get(
     "GEMINI_MODEL",
