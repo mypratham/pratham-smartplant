@@ -38,7 +38,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-VIRTUAL_ENV="C:\Users\infop\OneDrive\Desktop\ESP32\ESP32\venv310"
+VIRTUAL_ENV="C:\Users\infop\OneDrive\Desktop\ESP32\pratham-smartplant\venv310"
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"
