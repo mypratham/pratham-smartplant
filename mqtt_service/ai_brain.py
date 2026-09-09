@@ -33,22 +33,22 @@ logger = logging.getLogger("PRATHAM-AI")
 # GEMINI CONFIGURATION
 # =========================================================
 
-GEMINI_API_KEY = os.environ.get(
-    "GEMINI_API_KEY",
-    "AQ.Ab8RN6IZ4NxpBe2wkqgKPV0YHWBqRlQphcy5RnLtCUYZEz254w"
-)
+# GEMINI_API_KEY = os.environ.get(
+#     "GEMINI_API_KEY",
+#     "AQ.Ab8RN6IZ4NxpBe2wkqgKPV0YHWBqRlQphcy5RnLtCUYZEz254w"
+# )
 
-GEMINI_MODEL = os.environ.get(
-    "GEMINI_MODEL",
-    "gemini-1.5-flash"
-)
+# GEMINI_MODEL = os.environ.get(
+#     "GEMINI_MODEL",
+#     "gemini-1.5-flash"
+# )
 
-GEMINI_API_URL = (
-    "https://generativelanguage.googleapis.com/"
-    "v1beta/models/"
-    + GEMINI_MODEL
-    + ":generateContent"
-)
+# GEMINI_API_URL = (
+#     "https://generativelanguage.googleapis.com/"
+#     "v1beta/models/"
+#     + GEMINI_MODEL
+#     + ":generateContent"
+# )
 
 
 # =========================================================
@@ -207,12 +207,20 @@ def clean_ai_response(text):
 # =========================================================
 # GEMINI REST API
 # =========================================================
+GEMINI_API_KEY = "AQ.Ab8RN6IZ4NxpBe2wkqgKPV0YHWBqRlQphcy5RnLtCUYZEz254w"
+GEMINI_MODEL = "gemini-1.5-flash"
+GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
+PLANT_ID = "pratham_plant_01"
+
+
+def clean_ai_response(text):
+    if not text:
+        return "AI Error"
+    # Basic cleaning
+    return text.replace("\n", " ").strip()
+
 
 def call_gemini_api(message_text, plant_data=None):
-    if not GEMINI_API_KEY:
-        logger.error("GEMINI_API_KEY is not configured.")
-        return "AI Offline"
-
     if plant_data is None:
         plant_data = {}
 
@@ -248,7 +256,7 @@ Rules:
         "contents": [{"parts": [{"text": prompt}]}]
     }
 
-    # API Key URL me attach karein
+    # Pass API key explicitly as query parameter
     url = f"{GEMINI_API_URL}?key={GEMINI_API_KEY}"
 
     headers = {
@@ -257,7 +265,6 @@ Rules:
 
     try:
         logger.info("Sending request to Gemini...")
-        # URL variable use karein (GEMINI_API_URL nahi)
         response = requests.post(url, headers=headers, json=payload, timeout=30)
 
         logger.info("Gemini HTTP: %s", response.status_code)
