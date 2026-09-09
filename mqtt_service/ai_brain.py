@@ -248,17 +248,17 @@ Rules:
         "contents": [{"parts": [{"text": prompt}]}]
     }
 
+    # API Key URL me attach karein
     url = f"{GEMINI_API_URL}?key={GEMINI_API_KEY}"
 
     headers = {
         "Content-Type": "application/json"
     }
 
-    response = requests.post(url, headers=headers, json=payload, timeout=30)
-
     try:
         logger.info("Sending request to Gemini...")
-        response = requests.post(GEMINI_API_URL, headers=headers, json=payload, timeout=30)
+        # URL variable use karein (GEMINI_API_URL nahi)
+        response = requests.post(url, headers=headers, json=payload, timeout=30)
 
         logger.info("Gemini HTTP: %s", response.status_code)
 
@@ -294,7 +294,6 @@ Rules:
     except Exception as e:
         logger.exception("Gemini API Error: %s", e)
         return "AI Error"
-
 
 # =========================================================
 # ASYNC GEMINI WRAPPER
