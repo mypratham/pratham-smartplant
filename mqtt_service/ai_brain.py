@@ -35,12 +35,12 @@ logger = logging.getLogger("PRATHAM-AI")
 
 GEMINI_API_KEY = os.environ.get(
     "GEMINI_API_KEY",
-    "AQ.Ab8RN6IPkUk-ahkm5dGBWrcpW7u6aHue1_macOe7ZEFcepQ_LQ"
+    "AQ.Ab8RN6IZ4NxpBe2wkqgKPV0YHWBqRlQphcy5RnLtCUYZEz254w"
 )
 
 GEMINI_MODEL = os.environ.get(
     "GEMINI_MODEL",
-    "gemini-3.6-flash"
+    "gemini-1.5-flash"
 )
 
 GEMINI_API_URL = (
@@ -248,10 +248,13 @@ Rules:
         "contents": [{"parts": [{"text": prompt}]}]
     }
 
+    url = f"{GEMINI_API_URL}?key={GEMINI_API_KEY}"
+
     headers = {
-        "Content-Type": "application/json",
-        "x-goog-api-key": GEMINI_API_KEY
+        "Content-Type": "application/json"
     }
+
+    response = requests.post(url, headers=headers, json=payload, timeout=30)
 
     try:
         logger.info("Sending request to Gemini...")
