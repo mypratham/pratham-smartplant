@@ -6,4 +6,5 @@ urlpatterns = [
 
     # Devices API
     path("api/devices/", include("devices.urls")),
+    path("api/", include("accounts.urls")),
 ]
