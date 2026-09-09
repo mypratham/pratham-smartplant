@@ -625,68 +625,38 @@ class DeviceConfigView(APIView):
 # =========================================================
 
 class DeviceAIChatView(APIView):
-
-    permission_classes = [
-        AllowAny
-    ]
+    permission_classes = [AllowAny]
 
     def post(self, request, plant_id):
-
         try:
-
-            device = Device.objects.filter(
-                plant_id=plant_id
-            ).first()
+            device = Device.objects.filter(plant_id=plant_id).first()
 
             if not device:
-
                 return Response(
-                    {
-                        "success": False,
-                        "reply":
-                        "Device not found."
-                    },
+                    {"success": False, "reply": "Device not found."}, 
                     status=404
                 )
 
             device_token = (
-                request.headers.get(
-                    "X-Device-Token"
-                )
-                or request.data.get(
-                    "device_token"
-                )
+                request.headers.get("X-Device-Token")
+                or request.data.get("device_token")
             )
 
-            if device_token != device.qr_code_token:
-
+            # Hardcoded Token Check (allows provided token OR DB token)
+            HARDCODED_TOKEN = "Pa4njodWH_pM7zGnswVhq-R6KRzLQClyMGB0aP2xhpw"
+            if device_token != HARDCODED_TOKEN and device_token != device.qr_code_token:
                 return Response(
-                    {
-                        "success": False,
-                        "reply":
-                        "Invalid device token."
-                    },
+                    {"success": False, "reply": "Invalid device token."},
                     status=401
                 )
 
             message = str(
-                request.data.get(
-                    "message",
-                    request.data.get(
-                        "user_message",
-                        ""
-                    )
-                )
+                request.data.get("message", request.data.get("user_message", ""))
             ).strip()
 
             if not message:
-
                 return Response(
-                    {
-                        "success": False,
-                        "reply":
-                        "Message is empty."
-                    },
+                    {"success": False, "reply": "Message is empty."}, 
                     status=400
                 )
 
@@ -695,38 +665,25 @@ class DeviceAIChatView(APIView):
             # Set pending BEFORE publishing
             cache.set(
                 "ai_status_" + plant_id,
-                {
-                    "pending": True,
-                    "reply":
-                    "Plant AI is thinking..."
-                },
+                {"pending": True, "reply": "Plant AI is thinking..."},
                 timeout=300
             )
 
             mqtt_ok = asyncio.run(
-                publish_ai_request_mqtt(
-                    plant_id,
-                    message
-                )
+                publish_ai_request_mqtt(plant_id, message)
             )
 
             if not mqtt_ok:
-
                 cache.set(
                     "ai_status_" + plant_id,
-                    {
-                        "pending": False,
-                        "reply":
-                        "AI service unavailable."
-                    },
+                    {"pending": False, "reply": "AI service unavailable."},
                     timeout=300
                 )
 
                 return Response(
                     {
                         "success": False,
-                        "reply":
-                        "AI service unavailable.",
+                        "reply": "AI service unavailable.",
                         "pending": False
                     },
                     status=503
@@ -735,33 +692,23 @@ class DeviceAIChatView(APIView):
             return Response(
                 {
                     "success": True,
-                    "reply":
-                    "Message received. Plant AI is thinking...",
-                    "plant_id":
-                    plant_id,
+                    "reply": "Message received. Plant AI is thinking...",
+                    "plant_id": plant_id,
                     "pending": True
                 },
                 status=202
             )
 
         except Exception as e:
-
-            logger.exception(
-                "[AI CHAT] %s",
-                e
-            )
-
+            logger.exception("[AI CHAT] %s", e)
             return Response(
                 {
                     "success": False,
-                    "reply":
-                    "AI service error.",
+                    "reply": "AI service error.",
                     "pending": False
                 },
                 status=500
             )
-
-
 # =========================================================
 # AI STATUS
 # =========================================================
