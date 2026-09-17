@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ document.name }} - Chunks View</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body { background-color: #121212; color: #e0e0e0; font-family: sans-serif; }
+        .card-chunk { background-color: #1e1e1e; border: 1px solid #2d2d2d; border-radius: 8px; margin-bottom: 20px; }
+        .card-header-custom { background-color: #252525; border-bottom: 1px solid #2d2d2d; padding: 12px 20px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+        .card-body-custom { padding: 20px; font-size: 14px; line-height: 1.6; color: #b0b0b0; word-break: break-word; }
+        .badge-chars { font-size: 12px; color: #888; font-weight: normal; margin-left: 10px; }
+    </style>
+</head>
+<body class="p-4">
+    <div class="container" style="max-width: 1000px;">
+        <!-- Header Section -->
+        <div class="mb-4">
+            <a href="/" class="btn btn-sm btn-outline-secondary mb-3"><i class="fas fa-arrow-left"></i> Back to Console</a>
+            <h3 class="text-white fw-bold">{{ document.name }}</h3>
+            <p class="text-muted small">View, edit, and delete parsed content chunks.</p>
+        </div>
+
+        <!-- Chunks Cards Loop -->
+        {% for chunk in chunks %}
+        <div class="card card-chunk">
+            <div class="card-header-custom">
+                <div>
+                    <span class="text-info fw-bold">Chunk {{ chunk.chunk_index }}</span>
+                    <span class="badge-chars">{{ chunk.chunk_text|length }} characters</span>
+                </div>
+                <div>
+                    <button class="btn btn-sm btn-dark text-light border-secondary me-2" onclick="editChunk(this, {{ chunk.id }})">
+                        <i class="fas fa-edit"></i> Edit
+                    </button>
+                    <button class="btn btn-sm btn-dark text-danger border-secondary" onclick="deleteChunk({{ chunk.id }})">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                </div>
+            </div>
+            <div class="card-body-custom chunk-text-body">
+                {{ chunk.chunk_text }}
+            </div>
+        </div>
+        {% empty %}
+        <div class="text-center text-muted py-5">
+            <h5>No chunks found for this document.</h5>
+        </div>
+        {% endfor %}
+
+        <!-- Footer Info -->
+        <div class="d-flex justify-content-between align-items-center text-muted small mt-4">
+            <span>{{ total_chunks }} total, page 1 / 1</span>
+        </div>
+    </div>
+
+    <script>
+        function editChunk(button, chunkId) {
+            let card = button.closest('.card-chunk');
+            let textBody = card.querySelector('.chunk-text-body');
+            
+            // Agar pehle se textarea open nahi hai toh open karein
+            if (card.querySelector('textarea')) return;
+
+            let currentText = textBody.innerText.trim();
+            
+            // Text ko textarea mein badal dein
+            textBody.innerHTML = `
+                <textarea class="form-control bg-dark text-light mb-2" rows="4">${currentText}</textarea>
+                <button class="btn btn-sm btn-success me-2" onclick="saveChunk(this, ${chunkId})">Save</button>
+                <button class="btn btn-sm btn-secondary" onclick="cancelEdit(this, \`${currentText.replace(/`/g, '\\`')}\`)">Cancel</button>
+            `;
+        }
+
+        function saveChunk(button, chunkId) {
+            let card = button.closest('.card-chunk');
+            let textarea = card.querySelector('textarea');
+            let newText = textarea.value.trim();
+
+            if (!newText) {
+                alert("Chunk text cannot be empty");
+                return;
+            }
+
+            fetch(`/api/knowledge-base/chunk/update/${chunkId}/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chunk_text: newText })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if(data.status === 'success') {
+                    location.reload();
+                } else {
+                    alert("Error: " + data.message);
+                }
+            })
+            .catch(err => alert("Failed to update chunk"));
+        }
+
+        function cancelEdit(button, originalText) {
+            let card = button.closest('.card-chunk');
+            let textBody = card.querySelector('.chunk-text-body');
+            textBody.innerText = originalText;
+        }
+
+        function deleteChunk(chunkId) {
+            if(confirm("Are you sure you want to delete this chunk?")) {
+                fetch(`/api/knowledge-base/chunk/delete/${chunkId}/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if(data.status === 'success') {
+                        location.reload();
+                    } else {
+                        alert("Error: " + data.message);
+                    }
+                });
+            }
+        }
+    </script>
