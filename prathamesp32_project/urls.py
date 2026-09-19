@@ -30,7 +30,9 @@ from core.views import (
     delete_chunk_api,
     set_reminder_api,
     update_delete_reminder_api, 
-    audio_upload_view,  # 👈 Yeh yahan import hona chahiye
+    audio_upload_view,
+    device_pair,      # 👈 Yahan add kar diya gaya hai
+    check_pairing,    # 👈 Yahan add kar diya gaya hai
 )
 
 urlpatterns = [
@@ -48,6 +50,8 @@ urlpatterns = [
     path('api/devices/<str:plant_id>/reminder/', set_reminder_api, name='set_reminder'),
     path('api/devices/<str:plant_id>/reminder/<int:reminder_id>/', update_delete_reminder_api, name='update_delete_reminder'),
     path('api/devices/<str:plant_id>/audio/', audio_upload_view, name='audio_upload'),
+    path('api/devices/pair/', device_pair, name='device_pair'),
+    path('api/devices/check-pairing/', check_pairing, name='check_pairing'),
 ]
 
 # Media files serve karne ke liye yeh zaroor add karein taaki 404 error na aaye:

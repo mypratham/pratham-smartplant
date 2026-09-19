@@ -16,12 +16,17 @@ class AIAgent(models.Model):
 class Device(models.Model):
     plant_id = models.CharField(max_length=100, unique=True, default="pratham_plant_01")
     device_token = models.CharField(max_length=255)
+    
+    # --- NAYE FIELDS PAIRING KE LIYE (Purana data delete nahi hoga) ---
+    mac_address = models.CharField(max_length=50, blank=True, null=True, unique=True)
+    is_paired = models.BooleanField(default=True)  # True rakhein taaki purane devices un-pair na ho
+    
     is_online = models.BooleanField(default=False)
     power_state = models.BooleanField(default=True)
     last_seen = models.DateTimeField(auto_now=True)
     agent = models.ForeignKey(AIAgent, on_delete=models.SET_NULL, null=True, blank=True, related_name="devices")
     
-    # Quiz aur state tracking ke liye fields jo humne pehle discuss kiye the
+    # Quiz aur state tracking ke liye fields
     is_quiz_active = models.BooleanField(default=False)
     quiz_topic = models.CharField(max_length=255, blank=True, null=True)
 
