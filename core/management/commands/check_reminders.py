@@ -5,7 +5,7 @@ from django.core.management.base import BaseCommand
 import paho.mqtt.publish as publish
 
 # Aapka views.py wala MQTT config
-MQTT_BROKER = "192.168.1.8"
+MQTT_BROKER = "192.168.1.9"
 MQTT_PORT = 1883
 
 class Command(BaseCommand):

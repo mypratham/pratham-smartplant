@@ -128,7 +128,7 @@ USE_TZ = True
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'static'
 
-ALLOWED_HOSTS = ['*']
+# ALLOWED_HOSTS = ['*']
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
@@ -140,4 +140,4 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Yahan apni OpenAI API Key daal dein
-OPENAI_API_KEY = "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"
+OPENAI_API_KEY = "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"

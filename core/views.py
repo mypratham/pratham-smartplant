@@ -1,5 +1,6 @@
 import json
 import os
+import uuid
 import requests
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
@@ -15,19 +16,19 @@ from .rag_service import get_rag_context
 from pypdf import PdfReader
 from docx import Document as DocxDocument
 import wave
-
-# Models import (Yahan PlantChatHistory bhi add kiya gaya hai)
+import re
+# Models import
 from .models import Device, AIAgent, KnowledgeBase, Document, DocumentChunk, Reminder, PlantChatHistory
 
 from pydub import AudioSegment
-# 👇 FFmpeg ke bin folder ko system PATH mein dynamically add kar rahe hain taaki pydub ko koi error na aaye
+# 👇 FFmpeg ke bin folder ko system PATH mein dynamically add kar rahe hain
 ffmpeg_bin_path = r"C:\ffmpeg-2026-09-14-git-6efe500d2e-essentials_build\bin"
 if ffm_path := ffmpeg_bin_path:
     if ffm_path not in os.environ["PATH"]:
         os.environ["PATH"] += os.pathsep + ffm_path
 
 # MQTT Config
-MQTT_BROKER = "192.168.1.8"
+MQTT_BROKER = "192.168.1.9"
 MQTT_PORT = 1883
 
 # ==========================================
@@ -41,17 +42,9 @@ PRATHAM_SYSTEM_INSTRUCTION = (
     "OLED screen ke liye jawab hamesha chhota, seedha aur crisp hona chahiye."
 )
 
-
-
 # ==========================================
 # KNOWLEDGE BASE / RAG HELPERS
 # ==========================================
-# IMPORTANT:
-# The KB must be checked BEFORE any AI provider is called.
-# We do local retrieval here instead of depending only on rag_service.py.
-# This also handles Hindi speech such as "इंडिया जीके" against a document
-# named "India_GK_Facts.txt".
-
 RAG_HINDI_ALIASES = {
     "इंडिया": "india",
     "भारत": "india",
@@ -80,8 +73,7 @@ def _rag_normalize(value):
     value = str(value)
     value = value.replace("_", " ").replace("-", " ").replace("/", " ")
     value = value.casefold()
-    value = value.replace("’", "'").replace("–", " ").replace("—", " ")
-    # Remove punctuation but keep Unicode letters/digits/spaces.
+    value = value.replace('"', "").replace("'", "").replace("-", " ") # Fixed encoding issue
     value = re.sub(r"[^\w\s\u0900-\u097F]", " ", value, flags=re.UNICODE)
     return re.sub(r"\s+", " ", value).strip()
 
@@ -94,17 +86,14 @@ def _rag_query_terms(query):
         return []
 
     terms = []
-    # First add aliases for multi-word/specific Hindi phrases.
     for source, target in sorted(RAG_HINDI_ALIASES.items(), key=lambda x: len(x[0]), reverse=True):
         if source in normalized:
             terms.append(target)
 
-    # Then add original words of reasonable length.
     for word in re.findall(r"[\w\u0900-\u097F]+", normalized, flags=re.UNICODE):
         if len(word) >= 2 and word not in terms:
             terms.append(word)
 
-    # Common conversational words should not decide a KB match.
     stop_words = {
         "hai", "hain", "ho", "kya", "ka", "ke", "ki", "ko", "me", "mein",
         "mujhe", "batao", "bata", "please", "the", "is", "a", "an", "of",
@@ -116,10 +105,6 @@ def _rag_query_terms(query):
 
 
 def find_kb_matches(query, limit=5):
-    """
-    Deterministic KB retrieval with optimized weights.
-    Chunk content matching is prioritized higher than document titles.
-    """
     terms = _rag_query_terms(query)
     if not terms:
         return []
@@ -150,27 +135,22 @@ def find_kb_matches(query, limit=5):
             score = 0
             matched = set()
 
-            # Exact full-query match inside chunk content gets highest priority
-            if normalized_query and normalized_query in chunk_text:
-                score += 150
-            elif normalized_query and normalized_query in searchable:
-                score += 80
+            if normalized_query and normalized_query in searchable:
+                score += 100
 
-            # Score terms separately with balanced weights (Chunk content prioritized)
             for term in terms:
                 term_score = 0
                 if term in chunk_text:
-                    term_score += 40  # Chunk text match weight increased for accuracy
+                    term_score += 20
                     matched.add(term)
                 if term in doc_name:
-                    term_score += 15  # Doc name weight balanced
+                    term_score += 35
                     matched.add(term)
                 if term in kb_name:
-                    term_score += 15  # KB name weight balanced
+                    term_score += 35
                     matched.add(term)
                 score += term_score
 
-            # Require at least one meaningful match.
             if matched:
                 score += len(matched) * 10
                 scored.append((score, chunk))
@@ -202,7 +182,6 @@ def find_kb_matches(query, limit=5):
 
 
 def get_kb_context_direct(query, limit=5):
-    """Return top KB context and match metadata."""
     matches = find_kb_matches(query, limit=limit)
     if not matches:
         return "", []
@@ -213,11 +192,7 @@ def get_kb_context_direct(query, limit=5):
     return context, matches
 
 
-def build_kb_answer(query, matches, max_chars=180):
-    """
-    Build a short answer directly from retrieved KB content.
-    No Gemini/OpenAI call is made when KB retrieval succeeds.
-    """
+def build_kb_answer(query, matches, max_chars=512):
     if not matches:
         return ""
 
@@ -230,7 +205,6 @@ def build_kb_answer(query, matches, max_chars=180):
         if not text:
             continue
 
-        # Split on common sentence boundaries.
         parts = re.split(r"(?<=[.!?।])\s+|\n+", text)
         for part in parts:
             part = part.strip(" -•\t")
@@ -258,7 +232,6 @@ def build_kb_answer(query, matches, max_chars=180):
 
 
 def get_safe_ai_text(response, default="Hello"):
-    """Safely extract model text."""
     try:
         text = getattr(response, "text", "") or ""
         return text.strip() or default
@@ -267,7 +240,6 @@ def get_safe_ai_text(response, default="Hello"):
 
 
 def parse_ai_json(text, default_text="Hello", default_expr="happy"):
-    """Parse JSON returned by an AI model without crashing on markdown fences."""
     cleaned = (text or "").strip()
     if cleaned.startswith("```"):
         cleaned = cleaned.replace("```json", "").replace("```JSON", "").replace("```", "").strip()
@@ -283,7 +255,6 @@ def parse_ai_json(text, default_text="Hello", default_expr="happy"):
 
 
 def generate_plant_tts(request, plant_id, text, filename_prefix="plant"):
-    """Generate MP3 TTS and return absolute media URL."""
     audio_url = ""
     try:
         if not text:
@@ -304,28 +275,42 @@ def generate_plant_tts(request, plant_id, text, filename_prefix="plant"):
 
 
 def save_chat_history_and_device_state(device, user_text, ai_reply):
-    """Keep existing chat-history/device-state logic in one safe helper."""
+    # 1. Fallback / Validation: Text empty ho toh default value dein
+    user_text_clean = str(user_text).strip() if user_text else "No user input"
+    ai_reply_clean = str(ai_reply).strip() if ai_reply else "No response"
+
+    # 2. Save Chat History
     try:
-        PlantChatHistory.objects.create(
+        history = PlantChatHistory.objects.create(
             device=device,
-            user_text=user_text,
-            ai_response=ai_reply
+            user_text=user_text_clean,
+            ai_response=ai_reply_clean
         )
+        print(f"[CHAT HISTORY SAVED SUCCESSFULLY]: ID {history.id}")
     except Exception as exc:
         print(f"[CHAT HISTORY SAVE ERROR]: {exc}")
 
+    # 3. Update Device State
     try:
+        fields_to_update = []
+        
         if hasattr(device, "custom_text"):
-            device.custom_text = ai_reply
+            device.custom_text = ai_reply_clean
+            fields_to_update.append("custom_text")
+            
         if hasattr(device, "current_expression"):
             device.current_expression = "happy"
-        device.save()
+            fields_to_update.append("current_expression")
+
+        if fields_to_update:
+            device.save(update_fields=fields_to_update)
+            print(f"[DEVICE STATE SAVED]: Updated {fields_to_update}")
+            
     except Exception as exc:
         print(f"[DEVICE STATE SAVE ERROR]: {exc}")
 
 
 def get_document_chunks_count(d):
-    """Safe method to count document chunks without returning 0 if chunks exist"""
     try:
         if hasattr(d, 'chunks'):
             return d.chunks.count()
@@ -337,16 +322,87 @@ def get_document_chunks_count(d):
         return DocumentChunk.objects.filter(document=d).count()
 
 
+# ==========================================
+# HELPER MOVED UP TO PREVENT NameError
+# ==========================================
+def save_pcm_as_wav(pcm_file_path, wav_file_path, sample_rate=16000):
+    with open(pcm_file_path, 'rb') as pcm_file:
+        pcm_data = pcm_file.read()
+
+    with wave.open(wav_file_path, 'wb') as wav_file:
+        wav_file.setnchannels(1)
+        wav_file.setsampwidth(2)
+        wav_file.setframerate(sample_rate)
+        wav_file.writeframes(pcm_data)
+
+
 def dashboard(request):
     return render(request, "index.html")
 
 
 @csrf_exempt
 def device_heartbeat(request, plant_id):
-    Device.objects.filter(plant_id=plant_id).update(is_online=True)
-    return JsonResponse(
-        {"status": "ok", "plant_id": plant_id, "is_online": True}
+    device, created = Device.objects.get_or_create(
+        plant_id=plant_id,
+        defaults={
+            'device_token': str(uuid.uuid4()),
+            'is_paired': True,
+            'is_online': True
+        }
     )
+    
+    if not created:
+        Device.objects.filter(plant_id=plant_id).update(is_online=True)
+
+    return JsonResponse(
+        {"status": "ok", "plant_id": plant_id, "is_online": True, "created": created}
+    )
+
+
+@csrf_exempt
+def device_pair(request):
+    if request.method != 'POST':
+        return JsonResponse({"success": False, "error": "Invalid request method"}, status=405)
+    try:
+        data = json.loads(request.body or "{}")
+        mac_address = data.get('mac_address')
+        
+        if not mac_address:
+            return JsonResponse({"success": False, "error": "MAC address missing"}, status=400)
+
+        device, created = Device.objects.get_or_create(
+            mac_address=mac_address,
+            defaults={
+                'plant_id': f"plant_{mac_address[-5:].replace(':', '').lower()}",
+                'device_token': str(uuid.uuid4()),
+                'is_paired': True
+            }
+        )
+        
+        return JsonResponse({
+            "success": True,
+            "plant_id": device.plant_id,
+            "device_token": device.device_token,
+            "is_paired": getattr(device, 'is_paired', True)
+        })
+    except Exception as e:
+        return JsonResponse({"success": False, "error": str(e)}, status=400)
+
+
+@csrf_exempt
+def check_pairing(request):
+    mac_address = request.GET.get('mac')
+    if not mac_address:
+        return JsonResponse({"is_paired": False, "error": "MAC address missing"}, status=400)
+    try:
+        device = Device.objects.get(mac_address=mac_address)
+        return JsonResponse({
+            "is_paired": getattr(device, 'is_paired', True),
+            "plant_id": device.plant_id,
+            "device_token": device.device_token
+        })
+    except Device.DoesNotExist:
+        return JsonResponse({"is_paired": False}, status=404)
 
 
 @csrf_exempt
@@ -361,77 +417,51 @@ def device_command(request, plant_id):
             user_text = (data.get("text") or data.get("message") or "").strip()
 
             if user_text:
-                # 🛑 Greeting ya 3 characters se chote words ke liye KB search skip karein
-                skip_kb = len(user_text) <= 3 or user_text.lower() in ["hi", "hello", "hey", "hii", "hlo"]
-                kb_context, kb_matches = ("", []) if skip_kb else get_kb_context_direct(user_text, limit=5)
+                kb_context, kb_matches = get_kb_context_direct(user_text, limit=5)
 
                 if kb_matches:
                     kb_answer = build_kb_answer(user_text, kb_matches)
                     data["rag_context"] = kb_answer or kb_context[:500]
                     data["kb_source"] = kb_matches[0]["document"]
-
-                    print(
-                        f"[PRIORITY 1 HIT 🧠] Query: {user_text!r} -> "
-                        f"{kb_matches[0]['document']} | "
-                        f"KB answer generated locally. AI provider NOT called."
-                    )
                 else:
-                    print(
-                        f"[PRIORITY 1 MISS] Query: {user_text!r} -> "
-                        f"Knowledge Base match nahi mila ya skip hua. Gemini fallback."
-                    )
-
                     try:
-                        device = Device.objects.filter(plant_id=plant_id).first()
-                        token = None
+                        # 👇 Gemini ki jagah OpenAI client configure aur use kar rahe hain
+                        openai_key = getattr(settings, "OPENAI_API_KEY", "")
+                        if not openai_key:
+                            raise RuntimeError("OPENAI_API_KEY is not configured.")
+                        
+                        client = OpenAI(api_key=openai_key)
 
-                        if device and device.agent and device.agent.api_token:
-                            token = device.agent.api_token
-                        else:
-                            token = "AQ.Ab8RN6KcABxL6w4dkbqbZcR-u8b42tYTOKyqDD7XgwvnewOllA"
+                        system_instruction = (
+                            "Aap 'Pratham' hain, ek smart assistant hain. "
+                            "Jawab hamesha chhota, seedha aur crisp Hindi/Hinglish mein dein jo OLED screen par fit ho sake."
+                        )
 
-                        if token:
-                            genai.configure(api_key=token)
-
-                            model_name = (
-                                getattr(getattr(device, "agent", None), "ai_model_name", None)
-                                or "gemini-3.5-flash"
-                            )
-
-                            model = genai.GenerativeModel(
-                                model_name=model_name,
-                                system_instruction=PRATHAM_SYSTEM_INSTRUCTION
-                            )
-
-                            prompt = (
-                                f"User ne pucha hai: '{user_text}'. "
-                                "Iska ek chhota, seedha aur useful jawab do jo OLED screen par fit ho sake."
-                            )
-
-                            res = model.generate_content(prompt)
-                            data["rag_context"] = get_safe_ai_text(res, "Hello! Main Pratham hoon, aapki kya madad karoon?")
-                        else:
-                            data["rag_context"] = "Hello! Main Pratham hoon."
+                        chat_response = client.chat.completions.create(
+                            model="gpt-3.5-turbo",
+                            messages=[
+                                {"role": "system", "content": system_instruction},
+                                {"role": "user", "content": user_text},
+                            ],
+                            max_tokens=30,
+                        )
+                        
+                        ai_reply = chat_response.choices[0].message.content.strip()
+                        data["rag_context"] = ai_reply
 
                     except Exception as ai_err:
-                        print(f"[DEVICE COMMAND GEMINI ERROR]: {str(ai_err)}")
-                        data["rag_context"] = "Hello! Aapne yaad kiya, boliye kya sunna chahenge?"
+                        data["rag_context"] = f"AI Error: {str(ai_err)}"
 
         topic = f"pratham/plant/{plant_id}/commands"
         payload = json.dumps(data, ensure_ascii=False)
 
-        try:
-            publish.single(
-                topic,
-                payload,
-                hostname=MQTT_BROKER,
-                port=MQTT_PORT,
-                qos=2
-            )
-        except Exception as mqtt_err:
-            print(f"[MQTT PUBLISH ERROR]: {mqtt_err}")
-            # Agar MQTT fail bhi ho jaye, tab bhi app crash na ho, 
-            # aap chahein toh ise hata sakte hain agar MQTT zaroori hai.
+        publish.single(
+            topic,
+            payload,
+            hostname=MQTT_BROKER,
+            port=MQTT_PORT,
+            qos=1
+        )
 
         return JsonResponse({
             "status": "success",
@@ -440,10 +470,7 @@ def device_command(request, plant_id):
         })
 
     except Exception as e:
-        # 👇 Yeh print batayega ki 400 error exactly kyu aa raha hai
-        print(f"[CRITICAL DEVICE COMMAND 400 ERROR]: {str(e)}")
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
-
 
 def plant_ai_config_view(request, plant_id):
     if request.method != "POST":
@@ -703,7 +730,6 @@ def rag_search_api(request):
         })
 
     except Exception as e:
-        print(f"[RAG SEARCH ERROR]: {e}")
         return JsonResponse({
             "status": "error",
             "message": str(e)
@@ -784,9 +810,7 @@ def unified_plant_ai_chat_view(request, plant_id):
                 "message": "Message is required"
             }, status=400)
 
-        # 🛑 FIXED: Greeting / Short messages ke liye KB search skip karein
-        skip_kb = len(user_message) <= 3 or user_message.lower() in ["hi", "hello", "hey", "hii", "hlo"]
-        kb_context, kb_matches = ("", []) if skip_kb else get_kb_context_direct(user_message, limit=5)
+        kb_context, kb_matches = get_kb_context_direct(user_message, limit=5)
 
         ai_text = ""
         ai_expr = "happy"
@@ -794,25 +818,12 @@ def unified_plant_ai_chat_view(request, plant_id):
 
         if kb_matches:
             ai_text = build_kb_answer(user_message, kb_matches)
-
             if not ai_text:
                 ai_text = "Knowledge Base mein data mila."
-
             source = "knowledge_base"
-
-            print(
-                f"[PRIORITY 1 HIT 🧠] Chat: {user_message!r} -> "
-                f"{kb_matches[0]['document']} | AI provider NOT called."
-            )
-            print(f"[KB ANSWER]: {ai_text}")
-
+            
         else:
-            print(
-                f"[PRIORITY 1 MISS] Chat: {user_message!r} -> "
-                "Knowledge Base mein match nahi mila ya skip kiya gaya."
-            )
-
-            agent = device.agent
+            agent = getattr(device, 'agent', None)
             if not agent or not agent.api_token:
                 return JsonResponse({
                     "status": "error",
@@ -834,23 +845,16 @@ def unified_plant_ai_chat_view(request, plant_id):
             }]
 
             for h in reversed(list(recent_history)):
-                messages.append({
-                    "role": "user",
-                    "content": h.user_text
-                })
-                messages.append({
-                    "role": "assistant",
-                    "content": h.ai_response
-                })
+                messages.append({"role": "user", "content": h.user_text})
+                messages.append({"role": "assistant", "content": h.ai_response})
 
-            messages.append({
-                "role": "user",
-                "content": user_message
-            })
+            messages.append({"role": "user", "content": user_message})
 
             genai.configure(api_key=agent.api_token)
 
-            model_name = agent.ai_model_name or "gemini-3.5-flash"
+            # 🔥 FIX 1: Corrected Gemini Model Name (gemini-1.5-flash)
+            model_name = agent.ai_model_name if (agent.ai_model_name and "gemini" in agent.ai_model_name) else "gemini-1.5-flash"
+            
             model = genai.GenerativeModel(
                 model_name=model_name,
                 system_instruction=system_prompt
@@ -867,24 +871,30 @@ def unified_plant_ai_chat_view(request, plant_id):
                 '{"text":"short answer","expr":"happy"}'
             )
 
-            res = model.generate_content(final_prompt)
-            ai_data = parse_ai_json(
-                get_safe_ai_text(res),
-                default_text="AI response unavailable.",
-                default_expr="happy"
-            )
+            try:
+                res = model.generate_content(final_prompt)
+                ai_data = parse_ai_json(
+                    get_safe_ai_text(res),
+                    default_text="AI response unavailable.",
+                    default_expr="happy"
+                )
 
-            ai_text = str(ai_data.get("text") or "Hello").strip()
-            ai_expr = str(ai_data.get("expr") or "happy").strip()
+                ai_text = str(ai_data.get("text") or "Hello").strip()
+                ai_expr = str(ai_data.get("expr") or "happy").strip()
+            except Exception as ai_err:
+                print(f"[GEMINI GENERATION ERROR]: {ai_err}")
+                ai_text = "Mujhe samajh nahi aaya, kripya dobara kahein."
+                ai_expr = "sad"
 
             source = "ai"
-            print(f"[PRIORITY 3 AI] AI Response: {ai_text}")
 
-        save_chat_history_and_device_state(
-            device,
-            user_message,
-            ai_text
-        )
+        # 🔥 FIX 2: History is saved safely here (Whether KB match or Gemini Response)
+        if ai_text:
+            save_chat_history_and_device_state(
+                device,
+                user_message,
+                ai_text
+            )
 
         audio_url = generate_plant_tts(
             request,
@@ -901,18 +911,17 @@ def unified_plant_ai_chat_view(request, plant_id):
             "source": source
         }
 
+        # MQTT Publish Block
         try:
             publish.single(
                 f"pratham/plant/{plant_id}/commands",
                 json.dumps(payload, ensure_ascii=False),
                 hostname=MQTT_BROKER,
                 port=MQTT_PORT,
-                qos=1,
-                timeout=4  # 👈 Timeout ko 2 se badhakar 4 seconds karein
+                qos=1
             )
         except Exception as mqtt_err:
-            print(f"[CHAT MQTT PUBLISH ERROR]: {mqtt_err}")
-            # Agar MQTT fail bhi ho jaye, toh bhi HTTP success return karein taaki frontend par chat na ruke
+            print(f"[MQTT PUBLISH ERROR]: {mqtt_err}")
 
         return JsonResponse({
             "status": "success",
@@ -928,12 +937,11 @@ def unified_plant_ai_chat_view(request, plant_id):
         }, status=404)
 
     except Exception as e:
-        print(f"[UNIFIED AI CHAT ERROR]: {e}")
+        print(f"[UNIFIED VIEW CRASH]: {e}")
         return JsonResponse({
             "status": "error",
             "message": str(e)
         }, status=500)
-
 
 def get_reminders_api(request, plant_id):
     if request.method != "GET":
@@ -1067,248 +1075,166 @@ def pratham_proxy_api(request, endpoint):
 
 @csrf_exempt
 def audio_upload_view(request, plant_id):
-    if request.method != "POST":
-        return JsonResponse({
-            "status": "error",
-            "message": "Invalid method"
-        }, status=405)
-
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
+        
     try:
         device = Device.objects.get(plant_id=plant_id)
 
+        # 1. Receive ESP32 raw binary data
         audio_data = request.body
-
         if not audio_data:
-            return JsonResponse({
-                "status": "error",
-                "message": "Audio data is empty"
-            }, status=400)
+            return JsonResponse({'status': 'error', 'message': 'Audio data is empty'}, status=400)
 
-        media_root = getattr(
-            settings,
-            "MEDIA_ROOT",
-            None
-        ) or os.path.join(settings.BASE_DIR, "media")
-
+        media_root = getattr(settings, 'MEDIA_ROOT', None) or os.path.join(settings.BASE_DIR, 'media')
         os.makedirs(media_root, exist_ok=True)
 
-        pcm_filename = f"plant_{plant_id}_upload.pcm"
+        pcm_filename = f'plant_{plant_id}_upload.pcm'
         pcm_path = os.path.join(media_root, pcm_filename)
-
-        audio_filename = f"plant_{plant_id}_upload.wav"
+        audio_filename = f'plant_{plant_id}_upload.wav'
         audio_path = os.path.join(media_root, audio_filename)
 
-        with open(pcm_path, "wb") as destination:
+        with open(pcm_path, 'wb+') as destination:
             destination.write(audio_data)
 
-        save_pcm_as_wav(
-            pcm_path,
-            audio_path,
-            sample_rate=16000
-        )
+        save_pcm_as_wav(pcm_path, audio_path, sample_rate=16000)
 
-        user_text = "Audio received"
-        ai_reply = "Hello from AI!"
-        ai_expr = "happy"
-        is_from_cache = False
-        source = "ai"
+        # 2. SPEECH-TO-TEXT
+        user_text = ""
+        openai_key = getattr(settings, 'OPENAI_API_KEY', '')
+        client = OpenAI(api_key=openai_key)
 
+        with open(audio_path, 'rb') as audio_file:
+            transcript = client.audio.transcriptions.create(
+                model='whisper-1', 
+                file=audio_file,
+                language='hi'
+            )
+            user_text = transcript.text.strip()
+
+        print(f'STT Raw User Text: {user_text}')
+
+        # 3. DIRECT TEXT REPLACEMENT
+        misheard_patterns = [
+            r'बाय\s*पृत्थम', r'बाय\s*प्रथम', r'माई\s*पर्थम', 
+            r'माई\s*प्रथम', r'माइ\s*प्रथम', r'माइ\s*पर्थम', r'बाय\s*प्रथम'
+        ]
+        
+        corrected_text = user_text
+        for pattern in misheard_patterns:
+            corrected_text = re.sub(pattern, 'MyPratham', corrected_text, flags=re.IGNORECASE)
+
+        print(f'Corrected Search Text: {corrected_text}')
+
+        ai_reply = ""
+        source = "knowledge_base"
+
+        # 4. STEP 1: DATABASE / KNOWLEDGE BASE SEARCH
+        kb_context, kb_matches = get_kb_context_direct(corrected_text, limit=5)
+
+        if kb_matches:
+            ai_reply = build_kb_answer(corrected_text, kb_matches)
+            source = "database"
+            print(f"[DB MATCH FOUND]: {ai_reply}")
+        else:
+            # STEP 2: Database me nahi mila -> AI Fallback
+            system_instruction = (
+                "Aap 'Pratham' hain. Pehle se DB me answer nahi mila hai. "
+                "Is query ka crisp aur short Hindi answer dein."
+            )
+
+            chat_response = client.chat.completions.create(
+                model='gpt-3.5-turbo',
+                messages=[
+                    {'role': 'system', 'content': system_instruction},
+                    {'role': 'user', 'content': corrected_text},
+                ],
+                max_tokens=50,
+            )
+            ai_reply = chat_response.choices[0].message.content.strip()
+            source = "openai_web"
+            print(f"[FALLBACK TO AI/WEB]: {ai_reply}")
+
+        # Update Device State
+        if hasattr(device, 'custom_text'):
+            device.custom_text = ai_reply
+        if hasattr(device, 'current_expression'):
+            device.current_expression = 'happy'
+        device.save()
+
+        # =========================================================
+        # 🔥 STEP 4.5: PLANT CHAT HISTORY KO DATABASE ME SAVE KAREIN
+        # =========================================================
         try:
-            openai_key = getattr(settings, "OPENAI_API_KEY", "")
-            if not openai_key:
-                raise RuntimeError("OPENAI_API_KEY is not configured.")
-
-            client = OpenAI(api_key=openai_key)
-
-            with open(audio_path, "rb") as audio_file:
-                transcript = client.audio.transcriptions.create(
-                    model="whisper-1",
-                    file=audio_file,
-                    language="hi"
-                )
-
-            user_text = (transcript.text or "").strip()
-
-            print(f"[STT User Text]: {user_text!r}")
-
-            if not user_text:
-                raise ValueError("STT returned empty text.")
-
-            kb_context, kb_matches = get_kb_context_direct(
-                user_text,
-                limit=5
+            history_entry = PlantChatHistory.objects.create(
+                device=device,
+                user_text=corrected_text or user_text or "No speech detected",
+                ai_response=ai_reply or "No response generated"
             )
+            print(f"[SUCCESS] Chat History Saved! Entry ID: {history_entry.id}")
+        except Exception as history_err:
+            print(f"[ERROR] Failed to save Chat History: {history_err}")
+        # =========================================================
 
-            if kb_matches:
-                ai_reply = build_kb_answer(
-                    user_text,
-                    kb_matches,
-                    max_chars=180
-                ) or "Knowledge Base mein data mila."
-
-                source = "knowledge_base"
-
-                print(
-                    f"[PRIORITY 1 HIT 🧠] Knowledge Base match: "
-                    f"{kb_matches[0]['document']} | "
-                    f"Chunk: {kb_matches[0]['chunk_index']}"
-                )
-                print(
-                    "[RAG] KB answer returned directly. "
-                    "OpenAI Chat Completion NOT called."
-                )
-                print(f"[AI Response (KB / Processed)]: {ai_reply}")
-
-            else:
-                print(
-                    "[PRIORITY 1 MISS] Knowledge Base mein match nahi mila, "
-                    "context memory aur OpenAI par move kar rahe hain."
-                )
-
-                recent_history = PlantChatHistory.objects.filter(
-                    device=device
-                ).order_by("-created_at")[:5]
-
-                system_instruction = (
-                    PRATHAM_SYSTEM_INSTRUCTION
-                    + " Keep your responses short and suitable for an OLED screen."
-                )
-
-                messages = [{
-                    "role": "system",
-                    "content": system_instruction
-                }]
-
-                for h in reversed(list(recent_history)):
-                    messages.append({
-                        "role": "user",
-                        "content": h.user_text
-                    })
-                    messages.append({
-                        "role": "assistant",
-                        "content": h.ai_response
-                    })
-
-                messages.append({
-                    "role": "user",
-                    "content": user_text
-                })
-
-                chat_response = client.chat.completions.create(
-                    model=getattr(settings, "OPENAI_CHAT_MODEL", "gpt-3.5-turbo"),
-                    messages=messages,
-                    max_tokens=60,
-                )
-
-                ai_reply = (
-                    chat_response.choices[0].message.content or "Hello"
-                ).strip()
-
-                source = "openai"
-
-                print(f"[AI Response (Real-time / Processed)]: {ai_reply}")
-
-            save_chat_history_and_device_state(
-                device,
-                user_text,
-                ai_reply
-            )
-
-        except Exception as ai_err:
-            print(f"[AI Integration Error]: {ai_err}")
-
-            if not ai_reply or ai_reply == "Hello from AI!":
-                ai_reply = "AI response unavailable."
-
+        # 5. Generate Audio (TTS)
         speech_audio_url = ""
-
         try:
             temp_mp3_filename = f"plant_{plant_id}_temp.mp3"
-            temp_mp3_path = os.path.join(
-                media_root,
-                temp_mp3_filename
-            )
-
-            tts = gTTS(
-                text=ai_reply,
-                lang="hi",
-                slow=False
-            )
+            temp_mp3_path = os.path.join(media_root, temp_mp3_filename)
+            
+            tts = gTTS(text=ai_reply, lang='hi', slow=False)
             tts.save(temp_mp3_path)
-
+            
             speech_filename = f"plant_{plant_id}_reply_speech.wav"
-            speech_path = os.path.join(
-                media_root,
-                speech_filename
-            )
-
+            speech_path = os.path.join(media_root, speech_filename)
+            
             sound = AudioSegment.from_mp3(temp_mp3_path)
-            sound = sound.set_frame_rate(16000)
-            sound = sound.set_channels(1)
-            sound = sound.set_sample_width(2)
+            sound = sound.set_frame_rate(16000).set_channels(1).set_sample_width(2)
             sound = sound.normalize()
-            sound = sound + 9
+            sound = sound + 16
             sound.export(speech_path, format="wav")
-
+            
             if os.path.exists(temp_mp3_path):
                 os.remove(temp_mp3_path)
-
-            media_url = getattr(
-                settings,
-                "MEDIA_URL",
-                "/media/"
-            )
-
-            speech_audio_url = request.build_absolute_uri(
-                f"{media_url}{speech_filename}"
-            )
-
+                
+            media_url = getattr(settings, 'MEDIA_URL', '/media/')
+            speech_audio_url = request.build_absolute_uri(f"{media_url}{speech_filename}")
+            
         except Exception as tts_err:
             print(f"[AUDIO UPLOAD TTS ERROR]: {str(tts_err)}")
 
-        media_url = getattr(
-            settings,
-            "MEDIA_URL",
-            "/media/"
+        # 6. MQTT Publish
+        payload = {
+            "type": "ai",
+            "text": ai_reply,
+            "expr": "happy",
+            "audio_url": speech_audio_url,
+            "source": source
+        }
+        
+        publish.single(
+            f"pratham/plant/{plant_id}/commands",
+            json.dumps(payload, ensure_ascii=False),
+            hostname=MQTT_BROKER,
+            port=MQTT_PORT,
+            qos=1
         )
 
-        audio_url = request.build_absolute_uri(
-            f"{media_url}{audio_filename}"
+        return JsonResponse(
+            {
+                'status': 'success',
+                'source': source,
+                'user_text': user_text,
+                'corrected_text': corrected_text,
+                'ai_response': ai_reply,
+                'speech_audio_url': speech_audio_url,
+            },
+            status=200,
         )
-
-        return JsonResponse({
-            "status": "success",
-            "message": "Audio uploaded, STT, RAG/AI processing completed.",
-            "user_text": user_text,
-            "ai_response": ai_reply,
-            "audio_url": audio_url,
-            "speech_audio_url": speech_audio_url,
-            "from_cache": is_from_cache,
-            "source": source,
-            "kb_match": source == "knowledge_base"
-        }, status=200)
 
     except Device.DoesNotExist:
-        return JsonResponse({
-            "status": "error",
-            "message": "Device not found"
-        }, status=404)
-
+        return JsonResponse({'status': 'error', 'message': 'Device not found'}, status=404)
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return JsonResponse({
-            "status": "error",
-            "message": str(e)
-        }, status=500)
-
-
-def save_pcm_as_wav(pcm_file_path, wav_file_path, sample_rate=16000):
-    with open(pcm_file_path, 'rb') as pcm_file:
-        pcm_data = pcm_file.read()
-
-    with wave.open(wav_file_path, 'wb') as wav_file:
-        wav_file.setnchannels(1)  # Mono
-        wav_file.setsampwidth(2)  # 16-bit
-        wav_file.setframerate(sample_rate)
-        wav_file.writeframes(pcm_data)
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)

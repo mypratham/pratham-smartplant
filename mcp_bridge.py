@@ -67,34 +67,34 @@ async def run_mcp_mqtt_bridge():
                         else:
                             ai_reply = str(rag_context).replace("{", "").replace("}", "").replace('"', "").replace("°C", "C")
                     else:
-                        print("--- CALLING GEMINI LLM ---")
-                        prompt = user_text
-                        model = genai.GenerativeModel('gemini-1.5-flash')
-                        response = model.generate_content(prompt)
-                        raw_reply = response.text if response else "No response generated."
-                        ai_reply = raw_reply.replace("*", "").replace("°C", "C").replace("°", "C")
+                        print("done")
+                        # prompt = user_text
+                        # model = genai.GenerativeModel('gemini-1.5-flash')
+                        # response = model.generate_content(prompt)
+                        # raw_reply = response.text if response else "No response generated."
+                        # ai_reply = raw_reply.replace("*", "").replace("°C", "C").replace("°", "C")
                         
-                    print(f"\n[AI Response / RAG Output]:\n{ai_reply}\n")
+                    # print(f"\n[AI Response / RAG Output]:\n{ai_reply}\n")
                     
                     # --- 1. Purana response topic publish (web/django ke liye) ---
-                    plant_id = topic.split('/')[2] if len(topic.split('/')) > 2 else "582abdd86440"
-                    response_topic = f"pratham/plant/{plant_id}/responses"
-                    response_payload = json.dumps({
-                        "type": "ai_response",
-                        "response": ai_reply
-                    })
-                    await client.publish(response_topic, response_payload.encode('utf-8'))
-                    print(f"[MQTT TX] Sent response back to topic: {response_topic}")
+                    # plant_id = topic.split('/')[2] if len(topic.split('/')) > 2 else "582abdd86440"
+                    # response_topic = f"pratham/plant/{plant_id}/responses"
+                    # response_payload = json.dumps({
+                    #     "type": "ai_response",
+                    #     "response": ai_reply
+                    # })
+                    # await client.publish(response_topic, response_payload.encode('utf-8'))
+                    # print(f"[MQTT TX] Sent response back to topic: {response_topic}")
 
-                    # --- 2. Naya direct commands topic publish (ESP32 OLED ke liye) ---
-                    cmd_topic = f"pratham/plant/{plant_id}/commands"
-                    cmd_payload = json.dumps({
-                        "type": "set_text",
-                        "text": ai_reply,
-                        "expr": "happy"
-                    })
-                    await client.publish(cmd_topic, cmd_payload.encode('utf-8'))
-                    print(f"[MQTT TX] Sent direct display text to: {cmd_topic}")
+                    # # --- 2. Naya direct commands topic publish (ESP32 OLED ke liye) ---
+                    # cmd_topic = f"pratham/plant/{plant_id}/commands"
+                    # cmd_payload = json.dumps({
+                    #     "type": "set_text",
+                    #     "text": ai_reply,
+                    #     "expr": "happy"
+                    # })
+                    # await client.publish(cmd_topic, cmd_payload.encode('utf-8'))
+                    # print(f"[MQTT TX] Sent direct display text to: {cmd_topic}")
                     
             except json.JSONDecodeError:
                 pass
