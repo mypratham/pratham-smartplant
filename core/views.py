@@ -342,62 +342,133 @@ def dashboard(request):
 
 @csrf_exempt
 def device_heartbeat(request, plant_id):
-    device, created = Device.objects.get_or_create(
-        plant_id=plant_id,
-        defaults={
-            'device_token': str(uuid.uuid4()),
-            'is_paired': True,
-            'is_online': True
-        }
-    )
-    
-    if not created:
-        Device.objects.filter(plant_id=plant_id).update(is_online=True)
+    # -----------------------------------------------------------------
+    # STEP 1: ESP32 SE AAYI GET REQUEST KO POST BANA KAR HANDLE KAREIN
+    # -----------------------------------------------------------------
+    if request.method == 'GET':
+        # Device exist karta hai ya nahi check karein
+        device = Device.objects.filter(plant_id=plant_id).first()
+        if device:
+            device.is_online = True
+            device.save(update_fields=['is_online'])
+            return JsonResponse({
+                "status": "ok",
+                "action": "none",
+                "plant_id": device.plant_id,
+                "device_token": device.device_token,
+                "is_online": True
+            }, status=200)
+        
+        # Agar pairing phase mein hai
+        return JsonResponse({
+            "status": "waiting_for_pairing",
+            "action": "none",
+            "message": "Waiting for user pairing"
+        }, status=200)
 
-    return JsonResponse(
-        {"status": "ok", "plant_id": plant_id, "is_online": True, "created": created}
-    )
+    # -----------------------------------------------------------------
+    # STEP 2: POST REQUEST HANDLING (STANDARD HEARTBEAT)
+    # -----------------------------------------------------------------
+    elif request.method == 'POST':
+        try:
+            data = json.loads(request.body or "{}")
+            pairing_code = data.get('pairing_code')
+            device_token = data.get('device_token')
+
+            if pairing_code:
+                device_by_code = Device.objects.filter(mac_address=pairing_code).first()
+                if device_by_code:
+                    device_by_code.is_online = True
+                    device_by_code.save(update_fields=['is_online'])
+                    return JsonResponse({
+                        "status": "ok",
+                        "action": "update",
+                        "plant_id": device_by_code.plant_id,
+                        "device_token": device_by_code.device_token,
+                        "is_online": True
+                    }, status=200)
+
+            device = Device.objects.filter(plant_id=plant_id, device_token=device_token).first()
+            if device:
+                device.is_online = True
+                device.save(update_fields=['is_online'])
+                return JsonResponse({
+                    "status": "ok",
+                    "action": "none",
+                    "plant_id": device.plant_id,
+                    "device_token": device.device_token,
+                    "is_online": True
+                }, status=200)
+
+            if pairing_code and not device_token:
+                return JsonResponse({
+                    "status": "waiting_for_pairing",
+                    "action": "none",
+                    "message": "Waiting for user to enter code in Web App"
+                }, status=200)
+
+            return JsonResponse({
+                "status": "error",
+                "action": "reset_device",
+                "message": "Device deleted from server."
+            }, status=404)
+
+        except Exception as e:
+            return JsonResponse({"status": "error", "error": str(e)}, status=400)
+
+    return JsonResponse({"status": "error", "message": "Method not allowed"}, status=405)
 
 
 @csrf_exempt
 def device_pair(request):
     if request.method != 'POST':
         return JsonResponse({"success": False, "error": "Invalid request method"}, status=405)
+    
     try:
         data = json.loads(request.body or "{}")
-        mac_address = data.get('mac_address')
+        # Frontend 'code' ya 'pairing_code' ya 'mac_address' kuch bhi bhej sakta hai
+        pairing_code = data.get('mac_address') or data.get('pairing_code') or data.get('code')
         
-        if not mac_address:
-            return JsonResponse({"success": False, "error": "MAC address missing"}, status=400)
+        if not pairing_code:
+            return JsonResponse({"success": False, "error": "Pairing code missing"}, status=400)
 
-        device, created = Device.objects.get_or_create(
-            mac_address=mac_address,
-            defaults={
-                'plant_id': f"plant_{mac_address[-5:].replace(':', '').lower()}",
-                'device_token': str(uuid.uuid4()),
-                'is_paired': True
-            }
-        )
-        
+        # 6-Digit Code ke basis par device dhundhein ya naya banayein
+        device = Device.objects.filter(mac_address=pairing_code).first()
+
+        if not device:
+            new_plant_id = f"plant_{pairing_code.lower()}"
+            new_token = str(uuid.uuid4())
+            device = Device.objects.create(
+                mac_address=pairing_code,  # 👈 Yahan 6-digit code hi save hoga
+                plant_id=new_plant_id,
+                device_token=new_token,
+                is_paired=True,
+                is_online=True
+            )
+        else:
+            device.is_paired = True
+            device.is_online = True
+            device.save(update_fields=['is_paired', 'is_online'])
+
         return JsonResponse({
             "success": True,
             "plant_id": device.plant_id,
             "device_token": device.device_token,
-            "is_paired": getattr(device, 'is_paired', True)
+            "is_paired": device.is_paired
         })
     except Exception as e:
         return JsonResponse({"success": False, "error": str(e)}, status=400)
 
-
 @csrf_exempt
 def check_pairing(request):
-    mac_address = request.GET.get('mac')
+    mac_address = request.GET.get('mac') or request.GET.get('code')
     if not mac_address:
-        return JsonResponse({"is_paired": False, "error": "MAC address missing"}, status=400)
+        return JsonResponse({"is_paired": False, "error": "MAC/Code missing"}, status=400)
+    
     try:
         device = Device.objects.get(mac_address=mac_address)
         return JsonResponse({
-            "is_paired": getattr(device, 'is_paired', True),
+            "is_paired": device.is_paired,
             "plant_id": device.plant_id,
             "device_token": device.device_token
         })
@@ -1071,7 +1142,8 @@ def pratham_proxy_api(request, endpoint):
             return JsonResponse({"status": "error", "message": "Failed to fetch from external API"}, status=response.status_code)
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
-
+    
+import openai
 
 @csrf_exempt
 def audio_upload_view(request, plant_id):
@@ -1099,30 +1171,44 @@ def audio_upload_view(request, plant_id):
 
         save_pcm_as_wav(pcm_path, audio_path, sample_rate=16000)
 
-        # 2. SPEECH-TO-TEXT
+        # 2. SPEECH-TO-TEXT WITH SAFE EXCEPTION HANDLING
         user_text = ""
         openai_key = getattr(settings, 'OPENAI_API_KEY', '')
-        client = OpenAI(api_key=openai_key)
 
-        with open(audio_path, 'rb') as audio_file:
-            transcript = client.audio.transcriptions.create(
-                model='whisper-1', 
-                file=audio_file,
-                language='hi'
-            )
-            user_text = transcript.text.strip()
+        if openai_key:
+            try:
+                client = OpenAI(api_key=openai_key)
+                with open(audio_path, 'rb') as audio_file:
+                    transcript = client.audio.transcriptions.create(
+                        model='whisper-1', 
+                        file=audio_file,
+                        language='en'
+                    )
+                    user_text = transcript.text.strip()
+            # ✅ Directly catch via openai module to avoid NameError
+            except openai.AuthenticationError:
+                print("[ERROR] OpenAI API Key Authentication Failed! Check your key in settings.py.")
+                user_text = ""
+            except openai.OpenAIError as oai_err:
+                print(f"[ERROR] OpenAI STT Error: {oai_err}")
+                user_text = ""
+            except Exception as stt_err:
+                print(f"[ERROR] Unexpected STT Error: {stt_err}")
+                user_text = ""
+        else:
+            print("[WARNING] OPENAI_API_KEY is missing in settings.py")
 
         print(f'STT Raw User Text: {user_text}')
 
         # 3. DIRECT TEXT REPLACEMENT
-        misheard_patterns = [
-            r'बाय\s*पृत्थम', r'बाय\s*प्रथम', r'माई\s*पर्थम', 
-            r'माई\s*प्रथम', r'माइ\s*प्रथम', r'माइ\s*पर्थम', r'बाय\s*प्रथम'
-        ]
-        
         corrected_text = user_text
-        for pattern in misheard_patterns:
-            corrected_text = re.sub(pattern, 'MyPratham', corrected_text, flags=re.IGNORECASE)
+        if user_text:
+            misheard_patterns = [
+                r'बाय\s*पृत्थम', r'बाय\s*प्रथम', r'माई\s*पर्थम', 
+                r'माई\s*प्रथम', r'माइ\s*प्रथम', r'माइ\s*पर्थम', r'बाय\s*प्रथम'
+            ]
+            for pattern in misheard_patterns:
+                corrected_text = re.sub(pattern, 'MyPratham', corrected_text, flags=re.IGNORECASE)
 
         print(f'Corrected Search Text: {corrected_text}')
 
@@ -1130,7 +1216,7 @@ def audio_upload_view(request, plant_id):
         source = "knowledge_base"
 
         # 4. STEP 1: DATABASE / KNOWLEDGE BASE SEARCH
-        kb_context, kb_matches = get_kb_context_direct(corrected_text, limit=5)
+        kb_context, kb_matches = get_kb_context_direct(corrected_text, limit=5) if corrected_text else (None, None)
 
         if kb_matches:
             ai_reply = build_kb_answer(corrected_text, kb_matches)
@@ -1138,22 +1224,32 @@ def audio_upload_view(request, plant_id):
             print(f"[DB MATCH FOUND]: {ai_reply}")
         else:
             # STEP 2: Database me nahi mila -> AI Fallback
-            system_instruction = (
-                "Aap 'Pratham' hain. Pehle se DB me answer nahi mila hai. "
-                "Is query ka crisp aur short Hindi answer dein."
-            )
+            if corrected_text and openai_key:
+                try:
+                    client = OpenAI(api_key=openai_key)
+                    system_instruction = (
+                        "Aap 'Pratham' hain. Pehle se DB me answer nahi mila hai. "
+                        "Is query ka crisp aur short Hindi answer dein."
+                    )
 
-            chat_response = client.chat.completions.create(
-                model='gpt-3.5-turbo',
-                messages=[
-                    {'role': 'system', 'content': system_instruction},
-                    {'role': 'user', 'content': corrected_text},
-                ],
-                max_tokens=50,
-            )
-            ai_reply = chat_response.choices[0].message.content.strip()
-            source = "openai_web"
-            print(f"[FALLBACK TO AI/WEB]: {ai_reply}")
+                    chat_response = client.chat.completions.create(
+                        model='gpt-3.5-turbo',
+                        messages=[
+                            {'role': 'system', 'content': system_instruction},
+                            {'role': 'user', 'content': corrected_text},
+                        ],
+                        max_tokens=50,
+                    )
+                    ai_reply = chat_response.choices[0].message.content.strip()
+                    source = "openai_web"
+                    print(f"[FALLBACK TO AI/WEB]: {ai_reply}")
+                except Exception as gpt_err:
+                    print(f"[ERROR] GPT Fallback failed: {gpt_err}")
+                    ai_reply = "Kripya dobara spashth aawaz mein bolein."
+                    source = "fallback_error"
+            else:
+                ai_reply = "Aapki aawaz saaf nahi aayi. Kripya fir se koshish karein."
+                source = "no_input_fallback"
 
         # Update Device State
         if hasattr(device, 'custom_text'):
@@ -1162,9 +1258,7 @@ def audio_upload_view(request, plant_id):
             device.current_expression = 'happy'
         device.save()
 
-        # =========================================================
-        # 🔥 STEP 4.5: PLANT CHAT HISTORY KO DATABASE ME SAVE KAREIN
-        # =========================================================
+        # 5. SAVE CHAT HISTORY
         try:
             history_entry = PlantChatHistory.objects.create(
                 device=device,
@@ -1174,9 +1268,8 @@ def audio_upload_view(request, plant_id):
             print(f"[SUCCESS] Chat History Saved! Entry ID: {history_entry.id}")
         except Exception as history_err:
             print(f"[ERROR] Failed to save Chat History: {history_err}")
-        # =========================================================
 
-        # 5. Generate Audio (TTS)
+        # 6. GENERATE AUDIO (TTS)
         speech_audio_url = ""
         try:
             temp_mp3_filename = f"plant_{plant_id}_temp.mp3"
@@ -1203,22 +1296,25 @@ def audio_upload_view(request, plant_id):
         except Exception as tts_err:
             print(f"[AUDIO UPLOAD TTS ERROR]: {str(tts_err)}")
 
-        # 6. MQTT Publish
-        payload = {
-            "type": "ai",
-            "text": ai_reply,
-            "expr": "happy",
-            "audio_url": speech_audio_url,
-            "source": source
-        }
-        
-        publish.single(
-            f"pratham/plant/{plant_id}/commands",
-            json.dumps(payload, ensure_ascii=False),
-            hostname=MQTT_BROKER,
-            port=MQTT_PORT,
-            qos=1
-        )
+        # 7. MQTT PUBLISH
+        try:
+            payload = {
+                "type": "ai",
+                "text": ai_reply,
+                "expr": "happy",
+                "audio_url": speech_audio_url,
+                "source": source
+            }
+            
+            publish.single(
+                f"pratham/plant/{plant_id}/commands",
+                json.dumps(payload, ensure_ascii=False),
+                hostname=MQTT_BROKER,
+                port=MQTT_PORT,
+                qos=1
+            )
+        except Exception as mqtt_err:
+            print(f"[MQTT ERROR]: {mqtt_err}")
 
         return JsonResponse(
             {

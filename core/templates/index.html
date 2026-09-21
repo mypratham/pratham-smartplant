@@ -762,7 +762,7 @@
     }
 
     /* =========================================================
-       DEVICE PAIRING LOGIC (6-DIGIT CODE)
+    DEVICE PAIRING LOGIC (6-DIGIT CODE) - FIXED
     ========================================================= */
     async function pairDevice() {
         const codeInput = document.getElementById("pairing-code-input");
@@ -770,6 +770,7 @@
         if (!codeInput) return;
         const code = codeInput.value.trim();
 
+        // 1. Code Length & Numeric Check
         if (code.length !== 6 || isNaN(code)) {
             if (statusDiv) {
                 statusDiv.innerHTML = `<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i> Please enter a valid 6-digit code.</span>`;
@@ -782,18 +783,26 @@
         }
 
         try {
-            const response = await fetch(`${API_BASE}/pair/`, {
+            // FIXED: Endpoint ko global `/api/devices/pair/` par point kiya gaya hai (Plant ID removed from URL)
+            const response = await fetch('/api/devices/pair/', {
                 method: "POST",
-                headers: { "Content-Type": "application/json", "X-Device-Token": DEVICE_TOKEN },
+                headers: { 
+                    "Content-Type": "application/json", 
+                    "X-Device-Token": DEVICE_TOKEN 
+                },
                 body: JSON.stringify({ pairing_code: code })
             });
+            
             const data = await response.json();
 
-            if (response.ok && (data.status === "success" || data.paired === true)) {
+            // FIXED: Django views ke response structure (`data.success === true`) se match kar diya hai
+            if (response.ok && (data.success === true || data.status === "success" || data.is_paired === true)) {
                 if (statusDiv) {
                     statusDiv.innerHTML = `<span class="text-success"><i class="fas fa-check-circle me-1"></i> Device successfully paired with ESP32!</span>`;
                 }
                 log(`Device successfully paired using code: ${code}`);
+
+                // Modal hide karke page fresh update karein
                 setTimeout(() => {
                     const modalEl = document.getElementById("addDeviceModal");
                     if (modalEl) {
@@ -802,39 +811,28 @@
                     }
                     codeInput.value = "";
                     if (statusDiv) statusDiv.innerHTML = "";
-                    checkStatus();
+                    
+                    // Agar status check function defined hai toh use call karein, warna page refresh karein
+                    if (typeof checkStatus === 'function') {
+                        checkStatus();
+                    } else {
+                        window.location.reload();
+                    }
                 }, 1500);
+
             } else {
                 if (statusDiv) {
-                    statusDiv.innerHTML = `<span class="text-danger"><i class="fas fa-times-circle me-1"></i> Code mismatch or pairing failed. Try again.</span>`;
+                    const errorMsg = data.error || "Code mismatch or pairing failed. Try again.";
+                    statusDiv.innerHTML = `<span class="text-danger"><i class="fas fa-times-circle me-1"></i> ${errorMsg}</span>`;
                 }
             }
         } catch (err) {
-            // Fallback simulation / handling if server endpoint is local or simulated
-            setTimeout(() => {
-                if (code.length === 6) {
-                    if (statusDiv) {
-                        statusDiv.innerHTML = `<span class="text-success"><i class="fas fa-check-circle me-1"></i> Successfully paired with ESP32!</span>`;
-                    }
-                    log(`Device paired successfully with code ${code}`);
-                    setTimeout(() => {
-                        const modalEl = document.getElementById("addDeviceModal");
-                        if (modalEl) {
-                            const modalInstance = bootstrap.Modal.getInstance(modalEl);
-                            if (modalInstance) modalInstance.hide();
-                        }
-                        codeInput.value = "";
-                        if (statusDiv) statusDiv.innerHTML = "";
-                    }, 1500);
-                } else {
-                    if (statusDiv) {
-                        statusDiv.innerHTML = `<span class="text-danger"><i class="fas fa-times-circle me-1"></i> Invalid code format.</span>`;
-                    }
-                }
-            }, 1000);
+            console.error("Pairing Error:", err);
+            if (statusDiv) {
+                statusDiv.innerHTML = `<span class="text-danger"><i class="fas fa-times-circle me-1"></i> Server connection failed. Check backend logs.</span>`;
+            }
         }
     }
-
     /* =========================================================
        PRATHAM TOKEN HANDLING
     ========================================================= */

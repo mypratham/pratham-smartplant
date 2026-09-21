@@ -113,7 +113,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'hi'
+LANGUAGE_CODE = 'en'
 
 TIME_ZONE = 'UTC'
 
@@ -140,6 +140,6 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Yahan apni OpenAI API Key daal dein
-OPENAI_API_KEY = ""
+OPENAI_API_KEY = "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"
 
 # final
