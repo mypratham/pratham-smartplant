@@ -17,6 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
+from core.views import admin_dashboard
 from django.conf.urls.static import static
 from core.views import (
     dashboard,
@@ -33,6 +34,8 @@ from core.views import (
     audio_upload_view,
     device_pair,      # 👈 Yahan add kar diya gaya hai
     check_pairing,    # 👈 Yahan add kar diya gaya hai
+    admin_login_api,      # <-- Yahan add karein
+    admin_register_api    # <-- Yahan add karein
 )
 
 urlpatterns = [
@@ -52,6 +55,9 @@ urlpatterns = [
     path('api/devices/<str:plant_id>/audio/', audio_upload_view, name='audio_upload'),
     path('api/devices/pair/', device_pair, name='device_pair'),
     path('api/devices/check-pairing/', check_pairing, name='check_pairing'),
+    path("admin-dashboard/", admin_dashboard, name="admin_dashboard"),
+    path('api/admin/login/', admin_login_api, name='admin_login_api'),
+    path('api/admin/register/', admin_register_api, name='admin_register_api'),
 ]
 
 # Media files serve karne ke liye yeh zaroor add karein taaki 404 error na aaye:
