@@ -1,6 +1,25 @@
 from django.db import models
 from django.contrib.auth.models import User
 
+# =========================================================
+# NAYA MODEL: Multi-Tenant Profile (Admin / School / College)
+# =========================================================
+class UserProfile(models.Model):
+    ROLE_CHOICES = [
+        ('admin', 'Admin (School / College / Org)'),
+        ('user', 'User / End Device'),
+    ]
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='admin')
+    organization_name = models.CharField(max_length=255, blank=True, null=True, help_text="College/School Name")
+    phone_number = models.CharField(max_length=15, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.username} ({self.get_role_display()}) - {self.organization_name or 'N/A'}"
+
+
 class AIAgent(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
     name = models.CharField(max_length=100, default="My AI Agent")
@@ -14,6 +33,16 @@ class AIAgent(models.Model):
 
 
 class Device(models.Model):
+    # NAYA FIELD: Admin/School/College se mapping ke liye
+    owner_admin = models.ForeignKey(
+        User, 
+        on_delete=models.CASCADE, 
+        null=True, 
+        blank=True, 
+        related_name="owned_devices",
+        help_text="The Admin/College account that owns this device"
+    )
+
     plant_id = models.CharField(max_length=100, unique=True, default="pratham_plant_01")
     device_token = models.CharField(max_length=255)
     
@@ -31,7 +60,8 @@ class Device(models.Model):
     quiz_topic = models.CharField(max_length=255, blank=True, null=True)
 
     def __str__(self):
-        return self.plant_id
+        admin_str = f" [{self.owner_admin.username}]" if self.owner_admin else ""
+        return f"{self.plant_id}{admin_str}"
 
 
 class KnowledgeBase(models.Model):
@@ -94,7 +124,7 @@ class TouchAction(models.Model):
 
 
 # ==========================================
-# NAYA MODEL: Chat History & Cache ke liye
+# Chat History & Cache
 # ==========================================
 class PlantChatHistory(models.Model):
     device = models.ForeignKey(Device, on_delete=models.CASCADE, related_name="chat_history")

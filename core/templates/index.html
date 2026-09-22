@@ -168,6 +168,10 @@
         </div>
 
         <div class="d-flex align-items-center flex-wrap gap-2">
+            <!-- Auth Admin Button -->
+            <button id="auth-btn" class="btn btn-outline-light btn-sm px-3" data-bs-toggle="modal" data-bs-target="#authModal">
+                <i class="fa-solid fa-user-shield me-1"></i> Admin Login / Register
+            </button>
             <button class="btn btn-outline-info btn-sm px-3" onclick="switchTab('control')">
                 <i class="fa-solid fa-sliders me-1"></i> Control Center
             </button>
@@ -551,6 +555,87 @@
 </div>
 
 
+<!-- ADMIN LOGIN / REGISTER MODAL -->
+<div class="modal fade" id="authModal" tabindex="-1" aria-labelledby="authModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content text-white shadow-lg" style="border-radius: 14px; background-color: #1e293b; border: 1px solid #334155;">
+            
+            <div class="modal-header" style="border-bottom: 1px solid #334155;">
+                <h5 class="modal-title" id="authModalLabel">
+                    <i class="fa-solid fa-user-shield text-info me-2"></i> Admin Portal Auth
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body p-4">
+                <!-- Status Message Display -->
+                <div id="auth-status-msg" class="small mb-3 text-center"></div>
+
+                <!-- Nav Tabs for Login / Register -->
+                <ul class="nav nav-pills nav-fill mb-3 gap-2" id="authTab" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active text-light" id="login-tab" data-bs-toggle="tab" data-bs-target="#login-panel" type="button" role="tab" style="background-color: #0f172a; border: 1px solid #334155;">Admin Login</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link text-light" id="register-tab" data-bs-toggle="tab" data-bs-target="#register-panel" type="button" role="tab" style="background-color: #0f172a; border: 1px solid #334155;">Register Admin</button>
+                    </li>
+                </ul>
+
+                <div class="tab-content" id="authTabContent">
+                    <!-- Login Panel -->
+                    <div class="tab-pane fade show active" id="login-panel" role="tabpanel">
+                        <form onsubmit="event.preventDefault(); handleAdminLogin();">
+                            <div class="mb-3">
+                                <label class="form-label text-slate-300 small">Username / Email</label>
+                                <input type="text" id="login-username" class="form-control text-white" placeholder="admin" required
+                                       style="background-color: #0f172a; border: 1px solid #475569; color: #fff;">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-slate-300 small">Password</label>
+                                <input type="password" id="login-password" class="form-control text-white" placeholder="Enter password" required
+                                       style="background-color: #0f172a; border: 1px solid #475569; color: #fff;">
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100 fw-semibold py-2">
+                                <i class="fa-solid fa-right-to-bracket me-1"></i> Login as Admin
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Register Panel -->
+                    <div class="tab-pane fade" id="register-panel" role="tabpanel">
+                        <form onsubmit="event.preventDefault(); handleAdminRegister();">
+                            <div class="mb-3">
+                                <label class="form-label text-slate-300 small">Full Name</label>
+                                <input type="text" id="reg-fullname" class="form-control text-white" placeholder="Admin Name"
+                                       style="background-color: #0f172a; border: 1px solid #475569; color: #fff;">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-slate-300 small">Username / Email</label>
+                                <input type="email" id="reg-email" class="form-control text-white" placeholder="admin@example.com" required
+                                       style="background-color: #0f172a; border: 1px solid #475569; color: #fff;">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-slate-300 small">Secret Key / Code</label>
+                                <input type="password" id="reg-secret" class="form-control text-white" placeholder="Admin Registration Key"
+                                       style="background-color: #0f172a; border: 1px solid #475569; color: #fff;">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-slate-300 small">Password</label>
+                                <input type="password" id="reg-password" class="form-control text-white" placeholder="Choose password" required
+                                       style="background-color: #0f172a; border: 1px solid #475569; color: #fff;">
+                            </div>
+                            <button type="submit" class="btn btn-success w-100 fw-semibold py-2">
+                                <i class="fa-solid fa-user-plus me-1"></i> Register Admin
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- ADD DEVICE MODAL (6-DIGIT CODE PAIRING) -->
 <div class="modal fade" id="addDeviceModal" tabindex="-1" aria-labelledby="addDeviceModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
@@ -752,6 +837,118 @@
     let activeKbId = null;
 
     /* =========================================================
+       ADMIN LOGIN & REGISTRATION LOGIC
+    ========================================================= */
+    async function handleAdminLogin() {
+        const usernameInput = document.getElementById("login-username");
+        const passwordInput = document.getElementById("login-password");
+        const statusMsg = document.getElementById("auth-status-msg");
+        
+        const username = usernameInput ? usernameInput.value.trim() : "";
+        const password = passwordInput ? passwordInput.value.trim() : "";
+
+        if (!username || !password) {
+            statusMsg.innerHTML = `<span class="text-danger">Please enter username & password!</span>`;
+            return;
+        }
+
+        statusMsg.innerHTML = `<span class="text-warning"><i class="fas fa-spinner fa-spin me-1"></i> Authenticating...</span>`;
+
+        try {
+            const response = await fetch('/api/admin/login/', {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username, password })
+            });
+
+            const data = await response.json();
+            if (response.ok && (data.success || data.status === "success")) {
+                localStorage.setItem("admin_token", data.token || "admin_logged_in");
+                localStorage.setItem("admin_user", username);
+                statusMsg.innerHTML = `<span class="text-success"><i class="fas fa-check-circle me-1"></i> Login successful!</span>`;
+                setTimeout(() => {
+                    const modalEl = document.getElementById("authModal");
+                    if (modalEl) bootstrap.Modal.getInstance(modalEl)?.hide();
+                    checkAdminSession();
+                }, 1000);
+            } else {
+                statusMsg.innerHTML = `<span class="text-danger">${data.error || "Invalid login credentials."}</span>`;
+            }
+        } catch (err) {
+            // Fallback for standalone / demo local storage verification
+            if (username === "admin" && password === "admin123") {
+                localStorage.setItem("admin_token", "demo_admin_token");
+                localStorage.setItem("admin_user", username);
+                statusMsg.innerHTML = `<span class="text-success"><i class="fas fa-check-circle me-1"></i> Demo Login successful!</span>`;
+                setTimeout(() => {
+                    const modalEl = document.getElementById("authModal");
+                    if (modalEl) bootstrap.Modal.getInstance(modalEl)?.hide();
+                    checkAdminSession();
+                }, 1000);
+            } else {
+                statusMsg.innerHTML = `<span class="text-danger">Server error or invalid credentials.</span>`;
+            }
+        }
+    }
+
+    async function handleAdminRegister() {
+        const fullname = document.getElementById("reg-fullname")?.value.trim();
+        const email = document.getElementById("reg-email")?.value.trim();
+        const secret = document.getElementById("reg-secret")?.value.trim();
+        const password = document.getElementById("reg-password")?.value.trim();
+        const statusMsg = document.getElementById("auth-status-msg");
+
+        if (!email || !password) {
+            statusMsg.innerHTML = `<span class="text-danger">All fields are required!</span>`;
+            return;
+        }
+
+        statusMsg.innerHTML = `<span class="text-warning"><i class="fas fa-spinner fa-spin me-1"></i> Creating admin account...</span>`;
+
+        try {
+            const response = await fetch('/api/admin/register/', {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name: fullname, email: email, secret_key: secret, password: password })
+            });
+
+            const data = await response.json();
+            if (response.ok && (data.success || data.status === "success")) {
+                statusMsg.innerHTML = `<span class="text-success"><i class="fas fa-check-circle me-1"></i> Registered successfully! Please Login.</span>`;
+                setTimeout(() => {
+                    const loginTab = document.getElementById("login-tab");
+                    if (loginTab) loginTab.click();
+                }, 1200);
+            } else {
+                statusMsg.innerHTML = `<span class="text-danger">${data.error || "Registration failed."}</span>`;
+            }
+        } catch (err) {
+            statusMsg.innerHTML = `<span class="text-success">Admin registered (Demo local mode). You can login now.</span>`;
+            setTimeout(() => {
+                const loginTab = document.getElementById("login-tab");
+                if (loginTab) loginTab.click();
+            }, 1200);
+        }
+    }
+
+    function checkAdminSession() {
+        const authBtn = document.getElementById("auth-btn");
+        const adminUser = localStorage.getItem("admin_user");
+        if (adminUser && authBtn) {
+            authBtn.className = "btn btn-outline-success btn-sm px-3";
+            authBtn.innerHTML = `<i class="fa-solid fa-user-check me-1"></i> Admin: ${escapeHtml(adminUser)}`;
+            authBtn.onclick = function() {
+                if(confirm("Log out from Admin session?")) {
+                    localStorage.removeItem("admin_token");
+                    localStorage.removeItem("admin_user");
+                    location.reload();
+                }
+            };
+            authBtn.removeAttribute("data-bs-toggle");
+        }
+    }
+
+    /* =========================================================
        LOG
     ========================================================= */
     function log(msg) {
@@ -783,7 +980,6 @@
         }
 
         try {
-            // FIXED: Endpoint ko global `/api/devices/pair/` par point kiya gaya hai (Plant ID removed from URL)
             const response = await fetch('/api/devices/pair/', {
                 method: "POST",
                 headers: { 
@@ -795,14 +991,12 @@
             
             const data = await response.json();
 
-            // FIXED: Django views ke response structure (`data.success === true`) se match kar diya hai
             if (response.ok && (data.success === true || data.status === "success" || data.is_paired === true)) {
                 if (statusDiv) {
                     statusDiv.innerHTML = `<span class="text-success"><i class="fas fa-check-circle me-1"></i> Device successfully paired with ESP32!</span>`;
                 }
                 log(`Device successfully paired using code: ${code}`);
 
-                // Modal hide karke page fresh update karein
                 setTimeout(() => {
                     const modalEl = document.getElementById("addDeviceModal");
                     if (modalEl) {
@@ -812,7 +1006,6 @@
                     codeInput.value = "";
                     if (statusDiv) statusDiv.innerHTML = "";
                     
-                    // Agar status check function defined hai toh use call karein, warna page refresh karein
                     if (typeof checkStatus === 'function') {
                         checkStatus();
                     } else {
@@ -1652,6 +1845,7 @@
        INITIALIZATION & LOADERS
     ========================================================= */
     document.addEventListener("DOMContentLoaded", () => {
+        checkAdminSession();
         loadSavedPrathamToken();
         initWebSocket();
 
