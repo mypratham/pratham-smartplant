@@ -720,7 +720,6 @@ def check_pairing(request):
     except Device.DoesNotExist:
         return JsonResponse({"is_paired": False}, status=404)
 
-
 @csrf_exempt
 def device_command(request, plant_id):
     if request.method != "POST":
@@ -728,18 +727,35 @@ def device_command(request, plant_id):
 
     try:
         data = json.loads(request.body or "{}")
+        ai_final_text = ""
 
         if data.get("type") == "ai":
             user_text = (data.get("text") or data.get("message") or "").strip()
 
             if user_text:
+                # 1. Knowledge Base Search
                 kb_context, kb_matches = get_kb_context_direct(user_text, limit=5)
 
                 if kb_matches:
                     kb_answer = build_kb_answer(user_text, kb_matches)
-                    data["rag_context"] = kb_answer or kb_context[:500]
-                    data["kb_source"] = kb_matches[0]["document"]
-                else:
+                    
+                    # Garbage XML Check (Checking for corrupted text or unzipped DOCX/XML files)
+                    is_junk_kb = False
+                    if kb_answer:
+                        check_text = kb_answer.strip().lower()
+                        if "xml" in check_text or "sharedstrings" in check_text or any(ord(c) > 127 for c in check_text[:30] if c not in 'äöüßñáéíóú'):
+                            is_junk_kb = True
+
+                    # Valid KB Answer Found
+                    if kb_answer and not is_junk_kb:
+                        ai_final_text = kb_answer
+                        data["rag_context"] = kb_answer
+                        data["kb_source"] = kb_matches[0]["document"]
+                    else:
+                        kb_matches = None  # Force fallback to OpenAI if KB returned junk data
+
+                # 2. OpenAI Fallback Call
+                if not kb_matches:
                     try:
                         client = get_openai_client()
                         if not client:
@@ -760,29 +776,42 @@ def device_command(request, plant_id):
                         )
                         
                         ai_reply = chat_response.choices[0].message.content.strip()
+                        ai_final_text = ai_reply
                         data["rag_context"] = ai_reply
 
                     except Exception as ai_err:
-                        data["rag_context"] = f"AI Error: {str(ai_err)}"
+                        print(f"[OPENAI ERROR]: {ai_err}")
+                        ai_final_text = "Mujhe samajh nahi aaya, kripya dobara kahein."
+                        data["rag_context"] = ai_final_text
 
+        # MQTT Publish Logic
         topic = f"pratham/plant/{plant_id}/commands"
         payload = json.dumps(data, ensure_ascii=False)
 
-        publish.single(
-            topic,
-            payload,
-            hostname=MQTT_BROKER,
-            port=MQTT_PORT,
-            qos=1
-        )
+        try:
+            publish.single(
+                topic,
+                payload,
+                hostname=MQTT_BROKER,
+                port=MQTT_PORT,
+                qos=1
+            )
+        except Exception as mqtt_err:
+            print(f"[MQTT PUBLISH ERROR]: {mqtt_err}")
+
+        # Final response formatted for Frontend UI compatibility
+        response_msg = ai_final_text if ai_final_text else "Command published to MQTT"
 
         return JsonResponse({
             "status": "success",
-            "message": "Command published to MQTT",
+            "message": response_msg,
+            "response": response_msg,
+            "reply": response_msg,
             "data": data
-        })
+        }, status=200)
 
     except Exception as e:
+        print(f"[DEVICE COMMAND ERROR]: {e}")
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
 
@@ -1202,7 +1231,6 @@ def unified_plant_ai_chat_view(request, plant_id):
 
                 genai.configure(api_key=agent.api_token)
 
-                # Updated default model to gemini-2.5-flash
                 model_name = agent.ai_model_name if (agent.ai_model_name and "gemini" in agent.ai_model_name) else "gemini-2.5-flash"
                 
                 model = genai.GenerativeModel(
@@ -1262,12 +1290,13 @@ def unified_plant_ai_chat_view(request, plant_id):
         except Exception as mqtt_err:
             print(f"[MQTT PUBLISH ERROR]: {mqtt_err}")
 
-        # Added reply and response keys for direct frontend compatibility
+        # Direct response sent to frontend UI
         return JsonResponse({
             "status": "success",
             "reply": ai_text,
             "response": ai_text,
             "expr": ai_expr,
+            "audio_url": audio_url,
             "ai_command": payload,
             "source": source,
             "kb_match": bool(kb_matches)
@@ -1278,8 +1307,6 @@ def unified_plant_ai_chat_view(request, plant_id):
     except Exception as e:
         print(f"[UNIFIED VIEW CRASH]: {e}")
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
-
-
 def get_reminders_api(request, plant_id):
     if request.method != "GET":
         return JsonResponse({"status": "error", "message": "Invalid method"}, status=405)
