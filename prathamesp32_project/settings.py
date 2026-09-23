@@ -140,5 +140,5 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Yahan apni OpenAI API Key daal dein
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "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")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 # final
