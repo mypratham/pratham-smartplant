@@ -41,7 +41,7 @@ AudioSegment.ffprobe   = os.path.join(ffmpeg_bin_path, "ffprobe.exe")
 # ==========================================
 # 2. CONFIGURATIONS & CONSTANTS
 # ==========================================
-MQTT_BROKER = getattr(settings, "MQTT_BROKER", "192.168.1.9")
+MQTT_BROKER = getattr(settings, "MQTT_BROKER", "api.agrowillbiotech.com")
 MQTT_PORT = getattr(settings, "MQTT_PORT", 1883)
 
 PRATHAM_SYSTEM_INSTRUCTION = (
@@ -597,18 +597,27 @@ def admin_register_api(request):
 @csrf_exempt
 def device_heartbeat(request, plant_id):
     if request.method == 'GET':
-        device = Device.objects.filter(plant_id=plant_id).first()
+        # 1. Search by plant_id OR mac_address (Dono support karega)
+        device = Device.objects.filter(
+            Q(plant_id=plant_id) | Q(mac_address=plant_id)
+        ).first()
+
         if device:
             device.is_online = True
             device.save(update_fields=['is_online'])
+
+            # Agar plant_id update ho chuki hai toh ESP32 ko 'update' action bhejein
+            action_type = "update" if device.plant_id != plant_id else "none"
+
             return JsonResponse({
                 "status": "ok",
-                "action": "none",
+                "action": action_type,
                 "plant_id": device.plant_id,
                 "device_token": device.device_token,
+                "is_paired": device.is_paired,
                 "is_online": True
             }, status=200)
-        
+
         return JsonResponse({
             "status": "waiting_for_pairing",
             "action": "none",
@@ -621,8 +630,12 @@ def device_heartbeat(request, plant_id):
             pairing_code = data.get('pairing_code')
             device_token = data.get('device_token')
 
+            # 2. Pairing Code ya MAC search ko robust banayein
             if pairing_code:
-                device_by_code = Device.objects.filter(mac_address=pairing_code).first()
+                device_by_code = Device.objects.filter(
+                    Q(mac_address=pairing_code) | Q(mac_address__endswith=pairing_code)
+                ).first()
+
                 if device_by_code:
                     device_by_code.is_online = True
                     device_by_code.save(update_fields=['is_online'])
@@ -634,6 +647,7 @@ def device_heartbeat(request, plant_id):
                         "is_online": True
                     }, status=200)
 
+            # 3. Direct match by plant_id and device_token
             device = Device.objects.filter(plant_id=plant_id, device_token=device_token).first()
             if device:
                 device.is_online = True
@@ -656,7 +670,7 @@ def device_heartbeat(request, plant_id):
             return JsonResponse({
                 "status": "error",
                 "action": "reset_device",
-                "message": "Device deleted from server."
+                "message": "Device deleted or not paired yet."
             }, status=404)
 
         except Exception as e:

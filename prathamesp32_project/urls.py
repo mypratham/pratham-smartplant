@@ -39,27 +39,35 @@ from core.views import (
 )
 
 urlpatterns = [
+    # 1. Admin & Dashboard Routes
     path('admin/', admin.site.urls),
     path('', dashboard, name='dashboard'),
+    path("admin-dashboard/", admin_dashboard, name="admin_dashboard"),
+    path('api/admin/login/', admin_login_api, name='admin_login_api'),
+    path('api/admin/register/', admin_register_api, name='admin_register_api'),
+
+    # 2. STATIC Device Endpoints (MUST COME BEFORE <str:plant_id>)
+    # Pehle static routes check hone chahiye taaki 'check-pairing' ko Django plant_id na samajh le
+    path('api/devices/pair/', device_pair, name='device_pair'),
+    path('api/devices/check-pairing/', check_pairing, name='check_pairing'),
+
+    # 3. DYNAMIC Device Specific Endpoints (<str:plant_id>)
     path('api/devices/<str:plant_id>/command/', device_command, name='device_command'),
     path('api/devices/<str:plant_id>/heartbeat/', device_heartbeat, name='device_heartbeat'),
     path('api/devices/<str:plant_id>/ai-config/', plant_ai_config_view, name='plant_ai_config'),
     path('api/devices/<str:plant_id>/ai-chat/', unified_plant_ai_chat_view, name='unified_plant_ai_chat'),
     path('api/devices/<str:plant_id>/responses/', unified_plant_ai_chat_view, name='device_responses'),
+    path('api/devices/<str:plant_id>/reminder/', set_reminder_api, name='set_reminder'),
+    path('api/devices/<str:plant_id>/reminder/<int:reminder_id>/', update_delete_reminder_api, name='update_delete_reminder'),
+    path('api/devices/<str:plant_id>/audio/', audio_upload_view, name='audio_upload'),
+
+    # 4. Knowledge Base Endpoints
     path('api/knowledge-base/', knowledge_base_api, name='knowledge_base_api'),
     path('api/knowledge-base/chunks/<int:doc_id>/', view_document_chunks, name='view_document_chunks'),
     path('api/knowledge-base/chunk/update/<int:chunk_id>/', update_chunk_api, name='update_chunk_api'),
     path('api/knowledge-base/chunk/delete/<int:chunk_id>/', delete_chunk_api, name='delete_chunk_api'),
-    path('api/devices/<str:plant_id>/reminder/', set_reminder_api, name='set_reminder'),
-    path('api/devices/<str:plant_id>/reminder/<int:reminder_id>/', update_delete_reminder_api, name='update_delete_reminder'),
-    path('api/devices/<str:plant_id>/audio/', audio_upload_view, name='audio_upload'),
-    path('api/devices/pair/', device_pair, name='device_pair'),
-    path('api/devices/check-pairing/', check_pairing, name='check_pairing'),
-    path("admin-dashboard/", admin_dashboard, name="admin_dashboard"),
-    path('api/admin/login/', admin_login_api, name='admin_login_api'),
-    path('api/admin/register/', admin_register_api, name='admin_register_api'),
 ]
 
-# Media files serve karne ke liye yeh zaroor add karein taaki 404 error na aaye:
+# Media files serve in DEBUG mode
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
