@@ -32,12 +32,12 @@ from .rag_service import get_rag_context
 # ==========================================
 # 1. FFMPEG & PYDUB SETUP
 # ==========================================
-ffmpeg_bin_path = r"C:\ffmpeg-2026-09-14-git-6efe500d2e-essentials_build\bin"
-if ffmpeg_bin_path not in os.environ.get("PATH", ""):
-    os.environ["PATH"] += os.pathsep + ffmpeg_bin_path
-
-AudioSegment.converter = os.path.join(ffmpeg_bin_path, "ffmpeg.exe")
-AudioSegment.ffprobe   = os.path.join(ffmpeg_bin_path, "ffprobe.exe")
+#ffmpeg_bin_path = r"C:\ffmpeg-2026-09-14-git-6efe500d2e-essentials_build\bin"
+#if ffmpeg_bin_path not in os.environ.get("PATH", ""):
+#    os.environ["PATH"] += os.pathsep + ffmpeg_bin_path
+#
+#AudioSegment.converter = os.path.join(ffmpeg_bin_path, "ffmpeg.exe")
+#AudioSegment.ffprobe   = os.path.join(ffmpeg_bin_path, "ffprobe.exe")
 
 # ==========================================
 # 2. CONFIGURATIONS & CONSTANTS
@@ -427,7 +427,7 @@ def generate_plant_tts(request, plant_id, text, filename_prefix="plant"):
             return ""
 
         tts = gTTS(text=text, lang="hi", slow=False)
-        filename = f"{filename_prefix}_{plant_id}_speech.mp3"
+        filename = f"{filename_prefix}_{plant_id}_speech.wav"
         media_root = getattr(settings, "MEDIA_ROOT", os.path.join(settings.BASE_DIR, "media"))
         os.makedirs(media_root, exist_ok=True)
         audio_path = os.path.join(media_root, filename)
@@ -743,17 +743,17 @@ def device_pair(request):
         if not device:
             new_plant_id = f"plant_{pairing_code.lower()}"
             new_token = str(uuid.uuid4())
+            # 🔴 Pehli baar device aane par is_paired = False rakhein taaki user bind kar sake
             device = Device.objects.create(
                 mac_address=pairing_code,
                 plant_id=new_plant_id,
                 device_token=new_token,
-                is_paired=True,
+                is_paired=False, 
                 is_online=True
             )
         else:
-            device.is_paired = True
             device.is_online = True
-            device.save(update_fields=['is_paired', 'is_online'])
+            device.save(update_fields=['is_online'])
 
         return JsonResponse({
             "success": True,
@@ -768,18 +768,59 @@ def device_pair(request):
 @csrf_exempt
 def check_pairing(request):
     mac_address = request.GET.get('mac') or request.GET.get('code')
+    
+    # Agar POST request hai ya body me claim data aa raha hai toh binding handle karein
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body or "{}")
+            mac_address = data.get('mac') or data.get('code') or mac_address
+            # Agar user logged in hai toh request.user se bind karenge
+            user = request.user if request.user.is_authenticated else None
+            
+            if not mac_address:
+                return JsonResponse({"is_paired": False, "error": "MAC/Code missing"}, status=400)
+                
+            device = Device.objects.filter(
+                Q(mac_address__iexact=mac_address) | Q(plant_id__iexact=mac_address)
+            ).first()
+            
+            if not device:
+                return JsonResponse({"is_paired": False, "error": "Device not found"}, status=404)
+                
+            # Device ko paired mark kar dein aur user assign kar dein (agar available ho)
+            device.is_paired = True
+            if user and hasattr(device, 'owner_admin'):
+                device.owner_admin = user
+            device.save(update_fields=['is_paired', 'owner_admin'] if hasattr(device, 'owner_admin') else ['is_paired'])
+            
+            return JsonResponse({
+                "is_paired": True,
+                "plant_id": device.plant_id,
+                "device_token": device.device_token,
+                "message": "Device successfully claimed and paired!"
+            })
+        except Exception as e:
+            return JsonResponse({"is_paired": False, "error": str(e)}, status=400)
+
+    # GET Request: Sirf check karega ki device paired hai ya nahi
     if not mac_address:
         return JsonResponse({"is_paired": False, "error": "MAC/Code missing"}, status=400)
     
     try:
-        device = Device.objects.get(mac_address=mac_address)
+        device = Device.objects.filter(
+            Q(mac_address__iexact=mac_address) | Q(plant_id__iexact=mac_address)
+        ).first()
+        
+        if not device:
+            return JsonResponse({"is_paired": False}, status=404)
+            
         return JsonResponse({
             "is_paired": device.is_paired,
             "plant_id": device.plant_id,
             "device_token": device.device_token
         })
-    except Device.DoesNotExist:
-        return JsonResponse({"is_paired": False}, status=404)
+    except Exception as e:
+        return JsonResponse({"is_paired": False, "error": str(e)}, status=500)
 
 @csrf_exempt
 def device_command(request, plant_id):
