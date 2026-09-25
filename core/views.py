@@ -23,9 +23,10 @@ from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth import authenticate, login
 
 # Models Import
-from .models import Device, User, AIAgent, KnowledgeBase, Document, DocumentChunk, Reminder, PlantChatHistory
+from .models import *
 from .rag_service import get_rag_context
 
 # ==========================================
@@ -529,37 +530,52 @@ def admin_dashboard(request):
 def dashboard(request):
     return render(request, "index.html")
 
-# ==========================================
-# ADMIN AUTHENTICATION APIs
-# ==========================================
-import json
-from django.contrib.auth import authenticate, login
-from django.contrib.auth.models import User
-from django.views.decorators.csrf import csrf_exempt
 
 @csrf_exempt
 def admin_login_api(request):
     if request.method == "POST":
         try:
             data = json.loads(request.body)
-            username = data.get("username", "").strip()
+            # Yahan 'username' key me aap username ya email kuch bhi bhej sakte hain
+            identifier = data.get("username", "").strip() or data.get("email", "").strip()
             password = data.get("password", "").strip()
 
-            if not username or not password:
-                return JsonResponse({"status": "error", "error": "Username and password required"}, status=400)
+            if not identifier or not password:
+                return JsonResponse({"status": "error", "error": "Username/Email and password required"}, status=400)
+
+            # Check karein ki identifier email hai ya username
+            username_to_auth = identifier
+            if "@" in identifier:  # Agar user ne email dala hai toh uska username pata karein
+                try:
+                    user_obj = User.objects.get(email=identifier)
+                    username_to_auth = user_obj.username
+                except User.DoesNotExist:
+                    pass
 
             # Django User Authentication
-            user = authenticate(request, username=username, password=password)
+            user = authenticate(request, username=username_to_auth, password=password)
 
             if user is not None:
                 login(request, user)
+                profile, created = UserProfile.objects.get_or_create(user=user)
+
                 return JsonResponse({
                     "status": "success",
                     "message": "Login successful",
-                    "token": "admin_session_active"
+                    "token": "admin_session_active",
+                    "user_data": {
+                        "id": user.id,
+                        "username": user.username,
+                        "email": user.email,
+                        "role": profile.role,
+                        "role_display": profile.get_role_display(),
+                        "organization_name": profile.organization_name,
+                        "phone_number": profile.phone_number,
+                        "is_staff": user.is_staff
+                    }
                 })
             else:
-                return JsonResponse({"status": "error", "error": "Invalid username or password"}, status=400)
+                return JsonResponse({"status": "error", "error": "Invalid credentials (Username/Email or Password)"}, status=400)
 
         except Exception as e:
             return JsonResponse({"status": "error", "error": str(e)}, status=500)
@@ -572,27 +588,58 @@ def admin_register_api(request):
     if request.method == "POST":
         try:
             data = json.loads(request.body)
-            username = data.get("email", "").strip() or data.get("name", "").strip()
+            username = data.get("username", "").strip()
+            email = data.get("email", "").strip()
             password = data.get("password", "").strip()
+            
+            role = data.get("role", "admin")
+            organization_name = data.get("organization_name", "").strip()
+            phone_number = data.get("phone_number", "").strip()
 
-            if not username or not password:
-                return JsonResponse({"status": "error", "error": "Email/Username and Password required"}, status=400)
+            # Validation: Username, Email aur Password teeno zaroori hain
+            if not username or not email or not password:
+                return JsonResponse({"status": "error", "error": "Username, Email, and Password are required"}, status=400)
 
+            # Check if Username already exists
             if User.objects.filter(username=username).exists():
-                return JsonResponse({"status": "error", "error": "User already exists!"}, status=400)
+                return JsonResponse({"status": "error", "error": "Username already exists!"}, status=400)
 
-            # Create Superuser/Admin
-            user = User.objects.create_user(username=username, email=username, password=password)
-            user.is_staff = True  # Staff access
+            # Check if Email already exists
+            if User.objects.filter(email=email).exists():
+                return JsonResponse({"status": "error", "error": "Email already exists!"}, status=400)
+
+            # Create User
+            user = User.objects.create_user(username=username, email=email, password=password)
+            user.is_staff = True  
             user.save()
 
-            return JsonResponse({"status": "success", "message": "Admin account created successfully!"})
+            # Create UserProfile
+            profile = UserProfile.objects.create(
+                user=user,
+                role=role,
+                organization_name=organization_name,
+                phone_number=phone_number
+            )
+
+            return JsonResponse({
+                "status": "success", 
+                "message": "Admin account created successfully!",
+                "user_data": {
+                    "id": user.id,
+                    "username": user.username,
+                    "email": user.email,
+                    "role": profile.role,
+                    "role_display": profile.get_role_display(),
+                    "organization_name": profile.organization_name,
+                    "phone_number": profile.phone_number,
+                    "is_staff": user.is_staff
+                }
+            })
 
         except Exception as e:
             return JsonResponse({"status": "error", "error": str(e)}, status=500)
 
     return JsonResponse({"error": "Method not allowed"}, status=405)
-
 
 @csrf_exempt
 def device_heartbeat(request, plant_id):
