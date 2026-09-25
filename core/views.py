@@ -774,20 +774,21 @@ def check_pairing(request):
         try:
             data = json.loads(request.body or "{}")
             mac_address = data.get('mac') or data.get('code') or mac_address
-            # Agar user logged in hai toh request.user se bind karenge
             user = request.user if request.user.is_authenticated else None
             
             if not mac_address:
                 return JsonResponse({"is_paired": False, "error": "MAC/Code missing"}, status=400)
                 
+            # 🟢 Fixed query to support 6-digit suffix matching
             device = Device.objects.filter(
-                Q(mac_address__iexact=mac_address) | Q(plant_id__iexact=mac_address)
+                Q(mac_address__iexact=mac_address) | 
+                Q(mac_address__iendswith=mac_address) | 
+                Q(plant_id__icontains=mac_address)
             ).first()
             
             if not device:
                 return JsonResponse({"is_paired": False, "error": "Device not found"}, status=404)
                 
-            # Device ko paired mark kar dein aur user assign kar dein (agar available ho)
             device.is_paired = True
             if user and hasattr(device, 'owner_admin'):
                 device.owner_admin = user
@@ -807,8 +808,11 @@ def check_pairing(request):
         return JsonResponse({"is_paired": False, "error": "MAC/Code missing"}, status=400)
     
     try:
+        # 🟢 Fixed query here as well
         device = Device.objects.filter(
-            Q(mac_address__iexact=mac_address) | Q(plant_id__iexact=mac_address)
+            Q(mac_address__iexact=mac_address) | 
+            Q(mac_address__iendswith=mac_address) | 
+            Q(plant_id__icontains=mac_address)
         ).first()
         
         if not device:
