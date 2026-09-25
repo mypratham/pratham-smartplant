@@ -735,23 +735,32 @@ def device_pair(request):
         data = json.loads(request.body or "{}")
         pairing_code = data.get('mac_address') or data.get('pairing_code') or data.get('code')
         
-        if not pairing_code:
-            return JsonResponse({"success": False, "error": "Pairing code missing"}, status=400)
+        if not pairing_code or pairing_code == "000000":
+            return JsonResponse({"success": False, "error": "Invalid MAC/Code"}, status=400)
 
-        device = Device.objects.filter(mac_address=pairing_code).first()
+        # 🟢 Clean MAC address format (agar beech me colons hain toh hata dein)
+        clean_mac = pairing_code.replace(":", "").strip().lower()
+
+        # 🟢 Check karein ki kya yeh device pehle se database me maujud hai (exact ya suffix match)
+        device = Device.objects.filter(
+            Q(mac_address__iexact=clean_mac) | 
+            Q(mac_address__iendswith=clean_mac) | 
+            Q(plant_id__icontains=clean_mac)
+        ).first()
 
         if not device:
-            new_plant_id = f"plant_{pairing_code.lower()}"
+            # Agar bilkul naya hai tab hi naya create karein
+            new_plant_id = f"plant_{clean_mac}"
             new_token = str(uuid.uuid4())
-            # 🔴 Pehli baar device aane par is_paired = False rakhein taaki user bind kar sake
             device = Device.objects.create(
-                mac_address=pairing_code,
+                mac_address=clean_mac,
                 plant_id=new_plant_id,
                 device_token=new_token,
                 is_paired=False, 
                 is_online=True
             )
         else:
+            # Agar pehle se hai, toh naya banane ke bajaye usi ko update karein
             device.is_online = True
             device.save(update_fields=['is_online'])
 

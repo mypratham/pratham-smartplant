@@ -1038,71 +1038,47 @@
         /* =========================================================
         DEVICE PAIRING LOGIC (6-DIGIT CODE) - FIXED
         ========================================================= */
-        async function pairDevice() {
-            const codeInput = document.getElementById("pairing-code-input");
-            const statusDiv = document.getElementById("pairing-status");
-            if (!codeInput) return;
-            const code = codeInput.value.trim();
+    function pairDevice() {
+    const codeInput = document.getElementById('pairing-code-input').value.trim();
+    const statusDiv = document.getElementById('pairing-status');
 
-            // 1. Code Length & Numeric Check
-            if (code.length !== 6 || isNaN(code)) {
-                if (statusDiv) {
-                    statusDiv.innerHTML = `<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i> Please enter a valid 6-digit code.</span>`;
-                }
-                return;
-            }
+    // Validation: Allow 6-character Hexadecimal (numbers + letters a-f)
+    const isValidHex = /^[0-9a-fA-F]{6}$/.test(codeInput);
 
-            if (statusDiv) {
-                statusDiv.innerHTML = `<span class="text-warning"><i class="fas fa-spinner fa-spin me-1"></i> Matching code with ESP32...</span>`;
-            }
+    if (!isValidHex) {
+        statusDiv.innerHTML = '<span class="text-danger">⚠️ Please enter a valid 6-digit code (e.g., d86440)</span>';
+        return;
+    }
 
-            try {
-                const response = await fetch('/api/devices/pair/', {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "X-Device-Token": DEVICE_TOKEN
-                    },
-                    body: JSON.stringify({ pairing_code: code })
-                });
+    statusDiv.innerHTML = '<span class="text-warning">Verifying and pairing...</span>';
 
-                const data = await response.json();
+    // 🟢 GET ki jagah POST request bhej rahe hain taaki Django `is_paired = True` save kar sake
+    fetch(`/api/devices/check-pairing/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            // 'X-CSRFToken': getCookie('csrftoken') // Agar Django CSRF protection on hai
+        },
+        body: JSON.stringify({ code: codeInput })
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log("Server Response:", data);
 
-                if (response.ok && (data.success === true || data.status === "success" || data.is_paired === true)) {
-                    if (statusDiv) {
-                        statusDiv.innerHTML = `<span class="text-success"><i class="fas fa-check-circle me-1"></i> Device successfully paired with ESP32!</span>`;
-                    }
-                    log(`Device successfully paired using code: ${code}`);
-
-                    setTimeout(() => {
-                        const modalEl = document.getElementById("addDeviceModal");
-                        if (modalEl) {
-                            const modalInstance = bootstrap.Modal.getInstance(modalEl);
-                            if (modalInstance) modalInstance.hide();
-                        }
-                        codeInput.value = "";
-                        if (statusDiv) statusDiv.innerHTML = "";
-
-                        if (typeof checkStatus === 'function') {
-                            checkStatus();
-                        } else {
-                            window.location.reload();
-                        }
-                    }, 1500);
-
-                } else {
-                    if (statusDiv) {
-                        const errorMsg = data.error || "Code mismatch or pairing failed. Try again.";
-                        statusDiv.innerHTML = `<span class="text-danger"><i class="fas fa-times-circle me-1"></i> ${errorMsg}</span>`;
-                    }
-                }
-            } catch (err) {
-                console.error("Pairing Error:", err);
-                if (statusDiv) {
-                    statusDiv.innerHTML = `<span class="text-danger"><i class="fas fa-times-circle me-1"></i> Server connection failed. Check backend logs.</span>`;
-                }
-            }
+        if (data.is_paired === true) {
+            statusDiv.innerHTML = '<span class="text-success">✅ Device successfully paired!</span>';
+            setTimeout(() => {
+                location.reload(); // Page refresh karke dashboard update karein
+            }, 1500);
+        } else {
+            statusDiv.innerHTML = '<span class="text-danger">❌ ' + (data.error || 'Device not found or invalid code.') + '</span>';
         }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        statusDiv.innerHTML = '<span class="text-danger">❌ Server connection failed.</span>';
+    });
+}
         /* =========================================================
            PRATHAM TOKEN HANDLING
         ========================================================= */
