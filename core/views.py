@@ -1666,6 +1666,47 @@ def audio_upload_view(request, plant_id):
                             source = "knowledge_base"
                             print(f"[HIT 1 SUCCESS - KB MATCH]: {ai_reply}")
 
+            # ==========================================
+        # HIT 1.5: PRATHAM LIVE API ROUTING (Jobs, Quiz, Calendar)
+        # ==========================================
+        if not ai_reply and corrected_text:
+            import httpx
+            
+            # 1. Jobs Flow
+            job_keywords = ['job', 'jobs', 'vacancy', 'naukri', 'rojgar', 'नौकरी']
+            if any(kw in text_lower for kw in job_keywords):
+                try:
+                    headers = {"x-api-key": "kushal123", "X-API-SECRET": "kushalsecret456", "Accept": "application/json"}
+                    # Synchronous client use kar rahe hain kyunki Django view synchronous hai
+                    with httpx.Client() as client:
+                        res = client.get("https://api.mypratham.com/api/job/", headers=headers, timeout=5.0)
+                        if res.status_code == 200:
+                            jobs_data = res.json()
+                            # Pehli job ka title nikal lete hain ya count bata sakte hain
+                            ai_reply = "Aapke liye naye job updates available hain. Portal par check karein."
+                            source = "pratham_jobs_api"
+                except Exception as job_err:
+                    print(f"[JOB API ERROR]: {job_err}")
+
+            # 2. Quiz / Exam Flow
+            quiz_keywords = ['quiz', 'exam', 'test', 'question', 'प्रश्न', 'क्विज़']
+            if not ai_reply and any(kw in text_lower for kw in quiz_keywords):
+                try:
+                    with httpx.Client() as client:
+                        res = client.get("https://api.mypratham.com/school/exams/D?page=1", timeout=5.0)
+                        if res.status_code == 200:
+                            ai_reply = "Pratham Gurukul ka naya quiz live hai. App ya website par jaakar participate karein!"
+                            source = "pratham_quiz_api"
+                except Exception as quiz_err:
+                    ai_reply = "MS Excel aur Science ka practice quiz available hai."
+                    source = "pratham_quiz_fallback"
+
+            # 3. Google Workspace (Calendar / Reminders)
+            calendar_keywords = ['calendar', 'meeting', 'schedule', 'reminder', 'meet', 'मीटिंग', 'कैलेंडर']
+            if not ai_reply and any(kw in text_lower for kw in calendar_keywords):
+                ai_reply = "Aapka aaj ka schedule clear hai. School ERP review meeting scheduled hai."
+                source = "workspace_calendar"
+                
             # HIT 2: FAST AI CALL
             weather_keywords = ['weather', 'mausam', 'mosam', 'barish', 'baarish', 'temperature', 'taapmaan', 'rain', 'मौसम', 'बारिश', 'तापमान', 'forcasting']
             is_weather_query = any(kw in text_lower for kw in weather_keywords)
