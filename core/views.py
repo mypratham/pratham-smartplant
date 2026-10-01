@@ -1634,7 +1634,7 @@ def audio_upload_view(request, plant_id):
         ai_reply = ""
         source = ""
 
-        # ROUTING LOGIC: IDENTITY -> HIT 1 (KB) -> HIT 2 (AI) -> HIT 3 (WEATHER)
+        # ROUTING LOGIC: IDENTITY -> HIT 1 (KB)-> HIT 1.5: PRATHAM LIVE API ROUTING (Jobs, Quiz, Calendar) -> HIT 2 (AI) -> HIT 3 (WEATHER)
         if corrected_text:
             text_lower = corrected_text.lower().strip()
 
@@ -1666,7 +1666,7 @@ def audio_upload_view(request, plant_id):
                             source = "knowledge_base"
                             print(f"[HIT 1 SUCCESS - KB MATCH]: {ai_reply}")
 
-            # ==========================================
+        # ==========================================
         # HIT 1.5: PRATHAM LIVE API ROUTING (Jobs, Quiz, Calendar)
         # ==========================================
         if not ai_reply and corrected_text:
@@ -1706,7 +1706,7 @@ def audio_upload_view(request, plant_id):
             if not ai_reply and any(kw in text_lower for kw in calendar_keywords):
                 ai_reply = "Aapka aaj ka schedule clear hai. School ERP review meeting scheduled hai."
                 source = "workspace_calendar"
-                
+
             # HIT 2: FAST AI CALL
             weather_keywords = ['weather', 'mausam', 'mosam', 'barish', 'baarish', 'temperature', 'taapmaan', 'rain', 'मौसम', 'बारिश', 'तापमान', 'forcasting']
             is_weather_query = any(kw in text_lower for kw in weather_keywords)
