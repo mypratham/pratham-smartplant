@@ -17,7 +17,7 @@ class DeviceAdmin(admin.ModelAdmin):
 
 @admin.register(Reminder)
 class ReminderAdmin(admin.ModelAdmin):
-    list_display = ('device', 'time', 'message', 'is_active')
+    list_display = ('device', 'user','time', 'message', 'is_active')
     list_filter = ('is_active',)
 
 @admin.register(TouchAction)
@@ -26,8 +26,8 @@ class TouchActionAdmin(admin.ModelAdmin):
 
 @admin.register(KnowledgeBase)
 class KnowledgeBaseAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'status', 'created_at')
-    search_fields = ('name',)
+    list_display = ('id', 'user', 'name', 'status', 'created_at')
+    search_fields = ('name', 'user')
 
 @admin.register(Document)
 class DocumentAdmin(admin.ModelAdmin):

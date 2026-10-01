@@ -65,6 +65,7 @@ class Device(models.Model):
 
 
 class KnowledgeBase(models.Model):
+    user = models.ForeignKey(UserProfile, on_delete=models.CASCADE, null=True, blank=True)
     agent = models.ForeignKey(AIAgent, on_delete=models.CASCADE, related_name="knowledge_bases", null=True, blank=True)
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
@@ -98,9 +99,23 @@ class DocumentChunk(models.Model):
 
 
 class Reminder(models.Model):
-    device = models.ForeignKey(Device, on_delete=models.CASCADE, related_name="reminders")
+    user = models.ForeignKey(
+        UserProfile,
+        on_delete=models.CASCADE,
+        related_name="reminders",
+        null=True, blank=True
+    )
+
+    device = models.ForeignKey(
+        Device,
+        on_delete=models.CASCADE,
+        related_name="reminders"
+    )
+
     time = models.CharField(max_length=10)
+
     message = models.CharField(max_length=255)
+
     is_active = models.BooleanField(default=True)
 
     def __str__(self):

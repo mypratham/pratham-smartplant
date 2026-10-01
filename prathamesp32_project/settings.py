@@ -46,6 +46,8 @@ INSTALLED_APPS = [
 
     # Custom App
     'core',
+    'rest_framework',
+    'rest_framework.authtoken',
 ]
 
 MIDDLEWARE = [
@@ -140,5 +142,14 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Yahan apni OpenAI API Key daal dein
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "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")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 # final
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+}
