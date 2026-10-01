@@ -24,7 +24,12 @@ from django.shortcuts import render, get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import authenticate, login
-
+from rest_framework.authtoken.models import Token
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.authentication import TokenAuthentication
+from rest_framework import exceptions
 # Models Import
 from .models import *
 from .rag_service import get_rag_context
@@ -42,7 +47,7 @@ from .rag_service import get_rag_context
 # ==========================================
 # 2. CONFIGURATIONS & CONSTANTS
 # ==========================================
-MQTT_BROKER = getattr(settings, "MQTT_BROKER", "api.agrowillbiotech.com")
+MQTT_BROKER = getattr(settings, "MQTT_BROKER", "api.prathamsmart.in")
 MQTT_PORT = getattr(settings, "MQTT_PORT", 1883)
 
 PRATHAM_SYSTEM_INSTRUCTION = (
@@ -536,7 +541,6 @@ def admin_login_api(request):
     if request.method == "POST":
         try:
             data = json.loads(request.body)
-            # Yahan 'username' key me aap username ya email kuch bhi bhej sakte hain
             identifier = data.get("username", "").strip() or data.get("email", "").strip()
             password = data.get("password", "").strip()
 
@@ -545,7 +549,7 @@ def admin_login_api(request):
 
             # Check karein ki identifier email hai ya username
             username_to_auth = identifier
-            if "@" in identifier:  # Agar user ne email dala hai toh uska username pata karein
+            if "@" in identifier: 
                 try:
                     user_obj = User.objects.get(email=identifier)
                     username_to_auth = user_obj.username
@@ -559,10 +563,13 @@ def admin_login_api(request):
                 login(request, user)
                 profile, created = UserProfile.objects.get_or_create(user=user)
 
+                # Yahan check hoga: Agar purana user hai aur token nahi hai, toh automatic ban jayega
+                token, _ = Token.objects.get_or_create(user=user)
+
                 return JsonResponse({
                     "status": "success",
                     "message": "Login successful",
-                    "token": "admin_session_active",
+                    "token": token.key,  # <-- Ab yahan real DRF token jayega
                     "user_data": {
                         "id": user.id,
                         "username": user.username,
@@ -581,7 +588,6 @@ def admin_login_api(request):
             return JsonResponse({"status": "error", "error": str(e)}, status=500)
 
     return JsonResponse({"error": "Method not allowed"}, status=405)
-
 
 @csrf_exempt
 def admin_register_api(request):
@@ -621,9 +627,13 @@ def admin_register_api(request):
                 phone_number=phone_number
             )
 
+            # Naye user ke liye DRF token create karna
+            token, _ = Token.objects.get_or_create(user=user)
+
             return JsonResponse({
                 "status": "success", 
                 "message": "Admin account created successfully!",
+                "token": token.key,  # <-- Ab yahan register hote hi token mil jayega
                 "user_data": {
                     "id": user.id,
                     "username": user.username,
@@ -1009,97 +1019,326 @@ def admin_manage_kb_api(request):
     return JsonResponse({"status": "error", "message": "Method not allowed"}, status=405)
 
 
-@csrf_exempt
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.authentication import TokenAuthentication
+from rest_framework.permissions import IsAuthenticated
+@api_view(['GET', 'POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
 def knowledge_base_api(request):
+
+    # ============================================================
+    # 1. GET CURRENT USER PROFILE
+    # ============================================================
+
+    try:
+        user_profile = request.user.profile
+
+    except UserProfile.DoesNotExist:
+        return Response(
+            {
+                "status": "error",
+                "error": "Is user ke liye UserProfile nahi mila."
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+
+    # ============================================================
+    # HELPER FUNCTION
+    # GET KNOWLEDGE BASE LIST
+    # ============================================================
+
     def get_kb_list_json():
-        kbs = KnowledgeBase.objects.all().prefetch_related('documents__chunks')
+
+        # --------------------------------------------------------
+        # IMPORTANT:
+        # Sirf current token wale user ki KBs
+        # --------------------------------------------------------
+
+        kbs = (
+            KnowledgeBase.objects
+            .filter(user=user_profile)
+            .prefetch_related('documents__chunks')
+        )
+
         data = []
+
         for kb in kbs:
+
             docs = []
+
             for d in kb.documents.all():
+
                 c_count = get_document_chunks_count(d)
+
                 docs.append({
                     "id": d.id,
                     "name": d.name,
-                    "size": getattr(d, 'file_size', '0 KB'),
-                    "status": getattr(d, 'status', 'Parsed'),
+                    "size": getattr(
+                        d,
+                        'file_size',
+                        '0 KB'
+                    ),
+                    "status": getattr(
+                        d,
+                        'status',
+                        'Parsed'
+                    ),
                     "chunks": c_count,
                     "chunks_count": c_count,
-                    "date": d.created_at.strftime("%Y-%m-%d %H:%M:%S") if hasattr(d, 'created_at') and d.created_at else ""
+                    "date": (
+                        d.created_at.strftime(
+                            "%Y-%m-%d %H:%M:%S"
+                        )
+                        if hasattr(d, 'created_at')
+                        and d.created_at
+                        else ""
+                    )
                 })
-            
+
             data.append({
                 "id": kb.id,
                 "name": kb.name,
                 "desc": kb.description,
-                "status": getattr(kb, 'status', 'Enabled'),
+                "description": kb.description,
+                "status": getattr(
+                    kb,
+                    'status',
+                    'Enabled'
+                ),
                 "docsCount": len(docs),
-                "createdAt": kb.created_at.strftime("%Y-%m-%d %H:%M:%S") if hasattr(kb, 'created_at') and kb.created_at else "",
-                "documents": docs
+                "createdAt": (
+                    kb.created_at.strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    )
+                    if hasattr(kb, 'created_at')
+                    and kb.created_at
+                    else ""
+                ),
+                "documents": docs,
+                "agent_id": kb.agent_id
             })
-        return JsonResponse({
-            "status": "success", 
-            "data": data, 
-            "knowledge_bases": data, 
-            "results": data, 
-            "items": data
-        })
+
+        return Response(
+            {
+                "status": "success",
+
+                "knowledge_bases": data,
+            },
+            status=status.HTTP_200_OK
+        )
+
+
+    # ============================================================
+    # 2. GET REQUEST
+    # ============================================================
 
     if request.method == "GET":
+
         return get_kb_list_json()
 
-    elif request.method == "POST":
+
+    # ============================================================
+    # 3. POST REQUEST
+    # ============================================================
+
+    if request.method == "POST":
+
         try:
-            if request.FILES or request.POST.get("action") == "upload_doc":
-                kb_id = request.POST.get("kb_id")
-                kb = None
+
+            # ====================================================
+            # DOCUMENT UPLOAD
+            # ====================================================
+
+            if (
+                request.FILES
+                or request.data.get("action") == "upload_doc"
+            ):
+
+                # ------------------------------------------------
+                # KB ID
+                # ------------------------------------------------
+
+                kb_id = request.data.get("kb_id")
+
+                if not kb_id:
+
+                    return Response(
+                        {
+                            "status": "error",
+                            "message": (
+                                "kb_id is required "
+                                "for document upload"
+                            )
+                        },
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+
+                # ------------------------------------------------
+                # FIND KB
+                #
+                # IMPORTANT:
+                # user=user_profile condition means
+                # user can access ONLY his own KB.
+                # ------------------------------------------------
+
                 try:
-                    if kb_id and str(kb_id).isdigit():
-                        kb = KnowledgeBase.objects.filter(id=kb_id).first()
-                    if not kb and kb_id:
-                        kb = KnowledgeBase.objects.filter(name__iexact=str(kb_id)).first()
+
+                    if str(kb_id).isdigit():
+
+                        kb = (
+                            KnowledgeBase.objects
+                            .filter(
+                                id=kb_id,
+                                user=user_profile
+                            )
+                            .first()
+                        )
+
+                    else:
+
+                        kb = (
+                            KnowledgeBase.objects
+                            .filter(
+                                name__iexact=str(kb_id),
+                                user=user_profile
+                            )
+                            .first()
+                        )
+
                 except Exception:
+
                     kb = None
 
+
+                # ------------------------------------------------
+                # KB NOT FOUND
+                # ------------------------------------------------
+
                 if not kb:
-                    kb = KnowledgeBase.objects.first()
-                    if not kb:
-                        kb = KnowledgeBase.objects.create(name="General Knowledge Base", description="Auto-created KB")
-                
+
+                    return Response(
+                        {
+                            "status": "error",
+                            "message": (
+                                "Knowledge Base not found "
+                                "or you don't have permission "
+                                "to access it."
+                            )
+                        },
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+
                 uploaded_file = request.FILES.get("file")
-                name = request.POST.get("name") or request.POST.get("title")
-                content = request.POST.get("content", "")
+
+                name = ( 
+                    request.data.get("name")
+                    or request.data.get("title")
+                )
+
+                content = request.data.get(
+                    "content",
+                    ""
+                )
 
                 if uploaded_file:
+
                     if not name:
+
                         name = uploaded_file.name
-                    
-                    file_extension = os.path.splitext(name)[1].lower()
+
+
+                    file_extension = os.path.splitext(
+                        name
+                    )[1].lower()
+
+
                     try:
+
                         if file_extension == '.pdf':
-                            reader = PdfReader(uploaded_file)
-                            extracted_text = [page.extract_text() for page in reader.pages if page.extract_text()]
-                            content = "\n".join(extracted_text)
-                            
-                        elif file_extension in ['.docx', '.doc']:
-                            doc_file = DocxDocument(uploaded_file)
-                            extracted_text = [p.text for p in doc_file.paragraphs if p.text.strip()]
-                            content = "\n".join(extracted_text)
-                            
+
+                            reader = PdfReader(
+                                uploaded_file
+                            )
+
+                            extracted_text = []
+
+                            for page in reader.pages:
+
+                                page_text = page.extract_text()
+
+                                if page_text:
+
+                                    extracted_text.append(
+                                        page_text
+                                    )
+
+                            content = "\n".join(
+                                extracted_text
+                            )
+                        elif file_extension in [
+                            '.docx',
+                            '.doc'
+                        ]:
+
+                            doc_file = DocxDocument(
+                                uploaded_file
+                            )
+
+                            extracted_text = [
+                                p.text
+                                for p in doc_file.paragraphs
+                                if p.text.strip()
+                            ]
+
+                            content = "\n".join(
+                                extracted_text
+                            )
                         else:
-                            file_bytes = uploaded_file.read()
+
+                            file_bytes = (
+                                uploaded_file.read()
+                            )
+
                             try:
-                                content = file_bytes.decode('utf-8')
+
+                                content = file_bytes.decode(
+                                    'utf-8'
+                                )
+
                             except UnicodeDecodeError:
-                                content = file_bytes.decode('latin-1', errors='ignore')
+
+                                content = file_bytes.decode(
+                                    'latin-1',
+                                    errors='ignore'
+                                )
+
+
                     except Exception as e:
-                        content = f"Error reading file content: {str(e)}"
 
-                if not content.strip():
-                    return JsonResponse({"status": "error", "message": "File content is empty or could not be read"}, status=400)
+                        content = (
+                            f"Error reading file content: {str(e)}"
+                        )
 
-                size_kb = f"{len(content.encode('utf-8')) / 1024:.2f} KB"
-                
+                if not content or not content.strip():
+
+                    return Response(
+                        {
+                            "status": "error",
+                            "message": (
+                                "File content is empty "
+                                "or could not be read"
+                            )
+                        },
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+                size_kb = (
+                    f"{len(content.encode('utf-8')) / 1024:.2f} KB"
+                )
+
                 doc = Document.objects.create(
                     knowledge_base=kb,
                     name=name or "Untitled Document",
@@ -1108,98 +1347,409 @@ def knowledge_base_api(request):
                     status="Parsed"
                 )
 
-                DocumentChunk.objects.filter(document=doc).delete()
-                
+                DocumentChunk.objects.filter(
+                    document=doc
+                ).delete()
+
                 chunk_size = 300
+
                 chunks_count = 0
-                for i in range(0, len(content), chunk_size):
-                    chunk_text = content[i:i+chunk_size]
+
+
+                for i in range(
+                    0,
+                    len(content),
+                    chunk_size
+                ):
+
+                    chunk_text = content[
+                        i:i + chunk_size
+                    ]
+
+
                     if chunk_text.strip():
+
                         DocumentChunk.objects.create(
                             document=doc,
                             chunk_text=chunk_text,
                             chunk_index=chunks_count + 1
                         )
+
                         chunks_count += 1
 
-                return JsonResponse({
-                    "status": "success", 
-                    "doc_id": doc.id, 
-                    "chunks_count": chunks_count,
-                    "message": "Document uploaded and auto-chunked successfully into Knowledge Base!"
-                })
+                return Response(
+                    {
+                        "status": "success",
 
-            if not request.body:
-                return JsonResponse({"status": "success", "message": "Ignored empty request"})
-                
-            body = json.loads(request.body)
+                        "doc_id": doc.id,
+
+                        "kb_id": kb.id,
+
+                        "chunks_count": chunks_count,
+
+                        "message": (
+                            "Document uploaded and "
+                            "auto-chunked successfully "
+                            "into Knowledge Base!"
+                        )
+                    },
+                    status=status.HTTP_201_CREATED
+                )
+
+            if not request.data:
+
+                return Response(
+                    {
+                        "status": "success",
+                        "message": "Ignored empty request"
+                    },
+                    status=status.HTTP_200_OK
+                )
+
+            body = request.data
+
             action = body.get("action")
 
+
             if not action:
-                if "content" in body or "kb_id" in body:
+
+                if (
+                    "content" in body
+                    or "kb_id" in body
+                ):
+
                     action = "upload_doc"
-                elif "name" in body or "title" in body or "kb_name" in body:
+
+                elif (
+                    "name" in body
+                    or "title" in body
+                    or "kb_name" in body
+                ):
+
                     action = "create_kb"
+
                 else:
+
                     action = "list_kb"
 
             if action == "delete_kb":
+
                 kb_id = body.get("kb_id")
+
+
+                if not kb_id:
+
+                    return Response(
+                        {
+                            "status": "error",
+                            "message": "kb_id is required"
+                        },
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+
                 try:
-                    kb = KnowledgeBase.objects.get(id=kb_id)
+
+                    kb = KnowledgeBase.objects.get(
+                        id=kb_id,
+                        user=user_profile
+                    )
+
                     kb.delete()
-                    return JsonResponse({"status": "success", "message": "Knowledge Base deleted successfully!"})
-                except KnowledgeBase.DoesNotExist:
-                    return JsonResponse({"status": "error", "message": "Knowledge Base not found"}, status=404)
 
-            elif action in ["create_kb", "create_knowledge_base", "new_kb"]:
-                name = body.get("name") or body.get("title") or body.get("kb_name")
-                desc = body.get("desc") or body.get("description", "")
+
+                    return Response(
+                        {
+                            "status": "success",
+                            "message": (
+                                "Knowledge Base deleted successfully!"
+                            )
+                        },
+                        status=status.HTTP_200_OK
+                    )
+
+
+                except KnowledgeBase.DoesNotExist:
+
+                    return Response(
+                        {
+                            "status": "error",
+                            "message": (
+                                "Knowledge Base not found "
+                                "or you don't have permission "
+                                "to delete it."
+                            )
+                        },
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+
+            elif action in [
+                "create_kb",
+                "create_knowledge_base",
+                "new_kb"
+            ]:
+
+                name = (
+                    body.get("name")
+                    or body.get("title")
+                    or body.get("kb_name")
+                )
+
+
+                description = (
+                    body.get("desc")
+                    or body.get("description")
+                    or ""
+                )
+
+
+                agent_id = body.get(
+                    "agent_id"
+                )
+
                 if not name:
-                    return JsonResponse({"status": "error", "message": "Knowledge Base name is required"}, status=400)
-                kb = KnowledgeBase.objects.create(name=name, description=desc)
-                return JsonResponse({"status": "success", "id": kb.id, "message": "Knowledge Base created successfully!"})
 
+                    return Response(
+                        {
+                            "status": "error",
+                            "message": (
+                                "Knowledge Base name is required"
+                            )
+                        },
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+                kb = KnowledgeBase.objects.create(
+
+                    user=user_profile,
+
+                    agent_id=(
+                        agent_id
+                        if agent_id
+                        else None
+                    ),
+
+                    name=name,
+
+                    description=description
+                )
+
+                return Response(
+                    {
+                        "status": "success",
+
+                        "id": kb.id,
+
+                        "message": (
+                            "Knowledge Base created successfully!"
+                        ),
+
+                        "data": {
+                            "id": kb.id,
+                            "name": kb.name,
+                            "description": kb.description,
+                            "status": kb.status,
+                            "agent_id": kb.agent_id,
+                            "created_at": str(
+                                kb.created_at
+                            )
+                        }
+                    },
+                    status=status.HTTP_201_CREATED
+                )
             elif action == "list_docs":
-                kb_id = body.get("kb_id")
-                try:
-                    kb = KnowledgeBase.objects.get(id=kb_id)
-                    docs = []
-                    for d in kb.documents.all():
-                        c_count = get_document_chunks_count(d)
-                        docs.append({
-                            "id": d.id,
-                            "name": d.name,
-                            "size": getattr(d, 'file_size', '0 KB'),
-                            "status": getattr(d, 'status', 'Parsed'),
-                            "chunks": c_count,
-                            "chunks_count": c_count,
-                            "date": d.created_at.strftime("%Y-%m-%d %H:%M:%S") if hasattr(d, 'created_at') and d.created_at else ""
-                        })
-                    return JsonResponse({"status": "success", "documents": docs, "data": docs, "items": docs})
-                except KnowledgeBase.DoesNotExist:
-                    return JsonResponse({"status": "error", "message": "Knowledge Base not found"}, status=404)
 
-            elif action in ["delete_document", "del_doc", "delete_doc"]:
-                doc_id = body.get("doc_id") or body.get("document_id")
-                if not doc_id:
-                    return JsonResponse({"status": "error", "message": "Document ID is required for deletion"}, status=400)
+                kb_id = body.get(
+                    "kb_id"
+                )
+
+
+                if not kb_id:
+
+                    return Response(
+                        {
+                            "status": "error",
+                            "message": "kb_id is required"
+                        },
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+
                 try:
-                    doc = Document.objects.get(id=doc_id)
+
+                    kb = KnowledgeBase.objects.get(
+                        id=kb_id,
+                        user=user_profile
+                    )
+
+
+                    docs = []
+
+
+                    for d in kb.documents.all():
+
+                        c_count = (
+                            get_document_chunks_count(d)
+                        )
+
+
+                        docs.append(
+                            {
+                                "id": d.id,
+
+                                "name": d.name,
+
+                                "size": getattr(
+                                    d,
+                                    'file_size',
+                                    '0 KB'
+                                ),
+
+                                "status": getattr(
+                                    d,
+                                    'status',
+                                    'Parsed'
+                                ),
+
+                                "chunks": c_count,
+
+                                "chunks_count": c_count,
+
+                                "date": (
+                                    d.created_at.strftime(
+                                        "%Y-%m-%d %H:%M:%S"
+                                    )
+                                    if hasattr(
+                                        d,
+                                        'created_at'
+                                    )
+                                    and d.created_at
+                                    else ""
+                                )
+                            }
+                        )
+
+
+                    return Response(
+                        {
+                            "status": "success",
+
+                            "documents": docs,
+
+                            "data": docs,
+
+                            "items": docs
+                        },
+                        status=status.HTTP_200_OK
+                    )
+
+
+                except KnowledgeBase.DoesNotExist:
+
+                    return Response(
+                        {
+                            "status": "error",
+                            "message": (
+                                "Knowledge Base not found "
+                                "or you don't have permission "
+                                "to access it."
+                            )
+                        },
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+            elif action in [
+                "delete_document",
+                "del_doc",
+                "delete_doc"
+            ]:
+
+                doc_id = (
+                    body.get("doc_id")
+                    or body.get("document_id")
+                )
+
+
+                if not doc_id:
+
+                    return Response(
+                        {
+                            "status": "error",
+                            "message": (
+                                "Document ID is required "
+                                "for deletion"
+                            )
+                        },
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                try:
+
+                    doc = Document.objects.get(
+                        id=doc_id,
+                        knowledge_base__user=user_profile
+                    )
+
+
                     doc.delete()
-                    return JsonResponse({"status": "success", "message": "Document deleted successfully!"})
+
+
+                    return Response(
+                        {
+                            "status": "success",
+                            "message": (
+                                "Document deleted successfully!"
+                            )
+                        },
+                        status=status.HTTP_200_OK
+                    )
+
+
                 except Document.DoesNotExist:
-                    return JsonResponse({"status": "error", "message": "Document not found"}, status=404)
+
+                    return Response(
+                        {
+                            "status": "error",
+                            "message": (
+                                "Document not found "
+                                "or you don't have permission "
+                                "to delete it."
+                            )
+                        },
+                        status=status.HTTP_404_NOT_FOUND
+                    )
 
             else:
+
                 return get_kb_list_json()
 
         except json.JSONDecodeError:
-            return JsonResponse({"status": "error", "message": "Invalid JSON format"}, status=400)
-        except Exception as e:
-            return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
-    return JsonResponse({"status": "error", "message": "Invalid method"}, status=405)
+            return Response(
+                {
+                    "status": "error",
+                    "message": "Invalid JSON format"
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+        except Exception as e:
+
+            return Response(
+                {
+                    "status": "error",
+                    "message": str(e)
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+    return Response(
+        {
+            "status": "error",
+            "message": "Method not allowed"
+        },
+        status=status.HTTP_405_METHOD_NOT_ALLOWED
+    )
 
 
 @csrf_exempt
@@ -1436,109 +1986,659 @@ def get_reminders_api(request, plant_id):
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
 
-@csrf_exempt
+@api_view(["POST"])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
 def set_reminder_api(request, plant_id):
-    if request.method != "POST":
-        return JsonResponse({"status": "error", "message": "Invalid method"}, status=405)
-        
+
     try:
-        device = Device.objects.get(plant_id=plant_id)
-        
-        auth_token = request.headers.get("Authorization") or request.GET.get("token")
-        if auth_token and device.device_token and auth_token != device.device_token:
-            return JsonResponse({"status": "error", "message": "Unauthorized device token"}, status=403)
-            
-        body = json.loads(request.body)
-        time_str = body.get("time") or body.get("reminder_time")
-        message = body.get("message") or body.get("text")
-        
-        if not time_str or not message:
-            return JsonResponse({"status": "error", "message": "Time and message are required"}, status=400)
-        
+
+        # ========================================================
+        # 1. GET TOKEN USER PROFILE
+        # ========================================================
+
+        try:
+            user_profile = request.user.profile
+
+        except UserProfile.DoesNotExist:
+
+            return JsonResponse({
+                "status": "error",
+                "message": "Is user ke liye UserProfile nahi mila."
+            }, status=400)
+
+
+        # ========================================================
+        # 2. FIND DEVICE
+        # ========================================================
+
+        try:
+
+            device = Device.objects.get(
+                plant_id=plant_id
+            )
+
+        except Device.DoesNotExist:
+
+            return JsonResponse({
+                "status": "error",
+                "message": "Device not found"
+            }, status=404)
+
+
+        # ========================================================
+        # 3. REQUEST BODY
+        # ========================================================
+
+        try:
+
+            body = request.data
+
+        except Exception:
+
+            body = {}
+
+
+        time_str = (
+            body.get("time")
+            or body.get("reminder_time")
+        )
+
+        message = (
+            body.get("message")
+            or body.get("text")
+        )
+
+
+        # ========================================================
+        # 4. VALIDATION
+        # ========================================================
+
+        if not time_str:
+
+            return JsonResponse({
+                "status": "error",
+                "message": "Time is required"
+            }, status=400)
+
+
+        if not message:
+
+            return JsonResponse({
+                "status": "error",
+                "message": "Message is required"
+            }, status=400)
+
+
+        # ========================================================
+        # 5. CREATE REMINDER
+        #
+        # IMPORTANT:
+        # Token wale user ka profile automatically save hoga.
+        # Frontend se user_id lene ki zarurat nahi.
+        # ========================================================
+
         reminder = Reminder.objects.create(
+
+            user=user_profile,
+
             device=device,
+
             time=time_str,
+
             message=message,
+
             is_active=True
         )
-        
-        announcement_text = f"Reminder: {message}"
-        speech_audio_url = ""
-        try:
-            media_root = getattr(settings, 'MEDIA_ROOT', os.path.join(settings.BASE_DIR, 'media'))
-            os.makedirs(media_root, exist_ok=True)
-            temp_mp3_filename = f"plant_{plant_id}_reminder_temp.mp3"
-            temp_mp3_path = os.path.join(media_root, temp_mp3_filename)
-            
-            tts = gTTS(text=announcement_text, lang='hi', slow=False)
-            tts.save(temp_mp3_path)
-            
-            speech_filename = f"plant_{plant_id}_reminder_speech.wav"
-            speech_path = os.path.join(media_root, speech_filename)
-            
-            sound = AudioSegment.from_mp3(temp_mp3_path)
-            sound = sound.set_frame_rate(16000).set_channels(1).set_sample_width(2)
-            sound = sound.normalize()
-            sound.export(speech_path, format="wav")
-            
-            if os.path.exists(temp_mp3_path):
-                os.remove(temp_mp3_path)
-                
-            media_url = getattr(settings, 'MEDIA_URL', '/media/')
-            speech_audio_url = request.build_absolute_uri(f"{media_url}{speech_filename}")
-        except Exception as tts_err:
-            print(f"[REMINDER TTS ERROR]: {str(tts_err)}")
 
-        all_reminders = list(Reminder.objects.filter(device=device, is_active=True).values('time', 'message'))
-        
+
+        # ========================================================
+        # 6. CREATE ANNOUNCEMENT TEXT
+        # ========================================================
+
+        announcement_text = (
+            f"Reminder: {message}"
+        )
+
+
+        speech_audio_url = ""
+
+
+        # ========================================================
+        # 7. TEXT TO SPEECH
+        # ========================================================
+
+        try:
+
+            media_root = getattr(
+                settings,
+                "MEDIA_ROOT",
+                os.path.join(
+                    settings.BASE_DIR,
+                    "media"
+                )
+            )
+
+            os.makedirs(
+                media_root,
+                exist_ok=True
+            )
+
+
+            temp_mp3_filename = (
+                f"plant_{plant_id}_reminder_temp.mp3"
+            )
+
+            temp_mp3_path = os.path.join(
+                media_root,
+                temp_mp3_filename
+            )
+
+
+            # Hindi TTS
+            tts = gTTS(
+                text=announcement_text,
+                lang="hi",
+                slow=False
+            )
+
+            tts.save(
+                temp_mp3_path
+            )
+
+
+            # WAV filename
+            speech_filename = (
+                f"plant_{plant_id}_reminder_speech.wav"
+            )
+
+            speech_path = os.path.join(
+                media_root,
+                speech_filename
+            )
+
+
+            # MP3 -> WAV
+            sound = AudioSegment.from_mp3(
+                temp_mp3_path
+            )
+
+            sound = sound.set_frame_rate(
+                16000
+            )
+
+            sound = sound.set_channels(
+                1
+            )
+
+            sound = sound.set_sample_width(
+                2
+            )
+
+            sound = sound.normalize()
+
+
+            sound.export(
+                speech_path,
+                format="wav"
+            )
+
+
+            # Temporary MP3 delete
+            if os.path.exists(
+                temp_mp3_path
+            ):
+
+                os.remove(
+                    temp_mp3_path
+                )
+
+
+            media_url = getattr(
+                settings,
+                "MEDIA_URL",
+                "/media/"
+            )
+
+
+            speech_audio_url = (
+                request.build_absolute_uri(
+                    f"{media_url}{speech_filename}"
+                )
+            )
+
+
+        except Exception as tts_err:
+
+            print(
+                f"[REMINDER TTS ERROR]: {str(tts_err)}"
+            )
+
+
+        # ========================================================
+        # 8. GET ALL ACTIVE REMINDERS
+        #
+        # IMPORTANT:
+        # Sirf current user's reminders.
+        # ========================================================
+
+        all_reminders = list(
+            Reminder.objects.filter(
+                user=user_profile,
+                device=device,
+                is_active=True
+            ).values(
+                "time",
+                "message"
+            )
+        )
+
+
+        # ========================================================
+        # 9. MQTT PAYLOAD
+        # ========================================================
+
         payload = {
-            "type": "reminder_alert", 
+
+            "type": "reminder_alert",
+
             "text": announcement_text,
+
             "expr": "excited",
+
             "audio_url": speech_audio_url,
+
             "data": all_reminders
         }
-        publish.single(f"pratham/plant/{plant_id}/commands", json.dumps(payload), hostname=MQTT_BROKER, port=MQTT_PORT, qos=1)
-        
-        return JsonResponse({"status": "success", "message": "Reminder created and announced successfully!", "reminder_id": reminder.id}, status=201)
-        
-    except Device.DoesNotExist:
-        return JsonResponse({"status": "error", "message": "Device not found"}, status=404)
+
+
+        # ========================================================
+        # 10. PUBLISH MQTT
+        # ========================================================
+
+        publish.single(
+
+            f"pratham/plant/{plant_id}/commands",
+
+            json.dumps(payload),
+
+            hostname=MQTT_BROKER,
+
+            port=MQTT_PORT,
+
+            qos=1
+        )
+
+
+        # ========================================================
+        # 11. RESPONSE
+        # ========================================================
+
+        return JsonResponse({
+
+            "status": "success",
+
+            "message": (
+                "Reminder created and "
+                "announced successfully!"
+            ),
+
+            "reminder_id": reminder.id,
+
+            "plant_id": plant_id,
+
+            "time": reminder.time,
+
+            "reminder_message": reminder.message,
+
+            "audio_url": speech_audio_url
+
+        }, status=201)
+
+
     except Exception as e:
-        return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
+        return JsonResponse({
 
-@csrf_exempt
-def update_delete_reminder_api(request, plant_id, reminder_id):
+            "status": "error",
+
+            "message": str(e)
+
+        }, status=400)
+
+@api_view(["DELETE", "PUT", "POST"])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def update_delete_reminder_api(
+    request,
+    plant_id,
+    reminder_id
+):
+
     try:
-        device = Device.objects.get(plant_id=plant_id)
-        reminder = Reminder.objects.get(id=reminder_id, device=device)
-    except (Device.DoesNotExist, Reminder.DoesNotExist):
-        return JsonResponse({"status": "error", "message": "Device or Reminder not found"}, status=404)
 
-    if request.method == "DELETE":
-        reminder.delete()
-        all_reminders = list(Reminder.objects.filter(device=device, is_active=True).values('time', 'message'))
-        publish.single(f"pratham/plant/{plant_id}/commands", json.dumps({"type": "reminders", "data": all_reminders}), hostname=MQTT_BROKER, port=MQTT_PORT, qos=1)
-        return JsonResponse({"status": "success", "message": "Reminder deleted successfully!"})
+        # ========================================================
+        # 1. GET USER PROFILE
+        # ========================================================
 
-    elif request.method in ["PUT", "POST"]:
         try:
-            body = json.loads(request.body)
-            reminder.time = body.get("reminder_time", body.get("time", reminder.time))
-            reminder.message = body.get("text", body.get("message", reminder.message))
-            if "is_active" in body:
-                reminder.is_active = body.get("is_active")
-            reminder.save()
-            
-            all_reminders = list(Reminder.objects.filter(device=device, is_active=True).values('time', 'message'))
-            publish.single(f"pratham/plant/{plant_id}/commands", json.dumps({"type": "reminders", "data": all_reminders}), hostname=MQTT_BROKER, port=MQTT_PORT, qos=1)
-            return JsonResponse({"status": "success", "message": "Reminder updated successfully!"})
-        except Exception as e:
-            return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
-    return JsonResponse({"status": "error", "message": "Invalid method"}, status=405)
+            user_profile = request.user.profile
 
+        except UserProfile.DoesNotExist:
+
+            return JsonResponse({
+
+                "status": "error",
+
+                "message": (
+                    "Is user ke liye UserProfile nahi mila."
+                )
+
+            }, status=400)
+
+
+        # ========================================================
+        # 2. GET DEVICE
+        # ========================================================
+
+        try:
+
+            device = Device.objects.get(
+                plant_id=plant_id
+            )
+
+        except Device.DoesNotExist:
+
+            return JsonResponse({
+
+                "status": "error",
+
+                "message": "Device not found"
+
+            }, status=404)
+
+
+        # ========================================================
+        # 3. GET REMINDER
+        #
+        # IMPORTANT:
+        # Reminder current logged-in user ka hona chahiye.
+        # ========================================================
+
+        try:
+
+            reminder = Reminder.objects.get(
+
+                id=reminder_id,
+
+                device=device,
+
+                user=user_profile
+
+            )
+
+        except Reminder.DoesNotExist:
+
+            return JsonResponse({
+
+                "status": "error",
+
+                "message": (
+                    "Reminder not found "
+                    "or you don't have permission "
+                    "to access this reminder."
+                )
+
+            }, status=404)
+
+
+        # ========================================================
+        # 4. DELETE
+        # ========================================================
+
+        if request.method == "DELETE":
+
+            reminder.delete()
+
+
+            # -----------------------------------------------
+            # Current user's active reminders
+            # -----------------------------------------------
+
+            all_reminders = list(
+
+                Reminder.objects.filter(
+
+                    user=user_profile,
+
+                    device=device,
+
+                    is_active=True
+
+                ).values(
+
+                    "time",
+                    "message"
+
+                )
+
+            )
+
+
+            # -----------------------------------------------
+            # MQTT
+            # -----------------------------------------------
+
+            payload = {
+
+                "type": "reminders",
+
+                "data": all_reminders
+
+            }
+
+
+            publish.single(
+
+                f"pratham/plant/{plant_id}/commands",
+
+                json.dumps(payload),
+
+                hostname=MQTT_BROKER,
+
+                port=MQTT_PORT,
+
+                qos=1
+
+            )
+
+
+            return JsonResponse({
+
+                "status": "success",
+
+                "message": (
+                    "Reminder deleted successfully!"
+                )
+
+            })
+
+
+        # ========================================================
+        # 5. UPDATE
+        # ========================================================
+
+        elif request.method in [
+            "PUT",
+            "POST"
+        ]:
+
+            try:
+
+                body = request.data
+
+
+                # -----------------------------------------------
+                # TIME
+                # -----------------------------------------------
+
+                reminder.time = (
+
+                    body.get(
+                        "reminder_time"
+                    )
+
+                    or body.get(
+                        "time"
+                    )
+
+                    or reminder.time
+
+                )
+
+
+                # -----------------------------------------------
+                # MESSAGE
+                # -----------------------------------------------
+
+                reminder.message = (
+
+                    body.get(
+                        "text"
+                    )
+
+                    or body.get(
+                        "message"
+                    )
+
+                    or reminder.message
+
+                )
+
+
+                # -----------------------------------------------
+                # ACTIVE STATUS
+                # -----------------------------------------------
+
+                if "is_active" in body:
+
+                    reminder.is_active = (
+                        body.get("is_active")
+                    )
+
+
+                reminder.save()
+
+
+                # -----------------------------------------------
+                # GET UPDATED ACTIVE REMINDERS
+                # -----------------------------------------------
+
+                all_reminders = list(
+
+                    Reminder.objects.filter(
+
+                        user=user_profile,
+
+                        device=device,
+
+                        is_active=True
+
+                    ).values(
+
+                        "time",
+                        "message"
+
+                    )
+
+                )
+
+
+                # -----------------------------------------------
+                # MQTT
+                # -----------------------------------------------
+
+                payload = {
+
+                    "type": "reminders",
+
+                    "data": all_reminders
+
+                }
+
+
+                publish.single(
+
+                    f"pratham/plant/{plant_id}/commands",
+
+                    json.dumps(payload),
+
+                    hostname=MQTT_BROKER,
+
+                    port=MQTT_PORT,
+
+                    qos=1
+
+                )
+
+
+                return JsonResponse({
+
+                    "status": "success",
+
+                    "message": (
+                        "Reminder updated successfully!"
+                    ),
+
+                    "reminder_id": reminder.id,
+
+                    "time": reminder.time,
+
+                    "reminder_message": (
+                        reminder.message
+                    ),
+
+                    "is_active": (
+                        reminder.is_active
+                    )
+
+                })
+
+
+            except Exception as e:
+
+                return JsonResponse({
+
+                    "status": "error",
+
+                    "message": str(e)
+
+                }, status=400)
+
+
+        # ========================================================
+        # 6. INVALID METHOD
+        # ========================================================
+
+        return JsonResponse({
+
+            "status": "error",
+
+            "message": "Invalid method"
+
+        }, status=405)
+
+
+    except Exception as e:
+
+        return JsonResponse({
+
+            "status": "error",
+
+            "message": str(e)
+
+        }, status=400)
 
 def pratham_proxy_api(request, endpoint):
     target_url = f"https://api.mypratham.com/{endpoint}"
@@ -1833,3 +2933,4 @@ def audio_upload_view(request, plant_id):
         import traceback
         traceback.print_exc()
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+

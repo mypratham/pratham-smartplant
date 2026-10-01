@@ -57,8 +57,17 @@ urlpatterns = [
     path('api/devices/<str:plant_id>/ai-config/', plant_ai_config_view, name='plant_ai_config'),
     path('api/devices/<str:plant_id>/ai-chat/', unified_plant_ai_chat_view, name='unified_plant_ai_chat'),
     path('api/devices/<str:plant_id>/responses/', unified_plant_ai_chat_view, name='device_responses'),
-    path('api/devices/<str:plant_id>/reminder/', set_reminder_api, name='set_reminder'),
-    path('api/devices/<str:plant_id>/reminder/<int:reminder_id>/', update_delete_reminder_api, name='update_delete_reminder'),
+    path(
+        "api/reminder/<str:plant_id>/",
+        set_reminder_api,
+        name="set_reminder_api"
+    ),
+
+    path(
+        "api/reminder/<str:plant_id>/<int:reminder_id>/",
+        update_delete_reminder_api,
+        name="update_delete_reminder_api"
+    ),
     path('api/devices/<str:plant_id>/audio/', audio_upload_view, name='audio_upload'),
 
     # 4. Knowledge Base Endpoints
