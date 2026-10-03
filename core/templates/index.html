@@ -931,11 +931,41 @@
             return true;
         }
 
-        function getKnowledgeBaseAuthHeaders(extraHeaders = {}) {
-            const token = getPrathamUserToken();
-            return token
-                ? { ...extraHeaders, "Authorization": `token ${token}` }
-                : { ...extraHeaders };
+        function getAllPrathamUserTokens() {
+            const tokenKeys = ["admin_token", "mypratham_token", "user_token", "access_token", "token"];
+            const tokens = [];
+            tokenKeys.forEach(key => {
+                const value = String(localStorage.getItem(key) || "").trim();
+                if (value && value !== "admin_logged_in" && value !== "demo_admin_token" && !tokens.includes(value)) {
+                    tokens.push(value);
+                }
+            });
+            return tokens;
+        }
+
+        async function fetchKnowledgeBaseApi(options = {}) {
+            const tokens = getAllPrathamUserTokens();
+            if (tokens.length === 0) throw new Error("Knowledge Base user token not found");
+
+            let lastResponse = null;
+            for (const token of tokens) {
+                lastResponse = await fetch(KB_API_URL, {
+                    mode: "cors",
+                    ...options,
+                    headers: {
+                        ...(options.headers || {}),
+                        "Authorization": `token ${token}`
+                    }
+                });
+
+                if (lastResponse.status !== 401) {
+                    savePrathamUserToken(token);
+                    return lastResponse;
+                }
+            }
+
+            clearPrathamUserTokens();
+            return lastResponse;
         }
 
         function requireKnowledgeBaseToken() {
@@ -1057,20 +1087,15 @@
                 authBtn.innerHTML = `<i class="fa-solid fa-user-check me-1"></i> Admin: ${escapeHtml(adminUser)}`;
                 authBtn.onclick = function () {
                     if (confirm("Log out from Admin session?")) {
-                        localStorage.removeItem("admin_token");
-                        localStorage.removeItem("admin_user");
-                        localStorage.removeItem("user_data");
-                        localStorage.removeItem("mypratham_token");
-                        localStorage.removeItem("user_token");
-                        localStorage.removeItem("access_token");
-                        localStorage.removeItem("token");
+                        clearPrathamUserTokens();
                         location.reload();
                     }
                 };
                 authBtn.removeAttribute("data-bs-toggle");
             }
         }
-/* =========================================================
+ 
+        /* =========================================================
            LOG
         ========================================================= */
         function log(msg) {
@@ -1128,15 +1153,26 @@
            PRATHAM TOKEN HANDLING
         ========================================================= */
         function getPrathamUserToken() {
-            return (
-                localStorage.getItem("mypratham_token") ||
-                localStorage.getItem("user_token") ||
-                localStorage.getItem("access_token") ||
-                localStorage.getItem("token") ||
-                ""
-            ).trim();
+            const tokenKeys = ["admin_token", "mypratham_token", "user_token", "access_token", "token"];
+            for (const key of tokenKeys) {
+                const value = String(localStorage.getItem(key) || "").trim();
+                if (value && value !== "admin_logged_in" && value !== "demo_admin_token") {
+                    return value;
+                }
+            }
+            return "";
         }
-
+ 
+        function clearPrathamUserTokens() {
+            localStorage.removeItem("admin_token");
+            localStorage.removeItem("admin_user");
+            localStorage.removeItem("user_data");
+            localStorage.removeItem("mypratham_token");
+            localStorage.removeItem("user_token");
+            localStorage.removeItem("access_token");
+            localStorage.removeItem("token");
+        }
+ 
         function extractPrathamToken(value) {
             value = String(value || "").trim();
             if (!value) return "";
@@ -1317,23 +1353,24 @@
             if (!requireKnowledgeBaseToken()) return;
 
             try {
-                const response = await fetch(KB_API_URL, {
+                const response = await fetchKnowledgeBaseApi({
                     method: "GET",
-                    mode: "cors",
-                    headers: getKnowledgeBaseAuthHeaders({ "Accept": "application/json" })
+                    headers: { "Accept": "application/json" }
                 });
                 const data = await response.json();
                 if (response.ok && data.status === "success") {
                     knowledgeBases = data.knowledge_bases || [];
                     renderKbTable();
                 } else {
+                    if (response.status === 401) clearPrathamUserTokens();
                     log(`Error fetching Knowledge Bases: ${data.error || data.message || response.statusText}`);
+                    alert(response.status === 401 ? "Knowledge Base token invalid/expired. Please login again." : `Error fetching Knowledge Bases: ${data.error || data.message || response.statusText}`);
                 }
             } catch (err) {
                 log(`Error fetching Knowledge Bases: ${err.message}`);
             }
         }
- 
+  
         function renderKbTable() {
             const tbody = document.getElementById("kb-table-body");
             if (!tbody) return;
@@ -1371,10 +1408,9 @@
             if (!requireKnowledgeBaseToken()) return;
 
             try {
-                const response = await fetch(KB_API_URL, {
+                const response = await fetchKnowledgeBaseApi({
                     method: "POST",
-                    mode: "cors",
-                    headers: getKnowledgeBaseAuthHeaders({ "Content-Type": "application/json", "Accept": "application/json" }),
+                    headers: { "Content-Type": "application/json", "Accept": "application/json" },
                     body: JSON.stringify({ action: "list_docs", kb_id: kbId })
                 });
                 const data = await response.json();
@@ -1425,10 +1461,9 @@
             if (!requireKnowledgeBaseToken()) return;
  
             try {
-                const response = await fetch(KB_API_URL, {
+                const response = await fetchKnowledgeBaseApi({
                     method: "POST",
-                    mode: "cors",
-                    headers: getKnowledgeBaseAuthHeaders({ "Content-Type": "application/json", "Accept": "application/json" }),
+                    headers: { "Content-Type": "application/json", "Accept": "application/json" },
                     body: JSON.stringify({ action: "create_kb", name: name, description: desc })
                 });
                 const data = await response.json();
@@ -1455,10 +1490,9 @@
             if (!requireKnowledgeBaseToken()) return;
 
             try {
-                const response = await fetch(KB_API_URL, {
+                const response = await fetchKnowledgeBaseApi({
                     method: "POST",
-                    mode: "cors",
-                    headers: getKnowledgeBaseAuthHeaders({ "Content-Type": "application/json", "Accept": "application/json" }),
+                    headers: { "Content-Type": "application/json", "Accept": "application/json" },
                     body: JSON.stringify({ action: "delete_kb", kb_id: kbId })
                 });
                 const data = await response.json();
@@ -1495,10 +1529,9 @@
  
             log("Uploading document and parsing...");
             try {
-                const response = await fetch(KB_API_URL, {
+                const response = await fetchKnowledgeBaseApi({
                     method: "POST",
-                    mode: "cors",
-                    headers: getKnowledgeBaseAuthHeaders({ "Accept": "application/json" }),
+                    headers: { "Accept": "application/json" },
                     body: formData
                 });
                 const data = await response.json();
@@ -1527,10 +1560,9 @@
             if (!requireKnowledgeBaseToken()) return;
 
             try {
-                const response = await fetch(KB_API_URL, {
+                const response = await fetchKnowledgeBaseApi({
                     method: "POST",
-                    mode: "cors",
-                    headers: getKnowledgeBaseAuthHeaders({ "Content-Type": "application/json", "Accept": "application/json" }),
+                    headers: { "Content-Type": "application/json", "Accept": "application/json" },
                     body: JSON.stringify({ action: "delete_doc", doc_id: docId })
                 });
                 const data = await response.json();
