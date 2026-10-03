@@ -908,41 +908,72 @@
         const PLANT_ID = "582abdd86440";
         const API_BASE = `/api/devices/${PLANT_ID}`;
         const DEVICE_TOKEN = "582abdd86440";
-        const KB_API_URL = "/api/knowledge-base/";
+        const KB_API_URL = "https://api.prathamsmart.in/api/knowledge-base/";
         const PRATHAM_API_BASE = "https://api.mypratham.com";
-
+ 
         let knowledgeBases = [];
         let activeKbId = null;
-
+ 
         /* =========================================================
            ADMIN LOGIN & REGISTRATION LOGIC
         ========================================================= */
+        function persistAuthenticatedUser(data, fallbackUser = "") {
+            if (!data || !data.token) return false;
+
+            const userData = data.user_data || {};
+            const displayUser = userData.username || userData.email || fallbackUser || "user";
+
+            localStorage.setItem("admin_token", data.token);
+            localStorage.setItem("admin_user", displayUser);
+            localStorage.setItem("user_data", JSON.stringify(userData));
+            savePrathamUserToken(data.token);
+            loadSavedPrathamToken();
+            return true;
+        }
+
+        function getKnowledgeBaseAuthHeaders(extraHeaders = {}) {
+            const token = getPrathamUserToken();
+            return token
+                ? { ...extraHeaders, "Authorization": `token ${token}` }
+                : { ...extraHeaders };
+        }
+
+        function requireKnowledgeBaseToken() {
+            const token = getPrathamUserToken();
+            if (!token) {
+                const message = "Please login/register first. Knowledge Base API requires your user token.";
+                log(message);
+                alert(message);
+                return "";
+            }
+            return token;
+        }
+
         async function handleAdminLogin() {
             const usernameInput = document.getElementById("login-username");
             const passwordInput = document.getElementById("login-password");
             const statusMsg = document.getElementById("auth-status-msg");
-
+ 
             const username = usernameInput ? usernameInput.value.trim() : "";
             const password = passwordInput ? passwordInput.value.trim() : "";
-
+ 
             if (!username || !password) {
                 statusMsg.innerHTML = `<span class="text-danger">Please enter username & password!</span>`;
                 return;
             }
-
+ 
             statusMsg.innerHTML = `<span class="text-warning"><i class="fas fa-spinner fa-spin me-1"></i> Authenticating...</span>`;
-
+ 
             try {
                 const response = await fetch('/api/admin/login/', {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ username, password })
                 });
-
+ 
                 const data = await response.json();
                 if (response.ok && (data.success || data.status === "success")) {
-                    localStorage.setItem("admin_token", data.token || "admin_logged_in");
-                    localStorage.setItem("admin_user", username);
+                    persistAuthenticatedUser(data, username);
                     statusMsg.innerHTML = `<span class="text-success"><i class="fas fa-check-circle me-1"></i> Login successful!</span>`;
                     setTimeout(() => {
                         const modalEl = document.getElementById("authModal");
@@ -950,7 +981,7 @@
                         checkAdminSession();
                     }, 1000);
                 } else {
-                    statusMsg.innerHTML = `<span class="text-danger">${data.error || "Invalid login credentials."}</span>`;
+                    statusMsg.innerHTML = `<span class="text-danger">${data.error || data.message || "Invalid login credentials."}</span>`;
                 }
             } catch (err) {
                 // Fallback for standalone / demo local storage verification
@@ -968,37 +999,46 @@
                 }
             }
         }
-
+ 
         async function handleAdminRegister() {
             const fullname = document.getElementById("reg-fullname")?.value.trim();
             const email = document.getElementById("reg-email")?.value.trim();
             const secret = document.getElementById("reg-secret")?.value.trim();
             const password = document.getElementById("reg-password")?.value.trim();
             const statusMsg = document.getElementById("auth-status-msg");
-
+ 
             if (!email || !password) {
                 statusMsg.innerHTML = `<span class="text-danger">All fields are required!</span>`;
                 return;
             }
-
+ 
             statusMsg.innerHTML = `<span class="text-warning"><i class="fas fa-spinner fa-spin me-1"></i> Creating admin account...</span>`;
-
+ 
             try {
                 const response = await fetch('/api/admin/register/', {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ name: fullname, email: email, secret_key: secret, password: password })
                 });
-
+ 
                 const data = await response.json();
                 if (response.ok && (data.success || data.status === "success")) {
-                    statusMsg.innerHTML = `<span class="text-success"><i class="fas fa-check-circle me-1"></i> Registered successfully! Please Login.</span>`;
+                    const tokenSaved = persistAuthenticatedUser(data, email);
+                    statusMsg.innerHTML = tokenSaved
+                        ? `<span class="text-success"><i class="fas fa-check-circle me-1"></i> Registered successfully! Token saved and you are logged in.</span>`
+                        : `<span class="text-success"><i class="fas fa-check-circle me-1"></i> Registered successfully! Please Login.</span>`;
                     setTimeout(() => {
-                        const loginTab = document.getElementById("login-tab");
-                        if (loginTab) loginTab.click();
+                        if (tokenSaved) {
+                            const modalEl = document.getElementById("authModal");
+                            if (modalEl) bootstrap.Modal.getInstance(modalEl)?.hide();
+                            checkAdminSession();
+                        } else {
+                            const loginTab = document.getElementById("login-tab");
+                            if (loginTab) loginTab.click();
+                        }
                     }, 1200);
                 } else {
-                    statusMsg.innerHTML = `<span class="text-danger">${data.error || "Registration failed."}</span>`;
+                    statusMsg.innerHTML = `<span class="text-danger">${data.error || data.message || "Registration failed."}</span>`;
                 }
             } catch (err) {
                 statusMsg.innerHTML = `<span class="text-success">Admin registered (Demo local mode). You can login now.</span>`;
@@ -1008,7 +1048,7 @@
                 }, 1200);
             }
         }
-
+ 
         function checkAdminSession() {
             const authBtn = document.getElementById("auth-btn");
             const adminUser = localStorage.getItem("admin_user");
@@ -1019,14 +1059,18 @@
                     if (confirm("Log out from Admin session?")) {
                         localStorage.removeItem("admin_token");
                         localStorage.removeItem("admin_user");
+                        localStorage.removeItem("user_data");
+                        localStorage.removeItem("mypratham_token");
+                        localStorage.removeItem("user_token");
+                        localStorage.removeItem("access_token");
+                        localStorage.removeItem("token");
                         location.reload();
                     }
                 };
                 authBtn.removeAttribute("data-bs-toggle");
             }
         }
-
-        /* =========================================================
+/* =========================================================
            LOG
         ========================================================= */
         function log(msg) {
@@ -1270,22 +1314,26 @@
            KNOWLEDGE BASE
         ========================================================= */
         async function fetchKnowledgeBases() {
+            if (!requireKnowledgeBaseToken()) return;
+
             try {
                 const response = await fetch(KB_API_URL, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ action: "list_kb" })
+                    method: "GET",
+                    mode: "cors",
+                    headers: getKnowledgeBaseAuthHeaders({ "Accept": "application/json" })
                 });
                 const data = await response.json();
-                if (data.status === "success") {
+                if (response.ok && data.status === "success") {
                     knowledgeBases = data.knowledge_bases || [];
                     renderKbTable();
+                } else {
+                    log(`Error fetching Knowledge Bases: ${data.error || data.message || response.statusText}`);
                 }
             } catch (err) {
                 log(`Error fetching Knowledge Bases: ${err.message}`);
             }
         }
-
+ 
         function renderKbTable() {
             const tbody = document.getElementById("kb-table-body");
             if (!tbody) return;
@@ -1320,21 +1368,26 @@
         }
 
         async function fetchDocuments(kbId) {
+            if (!requireKnowledgeBaseToken()) return;
+
             try {
                 const response = await fetch(KB_API_URL, {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    mode: "cors",
+                    headers: getKnowledgeBaseAuthHeaders({ "Content-Type": "application/json", "Accept": "application/json" }),
                     body: JSON.stringify({ action: "list_docs", kb_id: kbId })
                 });
                 const data = await response.json();
-                if (data.status === "success") {
+                if (response.ok && data.status === "success") {
                     renderDocumentsTable(data.documents || []);
+                } else {
+                    log(`Error fetching documents: ${data.error || data.message || response.statusText}`);
                 }
             } catch (err) {
                 log(`Error fetching documents: ${err.message}`);
             }
         }
-
+ 
         function renderDocumentsTable(documents) {
             const tbody = document.getElementById("kb-documents-table-body");
             if (!tbody) return;
@@ -1369,15 +1422,17 @@
             const name = nameInput ? nameInput.value.trim() : "";
             const desc = descInput ? descInput.value.trim() : "";
             if (!name) return alert("Please enter a name.");
-
+            if (!requireKnowledgeBaseToken()) return;
+ 
             try {
                 const response = await fetch(KB_API_URL, {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    mode: "cors",
+                    headers: getKnowledgeBaseAuthHeaders({ "Content-Type": "application/json", "Accept": "application/json" }),
                     body: JSON.stringify({ action: "create_kb", name: name, description: desc })
                 });
                 const data = await response.json();
-                if (data.status === "success") {
+                if (response.ok && data.status === "success") {
                     const modalEl = document.getElementById("newKbModal");
                     if (modalEl) {
                         const modalInstance = bootstrap.Modal.getInstance(modalEl);
@@ -1388,31 +1443,36 @@
                     fetchKnowledgeBases();
                     log(`Created new Knowledge Base: ${name}`);
                 } else {
-                    alert("Error: " + data.message);
+                    alert("Error: " + (data.message || data.error || response.statusText));
                 }
             } catch (err) {
                 log(`Error creating KB: ${err.message}`);
             }
         }
-
+ 
         async function deleteKb(kbId) {
             if (!confirm("Are you sure you want to delete this Knowledge Base?")) return;
+            if (!requireKnowledgeBaseToken()) return;
+
             try {
                 const response = await fetch(KB_API_URL, {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    mode: "cors",
+                    headers: getKnowledgeBaseAuthHeaders({ "Content-Type": "application/json", "Accept": "application/json" }),
                     body: JSON.stringify({ action: "delete_kb", kb_id: kbId })
                 });
                 const data = await response.json();
-                if (data.status === "success") {
+                if (response.ok && data.status === "success") {
                     fetchKnowledgeBases();
                     log(`Deleted knowledge base ID ${kbId}`);
+                } else {
+                    log(`Error deleting KB: ${data.error || data.message || response.statusText}`);
                 }
             } catch (err) {
                 log(`Error deleting KB: ${err.message}`);
             }
         }
-
+ 
         function openUploadDocModal() {
             const modalEl = document.getElementById("uploadDocModal");
             if (modalEl) new bootstrap.Modal(modalEl).show();
@@ -1425,16 +1485,22 @@
                 alert("Please select a file to upload.");
                 return;
             }
-
+            if (!requireKnowledgeBaseToken()) return;
+ 
             const file = fileInput.files[0];
             const formData = new FormData();
             formData.append("name", docNameInput && docNameInput.value ? docNameInput.value : file.name);
             formData.append("file", file);
             if (activeKbId) formData.append("kb_id", activeKbId);
-
+ 
             log("Uploading document and parsing...");
             try {
-                const response = await fetch(KB_API_URL, { method: "POST", body: formData });
+                const response = await fetch(KB_API_URL, {
+                    method: "POST",
+                    mode: "cors",
+                    headers: getKnowledgeBaseAuthHeaders({ "Accept": "application/json" }),
+                    body: formData
+                });
                 const data = await response.json();
                 if (response.ok && data.status === "success") {
                     alert("Document uploaded successfully!");
@@ -1448,26 +1514,31 @@
                     if (activeKbId) fetchDocuments(activeKbId);
                     log("Document successfully uploaded & parsed.");
                 } else {
-                    alert("Failed to upload document on server: " + (data.message || "Unknown error"));
+                    alert("Failed to upload document on server: " + (data.message || data.error || response.statusText || "Unknown error"));
                 }
             } catch (err) {
                 console.error(err);
                 alert("Network error during file upload.");
             }
         }
-
+ 
         async function deleteDoc(docId) {
             if (!confirm("Are you sure you want to delete this document?")) return;
+            if (!requireKnowledgeBaseToken()) return;
+
             try {
                 const response = await fetch(KB_API_URL, {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    mode: "cors",
+                    headers: getKnowledgeBaseAuthHeaders({ "Content-Type": "application/json", "Accept": "application/json" }),
                     body: JSON.stringify({ action: "delete_doc", doc_id: docId })
                 });
                 const data = await response.json();
-                if (data.status === "success") {
+                if (response.ok && data.status === "success") {
                     fetchDocuments(activeKbId);
                     log(`Deleted document ID ${docId}`);
+                } else {
+                    log(`Error deleting document: ${data.error || data.message || response.statusText}`);
                 }
             } catch (err) {
                 log(`Error deleting document: ${err.message}`);
