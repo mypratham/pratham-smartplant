@@ -68,6 +68,12 @@
             border: 1px solid rgba(239, 68, 68, 0.3);
         }
 
+        .bg-registered {
+            background-color: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
         .form-control,
         .form-select {
             background-color: #0b0f19;
@@ -165,7 +171,7 @@
                     Pratham Plant Pro Console
                 </h3>
                 <small class="text-muted">
-                    ESP32 Device Controller Platform & Knowledge Center (ID: 582abdd86440)
+                    ESP32 Device Controller Platform & Knowledge Center (ID: 582abdd86440)[cite: 7]
                 </small>
             </div>
 
@@ -173,27 +179,28 @@
                 <!-- Auth Admin Button -->
                 <button id="auth-btn" class="btn btn-outline-light btn-sm px-3" data-bs-toggle="modal"
                     data-bs-target="#authModal">
-                    <i class="fa-solid fa-user-shield me-1"></i> Admin Login / Register
+                    <i class="fa-solid fa-user-shield me-1"></i> Admin Login / Register[cite: 7]
                 </button>
                 <button class="btn btn-outline-info btn-sm px-3" onclick="switchTab('control')">
-                    <i class="fa-solid fa-sliders me-1"></i> Control Center
+                    <i class="fa-solid fa-sliders me-1"></i> Control Center[cite: 7]
                 </button>
                 <button class="btn btn-outline-success btn-sm px-3" onclick="switchTab('kb')">
-                    <i class="fa-solid fa-book-bookmark me-1"></i> Knowledge Base
+                    <i class="fa-solid fa-book-bookmark me-1"></i> Knowledge Base[cite: 7]
                 </button>
                 <button class="btn btn-outline-warning btn-sm px-3" onclick="switchTab('pratham-data')">
-                    <i class="fa-solid fa-globe me-1"></i> Pratham Portal Data
+                    <i class="fa-solid fa-globe me-1"></i> Pratham Portal Data[cite: 7]
                 </button>
                 <button class="btn btn-dark border-secondary btn-sm px-3 text-light" data-bs-toggle="modal"
                     data-bs-target="#mcpConfigModal">
-                    <i class="fas fa-cog me-1"></i> Configure MCP
+                    <i class="fas fa-cog me-1"></i> Configure MCP[cite: 7]
                 </button>
                 <!-- Add Device Button Added Here -->
                 <button class="btn btn-success btn-sm px-3" data-bs-toggle="modal" data-bs-target="#addDeviceModal">
-                    <i class="fa-solid fa-plus-circle me-1"></i> Add Device
+                    <i class="fa-solid fa-plus-circle me-1"></i> Add Device[cite: 7]
                 </button>
+                <!-- Device Status & Registration Badge -->
                 <span id="device-status-badge" class="status-badge bg-offline">
-                    <i class="fa-solid fa-circle-dot me-1"></i> Checking Status
+                    <i class="fa-solid fa-circle-dot me-1"></i> Checking Status[cite: 7]
                 </span>
             </div>
         </div>
@@ -207,13 +214,13 @@
                 <div class="col-md-3">
                     <div class="card p-3 text-center h-100">
                         <h6 class="text-muted fw-semibold mb-3">
-                            <i class="fa-solid fa-power-off text-warning me-2"></i> Power Mode
+                            <i class="fa-solid fa-power-off text-warning me-2"></i> Power Mode[cite: 7]
                         </h6>
                         <div class="d-flex justify-content-center gap-2">
                             <button class="btn btn-sm btn-success w-50 py-2 fw-semibold"
-                                onclick="sendCommand('power', {state: true})">ON</button>
+                                onclick="sendCommand('power', {state: true})">ON[cite: 7]</button>
                             <button class="btn btn-sm btn-danger w-50 py-2 fw-semibold"
-                                onclick="sendCommand('power', {state: false})">OFF</button>
+                                onclick="sendCommand('power', {state: false})">OFF[cite: 7]</button>
                         </div>
                     </div>
                 </div>
@@ -221,11 +228,11 @@
                 <div class="col-md-3">
                     <div class="card p-3 text-center h-100">
                         <h6 class="text-muted fw-semibold mb-3">
-                            <i class="fa-solid fa-rotate text-info me-2"></i> System Reboot
+                            <i class="fa-solid fa-rotate text-info me-2"></i> System Reboot[cite: 7]
                         </h6>
                         <button class="btn btn-sm btn-outline-info mt-1 w-100 py-2"
                             onclick="sendCommand('restart', {})">
-                            <i class="fa-solid fa-power-off me-1"></i> Restart ESP32
+                            <i class="fa-solid fa-power-off me-1"></i> Restart ESP32[cite: 7]
                         </button>
                     </div>
                 </div>
@@ -233,12 +240,12 @@
                 <div class="col-md-6">
                     <div class="card p-3 h-100">
                         <h6 class="text-muted fw-semibold mb-2">
-                            <i class="fa-solid fa-robot text-success me-2"></i> Manual AI Chat / Expression
+                            <i class="fa-solid fa-robot text-success me-2"></i> Manual AI Chat / Expression[cite: 7]
                         </h6>
                         <div class="input-group mt-1">
                             <input type="text" id="ai-input" class="form-control" placeholder="Ask AI or set message..."
                                 onkeypress="if(event.key === 'Enter') sendAiMessage()">
-                            <button class="btn btn-primary px-4" onclick="sendAiMessage()">Send</button>
+                            <button class="btn btn-primary px-4" onclick="sendAiMessage()">Send[cite: 7]</button>
                         </div>
                     </div>
                 </div>
@@ -251,28 +258,28 @@
                     <div class="card p-4">
                         <h5 class="mb-3 text-light">
                             <i class="fa-solid fa-brain text-info me-2"></i> AI Model & Token Integration (MCP / MQTT
-                            Sync)
+                            Sync)[cite: 7]
                         </h5>
                         <div class="row g-3 align-items-end">
                             <div class="col-md-4">
-                                <label class="form-label text-muted small fw-semibold">Select AI Provider</label>
+                                <label class="form-label text-muted small fw-semibold">Select AI Provider[cite: 7]</label>
                                 <select id="ai-model-select" class="form-select" onchange="toggleTokenInput()">
-                                    <option value="">-- Choose AI Model --</option>
-                                    <option value="gemini">Google Gemini (gemini-1.5-flash)</option>
-                                    <option value="openai">OpenAI (GPT-4o-mini)</option>
-                                    <option value="grok">Grok (xAI)</option>
-                                    <option value="deepseek">DeepSeek</option>
+                                    <option value="">-- Choose AI Model --[cite: 7]</option>
+                                    <option value="gemini">Google Gemini (gemini-1.5-flash)[cite: 7]</option>
+                                    <option value="openai">OpenAI (GPT-4o-mini)[cite: 7]</option>
+                                    <option value="grok">Grok (xAI)[cite: 7]</option>
+                                    <option value="deepseek">DeepSeek[cite: 7]</option>
                                 </select>
                             </div>
                             <div class="col-md-6" id="token-container">
                                 <label id="token-label" class="form-label text-muted small fw-semibold">API Token /
-                                    Key</label>
+                                    Key[cite: 7]</label>
                                 <input type="password" id="ai-api-token" class="form-control text-white"
                                     placeholder="First select a model above...">
                             </div>
                             <div class="col-md-2">
                                 <button class="btn btn-success w-100 py-2 fw-semibold shadow-sm"
-                                    onclick="saveAiToken()">Save & Sync</button>
+                                    onclick="saveAiToken()">Save & Sync[cite: 7]</button>
                             </div>
                         </div>
                     </div>
@@ -286,10 +293,10 @@
                 <div class="col-md-6">
                     <div class="card p-4 h-100">
                         <h5 class="mb-3 text-light">
-                            <i class="fa-solid fa-hand-pointer text-warning me-2"></i> Touch Actions Config
+                            <i class="fa-solid fa-hand-pointer text-warning me-2"></i> Touch Actions Config[cite: 7]
                         </h5>
                         <div class="mb-3">
-                            <label class="form-label text-muted small fw-semibold">Single Tap Settings</label>
+                            <label class="form-label text-muted small fw-semibold">Single Tap Settings[cite: 7]</label>
                             <div class="row g-2">
                                 <div class="col-6">
                                     <input type="text" id="touch-text" class="form-control" value="Hi I am Tulsi"
@@ -301,16 +308,16 @@
                                 </div>
                                 <div class="col-3">
                                     <select id="touch-expr" class="form-select">
-                                        <option value="happy">Happy</option>
-                                        <option value="excited">Excited</option>
-                                        <option value="sad">Sad</option>
+                                        <option value="happy">Happy[cite: 7]</option>
+                                        <option value="excited">Excited[cite: 7]</option>
+                                        <option value="sad">Sad[cite: 7]</option>
                                     </select>
                                 </div>
                             </div>
                         </div>
                         <button class="btn btn-warning w-100 py-2 fw-semibold mt-auto text-dark"
                             onclick="saveTouchConfig()">
-                            Update Touch Actions
+                            Update Touch Actions[cite: 7]
                         </button>
                     </div>
                 </div>
@@ -320,10 +327,10 @@
                     <div class="card p-4 h-100">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h5 class="mb-0 text-light">
-                                <i class="fa-solid fa-bell text-danger me-2"></i> Plant Reminders
+                                <i class="fa-solid fa-bell text-danger me-2"></i> Plant Reminders[cite: 7]
                             </h5>
                             <button class="btn btn-sm btn-outline-success px-2 py-1" onclick="addReminderRow()">
-                                <i class="fa-solid fa-plus me-1"></i> Add More
+                                <i class="fa-solid fa-plus me-1"></i> Add More[cite: 7]
                             </button>
                         </div>
                         <div id="reminders-container" class="mb-3" style="max-height:150px;overflow-y:auto;">
@@ -344,7 +351,7 @@
                             </div>
                         </div>
                         <button class="btn btn-danger w-100 py-2 fw-semibold mt-auto" onclick="saveAllReminders()">
-                            Save & Sync Reminders
+                            Save & Sync Reminders[cite: 7]
                         </button>
                     </div>
                 </div>
@@ -356,19 +363,19 @@
                     <div class="card p-4">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h5 class="mb-0 text-light">
-                                <i class="fas fa-calendar-alt text-info me-2"></i> Workspace & Task Event Sync
+                                <i class="fas fa-calendar-alt text-info me-2"></i> Workspace & Task Event Sync[cite: 7]
                             </h5>
                             <button class="btn btn-sm btn-outline-info px-3" onclick="fetchGoogleCalendarData()">
-                                <i class="fas fa-sync-alt me-1"></i> Sync Workspace Data
+                                <i class="fas fa-sync-alt me-1"></i> Sync Workspace Data[cite: 7]
                             </button>
                         </div>
                         <p class="text-muted small mb-2">Real-time schedule and workspace events fetched via active
-                            WebSocket channel.</p>
+                            WebSocket channel.[cite: 7]</p>
                         <div id="calendar-display-window"
                             class="p-3 bg-black rounded border border-secondary text-light"
                             style="font-size: 0.85rem; min-height: 90px; max-height: 180px; overflow-y: auto;">
                             <span class="text-muted">[INFO] Click 'Sync Workspace Data' to fetch real-time tasks and
-                                events...</span>
+                                events...[cite: 7]</span>
                         </div>
                     </div>
                 </div>
@@ -378,12 +385,12 @@
             <!-- AI Chat -->
             <div class="card p-4 mt-4">
                 <h5 class="mb-3 text-light">
-                    <i class="fa-solid fa-comments text-info me-2"></i> Live AI Conversation & Device Response
+                    <i class="fa-solid fa-comments text-info me-2"></i> Live AI Conversation & Device Response[cite: 7]
                 </h5>
                 <div id="ai-chat-window" class="bg-black p-3 rounded mb-3 border border-secondary"
                     style="height:180px;overflow-y:auto;font-size:0.9rem;">
                     <div class="text-muted">[SYSTEM] Chat window ready. Send a message to interact with your Plant
-                        Pro...</div>
+                        Pro...[cite: 7]</div>
                 </div>
                 <div class="input-group">
                     <input type="text" id="live-chat-input" class="form-control"
@@ -396,7 +403,7 @@
                     </button>
 
                     <button class="btn btn-primary px-4" onclick="sendLiveAiChat()">
-                        <i class="fa-solid fa-paper-plane me-1"></i> Send to Plant
+                        <i class="fa-solid fa-paper-plane me-1"></i> Send to Plant[cite: 7]
                     </button>
                 </div>
             </div>
@@ -405,11 +412,11 @@
             <!-- Logs -->
             <div class="card p-3 mt-4">
                 <h6 class="text-muted fw-semibold mb-2">
-                    <i class="fa-solid fa-terminal text-secondary me-2"></i> Communication Logs
+                    <i class="fa-solid fa-terminal text-secondary me-2"></i> Communication Logs[cite: 7]
                 </h6>
                 <div id="log-window" class="bg-black p-3 rounded border border-secondary"
                     style="height:100px;overflow-y:auto;font-family:monospace;font-size:0.8rem;color:#38bdf8;">
-                    [SYSTEM] UI Control Panel Loaded...<br>
+                    [SYSTEM] UI Control Panel Loaded...<br>[cite: 7]
                 </div>
             </div>
 
@@ -422,25 +429,25 @@
                 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
                     <div>
                         <h4 class="fw-bold mb-1 text-light">
-                            <i class="fa-solid fa-book-bookmark text-success me-2"></i> Knowledge Base (Backend Synced)
+                            <i class="fa-solid fa-book-bookmark text-success me-2"></i> Knowledge Base (Backend Synced)[cite: 7]
                         </h4>
                         <p class="text-muted small mb-0">Manage documents, parsing status, and content chunks for your
-                            Plant AI.</p>
+                            Plant AI.[cite: 7]</p>
                     </div>
                     <button class="btn btn-primary" onclick="openNewKbModal()">
-                        <i class="fa-solid fa-plus me-1"></i> New Knowledge Base
+                        <i class="fa-solid fa-plus me-1"></i> New Knowledge Base[cite: 7]
                     </button>
                 </div>
                 <div class="table-responsive">
                     <table class="console-table">
                         <thead>
                             <tr>
-                                <th>Knowledge base name</th>
-                                <th>Description</th>
-                                <th>Documents</th>
-                                <th>Status</th>
-                                <th>Created at</th>
-                                <th class="text-end">Actions</th>
+                                <th>Knowledge base name[cite: 7]</th>
+                                <th>Description[cite: 7]</th>
+                                <th>Documents[cite: 7]</th>
+                                <th>Status[cite: 7]</th>
+                                <th>Created at[cite: 7]</th>
+                                <th class="text-end">Actions[cite: 7]</th>
                             </tr>
                         </thead>
                         <tbody id="kb-table-body"></tbody>
@@ -457,28 +464,28 @@
                     <div>
                         <h4 class="fw-bold mb-1 text-info">
                             <i class="fa-solid fa-cloud-arrow-down text-warning me-2"></i> Live Data from
-                            api.mypratham.com
+                            api.mypratham.com[cite: 7]
                         </h4>
-                        <p class="text-muted small mb-0">Real-time sync for Jobs, Quizzes, and Learning Modules.</p>
+                        <p class="text-muted small mb-0">Real-time sync for Jobs, Quizzes, and Learning Modules.[cite: 7]</p>
                     </div>
                     <button class="btn btn-success btn-sm px-4 fw-semibold" onclick="fetchAllPrathamPortalData()">
-                        <i class="fa-solid fa-sync me-1"></i> Refresh All Data
+                        <i class="fa-solid fa-sync me-1"></i> Refresh All Data[cite: 7]
                     </button>
                 </div>
 
                 <ul class="nav nav-pills mb-3 gap-2" id="prathamDataTab" role="tablist">
                     <li class="nav-item">
                         <button class="nav-link active bg-dark text-light border border-secondary" id="jobs-tab"
-                            data-bs-toggle="pill" data-bs-target="#jobs-content" type="button">💼 Jobs</button>
+                            data-bs-toggle="pill" data-bs-target="#jobs-content" type="button">💼 Jobs[cite: 7]</button>
                     </li>
                     <li class="nav-item">
                         <button class="nav-link bg-dark text-light border border-secondary" id="quiz-tab"
-                            data-bs-toggle="pill" data-bs-target="#quiz-content" type="button">❓ Quiz Modules</button>
+                            data-bs-toggle="pill" data-bs-target="#quiz-content" type="button">❓ Quiz Modules[cite: 7]</button>
                     </li>
                     <li class="nav-item">
                         <button class="nav-link bg-dark text-light border border-secondary" id="learning-tab"
                             data-bs-toggle="pill" data-bs-target="#learning-content" type="button">📚 Learning
-                            Content</button>
+                            Content[cite: 7]</button>
                     </li>
                 </ul>
 
@@ -489,17 +496,17 @@
                             <table class="console-table">
                                 <thead>
                                     <tr>
-                                        <th>Job Title</th>
-                                        <th>Department</th>
-                                        <th>Location</th>
-                                        <th>Type</th>
-                                        <th class="text-end">Action</th>
+                                        <th>Job Title[cite: 7]</th>
+                                        <th>Department[cite: 7]</th>
+                                        <th>Location[cite: 7]</th>
+                                        <th>Type[cite: 7]</th>
+                                        <th class="text-end">Action[cite: 7]</th>
                                     </tr>
                                 </thead>
                                 <tbody id="jobs-table-body">
                                     <tr>
                                         <td colspan="5" class="text-center text-muted py-4">Click "Refresh All Data" to
-                                            load jobs from API.</td>
+                                            load jobs from API.[cite: 7]</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -512,17 +519,17 @@
                             <table class="console-table">
                                 <thead>
                                     <tr>
-                                        <th>Quiz Title</th>
-                                        <th>Category</th>
-                                        <th>Questions Count</th>
-                                        <th>Difficulty</th>
-                                        <th class="text-end">Action</th>
+                                        <th>Quiz Title[cite: 7]</th>
+                                        <th>Category[cite: 7]</th>
+                                        <th>Questions Count[cite: 7]</th>
+                                        <th>Difficulty[cite: 7]</th>
+                                        <th class="text-end">Action[cite: 7]</th>
                                     </tr>
                                 </thead>
                                 <tbody id="quiz-table-body">
                                     <tr>
                                         <td colspan="5" class="text-center text-muted py-4">Click "Refresh All Data" to
-                                            load quizzes from API.</td>
+                                            load quizzes from API.[cite: 7]</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -535,11 +542,11 @@
                             <table class="console-table">
                                 <thead>
                                     <tr>
-                                        <th>Module Name</th>
-                                        <th>Subject / Topic</th>
-                                        <th>Progress / Status</th>
-                                        <th>Duration</th>
-                                        <th class="text-end">Action</th>
+                                        <th>Module Name[cite: 7]</th>
+                                        <th>Subject / Topic[cite: 7]</th>
+                                        <th>Progress / Status[cite: 7]</th>
+                                        <th>Duration[cite: 7]</th>
+                                        <th class="text-end">Action[cite: 7]</th>
                                     </tr>
                                 </thead>
                                 <tbody id="learning-table-body"></tbody>
@@ -557,30 +564,30 @@
                 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                     <div>
                         <button class="btn btn-sm btn-outline-secondary mb-2 px-3" onclick="switchTab('kb')">
-                            <i class="fa-solid fa-arrow-left me-1"></i> Back to KB List
+                            <i class="fa-solid fa-arrow-left me-1"></i> Back to KB List[cite: 7]
                         </button>
-                        <h4 id="current-kb-title" class="fw-bold mb-0 text-info">Knowledge Base Documents</h4>
-                        <small class="text-muted">Manage uploaded files, parsing status, and content chunks.</small>
+                        <h4 id="current-kb-title" class="fw-bold mb-0 text-info">Knowledge Base Documents[cite: 7]</h4>
+                        <small class="text-muted">Manage uploaded files, parsing status, and content chunks.[cite: 7]</small>
                     </div>
                     <button class="btn btn-primary btn-sm px-3" onclick="openUploadDocModal()">
-                        <i class="fa-solid fa-file-arrow-up me-1"></i> Upload New Document
+                        <i class="fa-solid fa-file-arrow-up me-1"></i> Upload New Document[cite: 7]
                     </button>
                 </div>
                 <div class="table-responsive mt-3">
                     <table class="console-table">
                         <thead>
                             <tr>
-                                <th>Document Name</th>
-                                <th>File Type</th>
-                                <th>Parsing Status</th>
-                                <th>Chunks</th>
-                                <th class="text-end">Actions</th>
+                                <th>Document Name[cite: 7]</th>
+                                <th>File Type[cite: 7]</th>
+                                <th>Parsing Status[cite: 7]</th>
+                                <th>Chunks[cite: 7]</th>
+                                <th class="text-end">Actions[cite: 7]</th>
                             </tr>
                         </thead>
                         <tbody id="kb-documents-table-body">
                             <tr>
                                 <td colspan="5" class="text-center text-muted py-4">Select a knowledge base to view
-                                    documents.</td>
+                                    documents.[cite: 7]</td>
                             </tr>
                         </tbody>
                     </table>
@@ -599,11 +606,17 @@
 
                 <div class="modal-header" style="border-bottom: 1px solid #334155;">
                     <h5 class="modal-title" id="authModalLabel">
-                        <i class="fa-solid fa-user-shield text-info me-2"></i> Admin Portal Auth
+                        <i class="fa-solid fa-user-shield text-info me-2"></i> Admin Portal Auth[cite: 7]
                     </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
                         aria-label="Close"></button>
                 </div>
+                <!-- Role Selection Dropdown -->
+                 <div class="mb-3"><label class="block text-sm font-medium text-yellow-300">Select Role</label>
+                 <select id="authRole" class="w-full bg-bg-slate-900-800 border border-yellow-700 rounded-lg p-2 text-white">
+                 <option value="user">User</option>
+                 <option value="admin">Admin</option>
+                 </select></div>
 
                 <div class="modal-body p-4">
                     <!-- Status Message Display -->
@@ -614,12 +627,12 @@
                         <li class="nav-item" role="presentation">
                             <button class="nav-link active text-light" id="login-tab" data-bs-toggle="tab"
                                 data-bs-target="#login-panel" type="button" role="tab"
-                                style="background-color: #0f172a; border: 1px solid #334155;">Admin Login</button>
+                                style="background-color: #0f172a; border: 1px solid #334155;">Admin Login[cite: 7]</button>
                         </li>
                         <li class="nav-item" role="presentation">
                             <button class="nav-link text-light" id="register-tab" data-bs-toggle="tab"
                                 data-bs-target="#register-panel" type="button" role="tab"
-                                style="background-color: #0f172a; border: 1px solid #334155;">Register Admin</button>
+                                style="background-color: #0f172a; border: 1px solid #334155;">Register Admin[cite: 7]</button>
                         </li>
                     </ul>
 
@@ -628,19 +641,19 @@
                         <div class="tab-pane fade show active" id="login-panel" role="tabpanel">
                             <form onsubmit="event.preventDefault(); handleAdminLogin();">
                                 <div class="mb-3">
-                                    <label class="form-label text-slate-300 small">Username / Email</label>
+                                    <label class="form-label text-slate-300 small">Username / Email[cite: 7]</label>
                                     <input type="text" id="login-username" class="form-control text-white"
                                         placeholder="admin" required
                                         style="background-color: #0f172a; border: 1px solid #475569; color: #fff;">
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label text-slate-300 small">Password</label>
+                                    <label class="form-label text-slate-300 small">Password[cite: 7]</label>
                                     <input type="password" id="login-password" class="form-control text-white"
                                         placeholder="Enter password" required
                                         style="background-color: #0f172a; border: 1px solid #475569; color: #fff;">
                                 </div>
                                 <button type="submit" class="btn btn-primary w-100 fw-semibold py-2">
-                                    <i class="fa-solid fa-right-to-bracket me-1"></i> Login as Admin
+                                    <i class="fa-solid fa-right-to-bracket me-1"></i> Login as Admin[cite: 7]
                                 </button>
                             </form>
                         </div>
@@ -649,31 +662,31 @@
                         <div class="tab-pane fade" id="register-panel" role="tabpanel">
                             <form onsubmit="event.preventDefault(); handleAdminRegister();">
                                 <div class="mb-3">
-                                    <label class="form-label text-slate-300 small">Full Name</label>
+                                    <label class="form-label text-slate-300 small">Full Name[cite: 7]</label>
                                     <input type="text" id="reg-fullname" class="form-control text-white"
                                         placeholder="Admin Name"
                                         style="background-color: #0f172a; border: 1px solid #475569; color: #fff;">
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label text-slate-300 small">Username / Email</label>
+                                    <label class="form-label text-slate-300 small">Username / Email[cite: 7]</label>
                                     <input type="email" id="reg-email" class="form-control text-white"
                                         placeholder="admin@example.com" required
                                         style="background-color: #0f172a; border: 1px solid #475569; color: #fff;">
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label text-slate-300 small">Secret Key / Code</label>
+                                    <label class="form-label text-slate-300 small">Secret Key / Code[cite: 7]</label>
                                     <input type="password" id="reg-secret" class="form-control text-white"
                                         placeholder="Admin Registration Key"
                                         style="background-color: #0f172a; border: 1px solid #475569; color: #fff;">
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label text-slate-300 small">Password</label>
+                                    <label class="form-label text-slate-300 small">Password[cite: 7]</label>
                                     <input type="password" id="reg-password" class="form-control text-white"
                                         placeholder="Choose password" required
                                         style="background-color: #0f172a; border: 1px solid #475569; color: #fff;">
                                 </div>
                                 <button type="submit" class="btn btn-success w-100 fw-semibold py-2">
-                                    <i class="fa-solid fa-user-plus me-1"></i> Register Admin
+                                    <i class="fa-solid fa-user-plus me-1"></i> Register Admin[cite: 7]
                                 </button>
                             </form>
                         </div>
@@ -691,13 +704,13 @@
                 style="border-radius: 14px;">
                 <div class="modal-header border-secondary">
                     <h5 class="modal-title" id="addDeviceModalLabel">
-                        <i class="fa-solid fa-microchip text-success me-2"></i> Pair ESP32 Device
+                        <i class="fa-solid fa-microchip text-success me-2"></i> Pair ESP32 Device[cite: 7]
                     </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body text-center p-4">
                     <p class="text-muted small mb-3">Apne ESP32 device screen par display hone wala **6-digit pairing
-                        code** yahan enter karein.</p>
+                        code** yahan enter karein.[cite: 7]</p>
                     <div class="mb-3">
                         <input type="text" id="pairing-code-input"
                             class="form-control text-center fs-3 fw-bold tracking-widest text-info" maxlength="6"
@@ -706,9 +719,9 @@
                     <div id="pairing-status" class="small mt-2 mb-2"></div>
                 </div>
                 <div class="modal-footer border-secondary justify-content-between">
-                    <button type="button" class="btn btn-secondary btn-sm px-4" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-secondary btn-sm px-4" data-bs-dismiss="modal">Cancel[cite: 7]</button>
                     <button type="button" class="btn btn-success btn-sm px-4 fw-semibold" onclick="pairDevice()">Verify
-                        & Pair</button>
+                        & Pair[cite: 7]</button>
                 </div>
             </div>
         </div>
@@ -721,26 +734,26 @@
             <div class="modal-content bg-dark border border-secondary text-white shadow-lg">
                 <div class="modal-header border-secondary">
                     <h5 class="modal-title">
-                        <i class="fa-solid fa-folder-plus text-primary me-2"></i> Create New Knowledge Base
+                        <i class="fa-solid fa-folder-plus text-primary me-2"></i> Create New Knowledge Base[cite: 7]
                     </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label text-muted small">Knowledge Base Name</label>
+                        <label class="form-label text-muted small">Knowledge Base Name[cite: 7]</label>
                         <input type="text" id="modal-kb-name" class="form-control"
                             placeholder="e.g., Ayurveda & Botany">
                     </div>
                     <div class="mb-3">
-                        <label class="form-label text-muted small">Description</label>
+                        <label class="form-label text-muted small">Description[cite: 7]</label>
                         <textarea id="modal-kb-desc" class="form-control" rows="3"
                             placeholder="Describe the topics covered..."></textarea>
                     </div>
                 </div>
                 <div class="modal-footer border-secondary">
-                    <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel[cite: 7]</button>
                     <button type="button" class="btn btn-success btn-sm px-3" onclick="createNewKb()">Create
-                        Base</button>
+                        Base[cite: 7]</button>
                 </div>
             </div>
         </div>
@@ -753,26 +766,26 @@
             <div class="modal-content bg-dark border border-secondary text-white shadow-lg">
                 <div class="modal-header border-secondary">
                     <h5 class="modal-title">
-                        <i class="fa-solid fa-file-arrow-up text-success me-2"></i> Upload Document / File
+                        <i class="fa-solid fa-file-arrow-up text-success me-2"></i> Upload Document / File[cite: 7]
                     </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label text-muted small">Document Name (Optional)</label>
+                        <label class="form-label text-muted small">Document Name (Optional)[cite: 7]</label>
                         <input type="text" id="modal-doc-name" class="form-control text-white bg-dark"
                             placeholder="e.g., Ayurveda Chapter 1">
                     </div>
                     <div class="mb-3">
-                        <label class="form-label text-muted small">Select File (PDF, TXT, DOCX)</label>
+                        <label class="form-label text-muted small">Select File (PDF, TXT, DOCX)[cite: 7]</label>
                         <input type="file" id="modal-doc-file" class="form-control text-white bg-dark"
                             accept=".pdf,.txt,.docx">
                     </div>
                 </div>
                 <div class="modal-footer border-secondary">
-                    <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel[cite: 7]</button>
                     <button type="button" class="btn btn-success btn-sm px-3" onclick="uploadDocument()">Upload &
-                        Parse</button>
+                        Parse[cite: 7]</button>
                 </div>
             </div>
         </div>
@@ -785,7 +798,7 @@
             <div class="modal-content bg-dark text-light border border-secondary" style="border-radius:12px;">
                 <div class="modal-header border-bottom border-secondary px-4 py-3">
                     <h5 class="modal-title fw-bold" id="mcpConfigModalLabel">
-                        <i class="fas fa-network-wired text-info me-2"></i> Assistant - Configure MCP Endpoints
+                        <i class="fas fa-network-wired text-info me-2"></i> Assistant - Configure MCP Endpoints[cite: 7]
                     </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
@@ -793,48 +806,48 @@
                     <div class="row">
                         <!-- LEFT -->
                         <div class="col-md-5 border-end border-secondary pe-md-4">
-                            <label class="text-muted small text-uppercase fw-bold mb-2">Official Services</label>
+                            <label class="text-muted small text-uppercase fw-bold mb-2">Official Services[cite: 7]</label>
                             <div class="row g-3 mb-4">
                                 <div class="col-6">
                                     <div
                                         class="p-3 bg-black border border-secondary rounded d-flex justify-content-between align-items-center">
-                                        <span>Weather</span>
+                                        <span>Weather[cite: 7]</span>
                                         <input class="form-check-input mt-0" type="checkbox" checked>
                                     </div>
                                 </div>
                                 <div class="col-6">
                                     <div
                                         class="p-3 bg-black border border-secondary rounded d-flex justify-content-between align-items-center">
-                                        <span>Music</span>
+                                        <span>Music[cite: 7]</span>
                                         <input class="form-check-input mt-0" type="checkbox" checked>
                                     </div>
                                 </div>
                                 <div class="col-6">
                                     <div
                                         class="p-3 bg-black border border-secondary rounded d-flex justify-content-between align-items-center">
-                                        <span>FastMCP</span>
+                                        <span>FastMCP[cite: 7]</span>
                                         <input class="form-check-input mt-0" type="checkbox" checked>
                                     </div>
                                 </div>
                                 <div class="col-6">
                                     <div
                                         class="p-3 bg-black border border-secondary rounded d-flex justify-content-between align-items-center">
-                                        <span>Search <small class="text-warning">(Trial)</small></span>
+                                        <span>Search <small class="text-warning">(Trial)</small>[cite: 7]</span>
                                         <input class="form-check-input mt-0" type="checkbox" checked>
                                     </div>
                                 </div>
                             </div>
 
                             <!-- CUSTOM SERVICES -->
-                            <label class="text-muted small text-uppercase fw-bold mb-2">Custom Services</label>
+                            <label class="text-muted small text-uppercase fw-bold mb-2">Custom Services[cite: 7]</label>
                             <div class="card bg-black border border-secondary p-3 rounded mb-3">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <span class="fw-bold text-info small">
-                                        <i class="fas fa-plug me-1"></i> MCP Server Endpoint
+                                        <i class="fas fa-plug me-1"></i> MCP Server Endpoint[cite: 7]
                                     </span>
                                     <div class="d-flex align-items-center">
                                         <span id="connectionStatus" class="badge bg-secondary me-2"
-                                            style="font-size:0.7rem;">Not Connected</span>
+                                            style="font-size:0.7rem;">Not Connected[cite: 7]</span>
                                         <button class="btn btn-sm btn-outline-secondary text-light py-0 px-2"
                                             onclick="checkMcpStatus()" title="Refresh Status">
                                             <i class="fas fa-sync-alt small"></i>
@@ -842,7 +855,7 @@
                                     </div>
                                 </div>
                                 <p class="text-muted small mb-2" style="font-size:0.75rem;">WebSocket / REST Endpoint
-                                    Bridge:</p>
+                                    Bridge:[cite: 7]</p>
                                 <div class="input-group input-group-sm mb-2">
                                     <input type="text" id="mcpEndpointUrl"
                                         class="form-control bg-dark text-light border-secondary"
@@ -858,9 +871,9 @@
                                     </button>
                                 </div>
                                 <small class="text-muted">Enter your MyPratham user token in this field and click <b
-                                        class="text-info">Save Configurations</b>.</small>
+                                        class="text-info">Save Configurations</b>.[cite: 7]</small>
                                 <div id="tokenSaveStatus" class="small mt-2 text-success" style="display:none;">
-                                    <i class="fa-solid fa-check me-1"></i> Token saved in browser storage.
+                                    <i class="fa-solid fa-check me-1"></i> Token saved in browser storage.[cite: 7]
                                 </div>
                             </div>
                         </div>
@@ -869,27 +882,27 @@
                         <div class="col-md-7 ps-md-4 mt-3 mt-md-0">
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <label class="text-muted small text-uppercase fw-bold mb-0">
-                                    <i class="fas fa-terminal text-success me-1"></i> MCP Live Data Test Window
+                                    <i class="fas fa-terminal text-success me-1"></i> MCP Live Data Test Window[cite: 7]
                                 </label>
                                 <button class="btn btn-sm btn-success px-3 py-1 fw-semibold"
                                     onclick="fetchMcpTestData()">
-                                    <i class="fas fa-play me-1"></i> Test & Fetch Data
+                                    <i class="fas fa-play me-1"></i> Test & Fetch Data[cite: 7]
                                 </button>
                             </div>
                             <p class="text-muted small mb-2">Fetching and displaying real-time data packets from <span
-                                    class="text-info">api.mypratham.com</span>:</p>
+                                    class="text-info">api.mypratham.com</span>:[cite: 7]</p>
                             <div id="mcp-test-window" class="bg-black p-3 rounded border border-secondary text-light"
                                 style="height:250px;overflow-y:auto;font-family:monospace;font-size:0.8rem;">
                                 <span class="text-muted">[INFO] Click "Test & Fetch Data" to request payload from
-                                    api.mypratham.com...</span>
+                                    api.mypratham.com...[cite: 7]</span>
                             </div>
                         </div>
                     </div>
                 </div>
                 <div class="modal-header border-top border-secondary px-4 py-3 justify-content-end">
-                    <button type="button" class="btn btn-secondary px-4 me-2" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-secondary px-4 me-2" data-bs-dismiss="modal">Cancel[cite: 7]</button>
                     <button type="button" class="btn btn-primary px-4" onclick="saveMcpConfig()">Save
-                        Configurations</button>
+                        Configurations[cite: 7]</button>
                 </div>
             </div>
         </div>
@@ -1014,7 +1027,6 @@
                     statusMsg.innerHTML = `<span class="text-danger">${data.error || data.message || "Invalid login credentials."}</span>`;
                 }
             } catch (err) {
-                // Fallback for standalone / demo local storage verification
                 if (username === "admin" && password === "admin123") {
                     localStorage.setItem("admin_token", "demo_admin_token");
                     localStorage.setItem("admin_user", username);
@@ -1094,7 +1106,6 @@
                 authBtn.removeAttribute("data-bs-toggle");
             }
         }
- 
         /* =========================================================
            LOG
         ========================================================= */
@@ -1106,13 +1117,12 @@
         }
 
         /* =========================================================
-        DEVICE PAIRING LOGIC (6-DIGIT CODE) - FIXED
+           DEVICE PAIRING & REGISTERED STATUS LOGIC
         ========================================================= */
         function pairDevice() {
             const codeInput = document.getElementById('pairing-code-input').value.trim();
             const statusDiv = document.getElementById('pairing-status');
 
-            // Validation: Allow 6-character Hexadecimal (numbers + letters a-f)
             const isValidHex = /^[0-9a-fA-F]{6}$/.test(codeInput);
 
             if (!isValidHex) {
@@ -1122,12 +1132,10 @@
 
             statusDiv.innerHTML = '<span class="text-warning">Verifying and pairing...</span>';
 
-            // 🟢 GET ki jagah POST request bhej rahe hain taaki Django `is_paired = True` save kar sake
             fetch(`/api/devices/check-pairing/`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    // 'X-CSRFToken': getCookie('csrftoken') // Agar Django CSRF protection on hai
                 },
                 body: JSON.stringify({ code: codeInput })
             })
@@ -1136,9 +1144,10 @@
                     console.log("Server Response:", data);
 
                     if (data.is_paired === true) {
-                        statusDiv.innerHTML = '<span class="text-success">✅ Device successfully paired!</span>';
+                        statusDiv.innerHTML = '<span class="text-success">✅ Device successfully paired & registered!</span>';
+                        localStorage.setItem(`device_registered_${PLANT_ID}`, "true");
                         setTimeout(() => {
-                            location.reload(); // Page refresh karke dashboard update karein
+                            location.reload();
                         }, 1500);
                     } else {
                         statusDiv.innerHTML = '<span class="text-danger">❌ ' + (data.error || 'Device not found or invalid code.') + '</span>';
@@ -1149,6 +1158,7 @@
                     statusDiv.innerHTML = '<span class="text-danger">❌ Server connection failed.</span>';
                 });
         }
+
         /* =========================================================
            PRATHAM TOKEN HANDLING
         ========================================================= */
@@ -1224,7 +1234,6 @@
         async function fetchAllPrathamPortalData() {
             log("Fetching real Jobs and Quizzes from api.mypratham.com...");
 
-            /* ---------------- JOBS ---------------- */
             try {
                 const response = await fetch(`${PRATHAM_API_BASE}/api/job`, {
                     method: "GET",
@@ -1246,10 +1255,8 @@
                 log(`Jobs API error: ${err.message}`);
             }
 
-            /* ---------------- QUIZZES ---------------- */
             try {
                 const token = getPrathamUserToken();
-                console.log("[QUIZ] MyPratham token:", token ? "FOUND" : "NOT FOUND");
                 if (!token) throw new Error("MyPratham user token not found");
 
                 const response = await fetch(`${PRATHAM_API_BASE}/school/exams/D?page=1`, {
@@ -1531,8 +1538,7 @@
             try {
                 const response = await fetchKnowledgeBaseApi({
                     method: "POST",
-                    headers: { "Accept": "application/json" },
-                    body: formData
+
                 });
                 const data = await response.json();
                 if (response.ok && data.status === "success") {
@@ -1662,17 +1668,14 @@
         }
 
         /* =========================================================
-        FIXED MANUAL AI CHAT & LIVE AI EXPRESSION HANDLERS
+           MANUAL AI CHAT & LIVE AI EXPRESSION HANDLERS
         ========================================================= */
-
-        // Live AI Conversation Panel
         async function sendLiveAiChat() {
             const inputField = document.getElementById("live-chat-input");
             if (!inputField) return;
             const text = inputField.value.trim();
             if (!text) return;
 
-            // Display user input in UI
             appendChatMessage("You", text);
             inputField.value = "";
 
@@ -1688,9 +1691,7 @@
 
                 const data = await response.json();
                 if (response.ok) {
-                    // Prioritize actual AI generated text over static backend messages
                     const aiReply = data.ai_response || data.response || data.answer || data.reply || data.generated_answer || data.message;
-
                     appendChatMessage("Plant Pro", aiReply);
                     log(`Plant Pro Response: ${aiReply}`);
                 } else {
@@ -1701,19 +1702,17 @@
                 appendChatMessage("Plant Pro", "Server communication failed.");
             }
         }
-        // Quick AI Input Command
+
         async function sendAiMessage() {
             const inputField = document.getElementById("ai-input");
             if (!inputField) return;
             const text = inputField.value.trim();
             if (!text) return;
 
-            // User ka message UI par dikhayein
             appendChatMessage("You", text);
             inputField.value = "";
 
             try {
-                // NOTE: Agar PLANT_ID variable name alag hai toh usey apne hisab se update kar lein (e.g. currentPlantId)
                 const chatEndpoint = `${API_BASE}/plant/${PLANT_ID}/chat/`;
 
                 const response = await fetch(chatEndpoint, {
@@ -1722,17 +1721,14 @@
                         "Content-Type": "application/json",
                         "X-Device-Token": DEVICE_TOKEN
                     },
-                    body: JSON.stringify({ message: text }) // Unified view 'message' ya 'text' padhta hai
+                    body: JSON.stringify({ message: text })
                 });
 
                 const data = await response.json();
                 if (response.ok && data.status === "success") {
-                    // Backend dynamic response (reply / response / ai_command.text)
                     const aiReply = data.reply || data.response || (data.ai_command && data.ai_command.text) || "AI Response Unavailable";
-
                     appendChatMessage("Plant Pro", aiReply);
 
-                    // Agar audio play karwana ho frontend par toh:
                     if (data.audio_url) {
                         const audio = new Audio(data.audio_url);
                         audio.play().catch(e => console.log("Audio autoplay error:", e));
@@ -1812,15 +1808,28 @@
         }
 
         /* =========================================================
-           HEARTBEAT
+           HEARTBEAT & REGISTRATION STATUS CHECK
         ========================================================= */
         async function checkStatus() {
             try {
                 const res = await fetch(`${API_BASE}/heartbeat/`, { headers: { "X-Device-Token": DEVICE_TOKEN } });
                 const badge = document.getElementById("device-status-badge");
                 if (!badge) return;
-                badge.className = res.ok ? "status-badge bg-online" : "status-badge bg-offline";
-                badge.innerHTML = res.ok ? `<i class="fa-solid fa-wifi me-1"></i> Device Online` : `<i class="fa-solid fa-circle-xmark me-1"></i> Device Offline`;
+
+                const isRegistered = localStorage.getItem(`device_registered_${PLANT_ID}`) === "true";
+
+                if (res.ok) {
+                    if (isRegistered) {
+                        badge.className = "status-badge bg-registered";
+                        badge.innerHTML = `<i class="fa-solid fa-shield-check me-1"></i> Registered & Online`;
+                    } else {
+                        badge.className = "status-badge bg-online";
+                        badge.innerHTML = `<i class="fa-solid fa-wifi me-1"></i> Device Online`;
+                    }
+                } else {
+                    badge.className = "status-badge bg-offline";
+                    badge.innerHTML = `<i class="fa-solid fa-circle-xmark me-1"></i> Device Offline`;
+                }
             } catch (e) { }
         }
 
