@@ -36,7 +36,7 @@ from core.views import (
     check_pairing,    # 👈 Yahan add kar diya gaya hai
     admin_login_api,      # <-- Yahan add karein
     admin_register_api    # <-- Yahan add karein
-)
+    )
 
 urlpatterns = [
     # 1. Admin & Dashboard Routes
@@ -45,7 +45,7 @@ urlpatterns = [
     path("admin-dashboard/", admin_dashboard, name="admin_dashboard"),
     path('api/admin/login/', admin_login_api, name='admin_login_api'),
     path('api/admin/register/', admin_register_api, name='admin_register_api'),
-
+    
     # 2. STATIC Device Endpoints (MUST COME BEFORE <str:plant_id>)
     # Pehle static routes check hone chahiye taaki 'check-pairing' ko Django plant_id na samajh le
     path('api/devices/pair/', device_pair, name='device_pair'),

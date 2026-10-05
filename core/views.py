@@ -33,6 +33,13 @@ from rest_framework import exceptions
 # Models Import
 from .models import *
 from .rag_service import get_rag_context
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.permissions import AllowAny
+from django.contrib.auth import get_user_model
+from .serializers import RegisterSerializer  # Apne serializer ka sahi import path dein
+from .models import Device
 
 # ==========================================
 # 1. FFMPEG & PYDUB SETUP
@@ -593,7 +600,9 @@ def admin_login_api(request):
 def admin_register_api(request):
     if request.method == "POST":
         try:
-            data = json.loads(request.body)
+            # request.body se seedha JSON load karein
+            data = json.loads(request.body.decode('utf-8')) if request.body else {}
+            
             username = data.get("username", "").strip()
             email = data.get("email", "").strip()
             password = data.get("password", "").strip()
@@ -601,6 +610,10 @@ def admin_register_api(request):
             role = data.get("role", "admin")
             organization_name = data.get("organization_name", "").strip()
             phone_number = data.get("phone_number", "").strip()
+            
+            # Extra fields agar user map karne ke liye bheji jayein
+            plant_id = data.get("plant_id", "").strip()
+            make_superuser = data.get("make_superuser", False)
 
             # Validation: Username, Email aur Password teeno zaroori hain
             if not username or not email or not password:
@@ -614,42 +627,79 @@ def admin_register_api(request):
             if User.objects.filter(email=email).exists():
                 return JsonResponse({"status": "error", "error": "Email already exists!"}, status=400)
 
-            # Create User
-            user = User.objects.create_user(username=username, email=email, password=password)
-            user.is_staff = True  
-            user.save()
+            # Create User (Superuser ya Staff)
+            if make_superuser:
+                user = User.objects.create_superuser(username=username, email=email, password=password)
+            else:
+                user = User.objects.create_user(username=username, email=email, password=password)
+                user.is_staff = True  
+                user.save()
 
-            # Create UserProfile
-            profile = UserProfile.objects.create(
+           # Create UserProfile (get_or_create use karein taaki agar pehle se bani ho toh error na aaye)
+            profile, created = UserProfile.objects.get_or_create(
                 user=user,
-                role=role,
-                organization_name=organization_name,
-                phone_number=phone_number
+                defaults={
+                    'role': role,
+                    'organization_name': organization_name,
+                    'phone_number': phone_number
+                }
             )
+            
+            # Agar profile pehle se exist karti thi, toh naye data ke sath update kar dein
+            if not created:
+                profile.role = role
+                profile.organization_name = organization_name
+                profile.phone_number = phone_number
+                profile.save()
 
-            # Naye user ke liye DRF token create karna
+           # Optional: Agar registration ke waqt plant_id di gayi hai, toh device map kar dein
+            mapping_status = None
+            if plant_id:
+                try:
+                    device = Device.objects.get(plant_id=plant_id)
+                    main_admin = User.objects.filter(is_superuser=True).first()
+                    
+                    # Agar user admin hai ya superuser/staff hai, toh owner_admin banayein
+                    if role == 'admin' or user.is_superuser or user.is_staff:
+                        device.owner_admin = user
+                        mapping_status = f"Successfully set as owner_admin for device {plant_id}"
+                    else:
+                        # Normal user ke liye assigned_user banayein aur main admin ko default owner set karein
+                        device.assigned_user = user
+                        if main_admin:
+                            device.owner_admin = main_admin
+                        mapping_status = f"Assigned to device {plant_id} (Main Admin set as default owner)"
+                    
+                    device.save()
+                except Device.DoesNotExist:
+                    mapping_status = f"Device {plant_id} not found for mapping"
+
+            # DRF token generate karna
             token, _ = Token.objects.get_or_create(user=user)
 
             return JsonResponse({
-                "status": "success", 
+                "status": "success",
                 "message": "Admin account created successfully!",
-                "token": token.key,  # <-- Ab yahan register hote hi token mil jayega
+                "token": token.key,
+                "mapping_status": mapping_status,
                 "user_data": {
                     "id": user.id,
                     "username": user.username,
                     "email": user.email,
                     "role": profile.role,
-                    "role_display": profile.get_role_display(),
                     "organization_name": profile.organization_name,
                     "phone_number": profile.phone_number,
-                    "is_staff": user.is_staff
+                    "is_staff": user.is_staff,
+                    "is_superuser": user.is_superuser
                 }
-            })
+            }, status=201)
 
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             return JsonResponse({"status": "error", "error": str(e)}, status=500)
-
-    return JsonResponse({"error": "Method not allowed"}, status=405)
+    
+    return JsonResponse({"status": "error", "error": "Invalid request method"}, status=405)
 
 @csrf_exempt
 def device_heartbeat(request, plant_id):
@@ -1043,6 +1093,74 @@ def knowledge_base_api(request):
             status=status.HTTP_400_BAD_REQUEST
         )
 
+    # ============================================================
+    # 2. PARSE REQUEST DATA
+    # ============================================================
+
+    request_data = {}
+
+    if request.method == "POST":
+        try:
+
+            if hasattr(request, "data") and request.data:
+                request_data = request.data
+
+            elif request.body:
+                request_data = json.loads(
+                    request.body.decode("utf-8")
+                )
+
+        except Exception:
+            request_data = {}
+
+    action = request_data.get("action")
+
+    # ============================================================
+    # 3. ROLE & ACTION BASED PERMISSION CHECK
+    # ============================================================
+
+    is_mutation = (
+        request.method in ["PUT", "PATCH", "DELETE"]
+        or (
+            request.method == "POST"
+            and action in [
+                "create_kb",
+                "create_knowledge_base",
+                "new_kb",
+                "edit_kb",
+                "delete_kb",
+                "upload",
+                "upload_doc",
+                "delete_document",
+                "del_doc",
+                "delete_doc",
+            ]
+        )
+    )
+
+    if is_mutation:
+
+        is_admin = (
+            request.user.is_superuser
+            or request.user.is_staff
+            or user_profile.role in [
+                "admin",
+                "owner_admin"
+            ]
+        )
+
+        if not is_admin:
+            return Response(
+                {
+                    "status": "error",
+                    "error": (
+                        "Unauthorized: Sirf Admin ya Owner-Admin "
+                        "hi Knowledge Base upload, edit ya delete "
+                        "kar sakte hain."
+                    )
+                },
+                status=status.HTTP_403_FORBIDDEN
+            )
 
     # ============================================================
     # HELPER FUNCTION
@@ -1053,13 +1171,13 @@ def knowledge_base_api(request):
 
         # --------------------------------------------------------
         # IMPORTANT:
-        # Sirf current token wale user ki KBs
+        # Sirf current user ki KBs
         # --------------------------------------------------------
 
         kbs = (
             KnowledgeBase.objects
             .filter(user=user_profile)
-            .prefetch_related('documents__chunks')
+            .prefetch_related("documents__chunks")
         )
 
         data = []
@@ -1072,75 +1190,94 @@ def knowledge_base_api(request):
 
                 c_count = get_document_chunks_count(d)
 
-                docs.append({
-                    "id": d.id,
-                    "name": d.name,
-                    "size": getattr(
-                        d,
-                        'file_size',
-                        '0 KB'
-                    ),
+                docs.append(
+                    {
+                        "id": d.id,
+
+                        "name": d.name,
+
+                        "size": getattr(
+                            d,
+                            "file_size",
+                            "0 KB"
+                        ),
+
+                        "status": getattr(
+                            d,
+                            "status",
+                            "Parsed"
+                        ),
+
+                        "chunks": c_count,
+
+                        "chunks_count": c_count,
+
+                        "date": (
+                            d.created_at.strftime(
+                                "%Y-%m-%d %H:%M:%S"
+                            )
+                            if hasattr(d, "created_at")
+                            and d.created_at
+                            else ""
+                        )
+                    }
+                )
+
+            data.append(
+                {
+                    "id": kb.id,
+
+                    "name": kb.name,
+
+                    "desc": kb.description,
+
+                    "description": kb.description,
+
                     "status": getattr(
-                        d,
-                        'status',
-                        'Parsed'
+                        kb,
+                        "status",
+                        "Enabled"
                     ),
-                    "chunks": c_count,
-                    "chunks_count": c_count,
-                    "date": (
-                        d.created_at.strftime(
+
+                    "docsCount": len(docs),
+
+                    "createdAt": (
+                        kb.created_at.strftime(
                             "%Y-%m-%d %H:%M:%S"
                         )
-                        if hasattr(d, 'created_at')
-                        and d.created_at
+                        if hasattr(kb, "created_at")
+                        and kb.created_at
                         else ""
-                    )
-                })
+                    ),
 
-            data.append({
-                "id": kb.id,
-                "name": kb.name,
-                "desc": kb.description,
-                "description": kb.description,
-                "status": getattr(
-                    kb,
-                    'status',
-                    'Enabled'
-                ),
-                "docsCount": len(docs),
-                "createdAt": (
-                    kb.created_at.strftime(
-                        "%Y-%m-%d %H:%M:%S"
+                    "documents": docs,
+
+                    "agent_id": (
+                        kb.agent_id
+                        if kb.agent_id
+                        else None
                     )
-                    if hasattr(kb, 'created_at')
-                    and kb.created_at
-                    else ""
-                ),
-                "documents": docs,
-                "agent_id": kb.agent_id
-            })
+                }
+            )
 
         return Response(
             {
                 "status": "success",
-
                 "knowledge_bases": data,
             },
             status=status.HTTP_200_OK
         )
 
-
     # ============================================================
-    # 2. GET REQUEST
+    # 4. GET REQUEST
     # ============================================================
 
     if request.method == "GET":
 
         return get_kb_list_json()
 
-
     # ============================================================
-    # 3. POST REQUEST
+    # 5. POST REQUEST
     # ============================================================
 
     if request.method == "POST":
@@ -1148,19 +1285,37 @@ def knowledge_base_api(request):
         try:
 
             # ====================================================
-            # DOCUMENT UPLOAD
+            # REQUEST BODY
+            # ====================================================
+
+            body = request.data
+
+            if not body:
+
+                return Response(
+                    {
+                        "status": "success",
+                        "message": "Ignored empty request"
+                    },
+                    status=status.HTTP_200_OK
+                )
+
+            action = body.get("action")
+
+            # ====================================================
+            # 6. DOCUMENT UPLOAD
             # ====================================================
 
             if (
                 request.FILES
-                or request.data.get("action") == "upload_doc"
+                or action == "upload_doc"
             ):
 
                 # ------------------------------------------------
                 # KB ID
                 # ------------------------------------------------
 
-                kb_id = request.data.get("kb_id")
+                kb_id = body.get("kb_id")
 
                 if not kb_id:
 
@@ -1175,13 +1330,8 @@ def knowledge_base_api(request):
                         status=status.HTTP_400_BAD_REQUEST
                     )
 
-
                 # ------------------------------------------------
                 # FIND KB
-                #
-                # IMPORTANT:
-                # user=user_profile condition means
-                # user can access ONLY his own KB.
                 # ------------------------------------------------
 
                 try:
@@ -1212,7 +1362,6 @@ def knowledge_base_api(request):
 
                     kb = None
 
-
                 # ------------------------------------------------
                 # KB NOT FOUND
                 # ------------------------------------------------
@@ -1231,17 +1380,25 @@ def knowledge_base_api(request):
                         status=status.HTTP_404_NOT_FOUND
                     )
 
+                # ------------------------------------------------
+                # FILE
+                # ------------------------------------------------
+
                 uploaded_file = request.FILES.get("file")
 
-                name = ( 
-                    request.data.get("name")
-                    or request.data.get("title")
+                name = (
+                    body.get("name")
+                    or body.get("title")
                 )
 
-                content = request.data.get(
+                content = body.get(
                     "content",
                     ""
                 )
+
+                # ------------------------------------------------
+                # FILE PROCESSING
+                # ------------------------------------------------
 
                 if uploaded_file:
 
@@ -1249,15 +1406,17 @@ def knowledge_base_api(request):
 
                         name = uploaded_file.name
 
-
                     file_extension = os.path.splitext(
                         name
                     )[1].lower()
 
-
                     try:
 
-                        if file_extension == '.pdf':
+                        # ----------------------------------------
+                        # PDF
+                        # ----------------------------------------
+
+                        if file_extension == ".pdf":
 
                             reader = PdfReader(
                                 uploaded_file
@@ -1278,10 +1437,12 @@ def knowledge_base_api(request):
                             content = "\n".join(
                                 extracted_text
                             )
-                        elif file_extension in [
-                            '.docx',
-                            '.doc'
-                        ]:
+
+                        # ----------------------------------------
+                        # DOCX
+                        # ----------------------------------------
+
+                        elif file_extension == ".docx":
 
                             doc_file = DocxDocument(
                                 uploaded_file
@@ -1296,31 +1457,44 @@ def knowledge_base_api(request):
                             content = "\n".join(
                                 extracted_text
                             )
+
+                        # ----------------------------------------
+                        # TXT / OTHER
+                        # ----------------------------------------
+
                         else:
 
-                            file_bytes = (
-                                uploaded_file.read()
-                            )
+                            file_bytes = uploaded_file.read()
 
                             try:
 
                                 content = file_bytes.decode(
-                                    'utf-8'
+                                    "utf-8"
                                 )
 
                             except UnicodeDecodeError:
 
                                 content = file_bytes.decode(
-                                    'latin-1',
-                                    errors='ignore'
+                                    "latin-1",
+                                    errors="ignore"
                                 )
-
 
                     except Exception as e:
 
-                        content = (
-                            f"Error reading file content: {str(e)}"
+                        return Response(
+                            {
+                                "status": "error",
+                                "message": (
+                                    "File read failed: "
+                                    f"{str(e)}"
+                                )
+                            },
+                            status=status.HTTP_400_BAD_REQUEST
                         )
+
+                # ------------------------------------------------
+                # EMPTY CONTENT CHECK
+                # ------------------------------------------------
 
                 if not content or not content.strip():
 
@@ -1335,9 +1509,17 @@ def knowledge_base_api(request):
                         status=status.HTTP_400_BAD_REQUEST
                     )
 
+                # ------------------------------------------------
+                # SIZE
+                # ------------------------------------------------
+
                 size_kb = (
                     f"{len(content.encode('utf-8')) / 1024:.2f} KB"
                 )
+
+                # ------------------------------------------------
+                # CREATE DOCUMENT
+                # ------------------------------------------------
 
                 doc = Document.objects.create(
                     knowledge_base=kb,
@@ -1347,14 +1529,21 @@ def knowledge_base_api(request):
                     status="Parsed"
                 )
 
+                # ------------------------------------------------
+                # REMOVE OLD CHUNKS
+                # ------------------------------------------------
+
                 DocumentChunk.objects.filter(
                     document=doc
                 ).delete()
 
+                # ------------------------------------------------
+                # CHUNK DOCUMENT
+                # ------------------------------------------------
+
                 chunk_size = 300
 
                 chunks_count = 0
-
 
                 for i in range(
                     0,
@@ -1365,7 +1554,6 @@ def knowledge_base_api(request):
                     chunk_text = content[
                         i:i + chunk_size
                     ]
-
 
                     if chunk_text.strip():
 
@@ -1396,20 +1584,9 @@ def knowledge_base_api(request):
                     status=status.HTTP_201_CREATED
                 )
 
-            if not request.data:
-
-                return Response(
-                    {
-                        "status": "success",
-                        "message": "Ignored empty request"
-                    },
-                    status=status.HTTP_200_OK
-                )
-
-            body = request.data
-
-            action = body.get("action")
-
+            # ====================================================
+            # 7. AUTO DETECT ACTION
+            # ====================================================
 
             if not action:
 
@@ -1432,10 +1609,13 @@ def knowledge_base_api(request):
 
                     action = "list_kb"
 
+            # ====================================================
+            # 8. DELETE KNOWLEDGE BASE
+            # ====================================================
+
             if action == "delete_kb":
 
                 kb_id = body.get("kb_id")
-
 
                 if not kb_id:
 
@@ -1447,7 +1627,6 @@ def knowledge_base_api(request):
                         status=status.HTTP_400_BAD_REQUEST
                     )
 
-
                 try:
 
                     kb = KnowledgeBase.objects.get(
@@ -1456,7 +1635,6 @@ def knowledge_base_api(request):
                     )
 
                     kb.delete()
-
 
                     return Response(
                         {
@@ -1467,7 +1645,6 @@ def knowledge_base_api(request):
                         },
                         status=status.HTTP_200_OK
                     )
-
 
                 except KnowledgeBase.DoesNotExist:
 
@@ -1483,11 +1660,19 @@ def knowledge_base_api(request):
                         status=status.HTTP_404_NOT_FOUND
                     )
 
+            # ====================================================
+            # 9. CREATE KNOWLEDGE BASE
+            # ====================================================
+
             elif action in [
                 "create_kb",
                 "create_knowledge_base",
                 "new_kb"
             ]:
+
+                # ------------------------------------------------
+                # NAME
+                # ------------------------------------------------
 
                 name = (
                     body.get("name")
@@ -1495,6 +1680,9 @@ def knowledge_base_api(request):
                     or body.get("kb_name")
                 )
 
+                # ------------------------------------------------
+                # DESCRIPTION
+                # ------------------------------------------------
 
                 description = (
                     body.get("desc")
@@ -1502,10 +1690,26 @@ def knowledge_base_api(request):
                     or ""
                 )
 
+                # ------------------------------------------------
+                # AGENT ID
+                # ------------------------------------------------
 
-                agent_id = body.get(
-                    "agent_id"
-                )
+                agent_id = body.get("agent_id")
+
+                # Normalize agent_id
+                if agent_id in [
+                    "",
+                    None,
+                    "null",
+                    "None",
+                    "0",
+                    0
+                ]:
+                    agent_id = None
+
+                # ------------------------------------------------
+                # NAME VALIDATION
+                # ------------------------------------------------
 
                 if not name:
 
@@ -1519,15 +1723,64 @@ def knowledge_base_api(request):
                         status=status.HTTP_400_BAD_REQUEST
                     )
 
+                # ------------------------------------------------
+                # AGENT VALIDATION
+                #
+                # IMPORTANT:
+                # ForeignKey constraint error yahin prevent hoga.
+                # ------------------------------------------------
+
+                agent = None
+
+                if agent_id is not None:
+
+                    try:
+
+                        agent = AIAgent.objects.get(
+                            id=agent_id
+                        )
+
+                    except AIAgent.DoesNotExist:
+
+                        return Response(
+                            {
+                                "status": "error",
+
+                                "message": (
+                                    "Invalid agent_id. "
+                                    "AIAgent does not exist."
+                                ),
+
+                                "agent_id": agent_id
+                            },
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+
+                    except (ValueError, TypeError):
+
+                        return Response(
+                            {
+                                "status": "error",
+
+                                "message": (
+                                    "agent_id must be a valid "
+                                    "AIAgent ID."
+                                ),
+
+                                "agent_id": agent_id
+                            },
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+
+                # ------------------------------------------------
+                # CREATE KB
+                # ------------------------------------------------
+
                 kb = KnowledgeBase.objects.create(
 
                     user=user_profile,
 
-                    agent_id=(
-                        agent_id
-                        if agent_id
-                        else None
-                    ),
+                    agent=agent,
 
                     name=name,
 
@@ -1546,10 +1799,19 @@ def knowledge_base_api(request):
 
                         "data": {
                             "id": kb.id,
+
                             "name": kb.name,
+
                             "description": kb.description,
+
                             "status": kb.status,
-                            "agent_id": kb.agent_id,
+
+                            "agent_id": (
+                                kb.agent_id
+                                if kb.agent_id
+                                else None
+                            ),
+
                             "created_at": str(
                                 kb.created_at
                             )
@@ -1557,12 +1819,14 @@ def knowledge_base_api(request):
                     },
                     status=status.HTTP_201_CREATED
                 )
+
+            # ====================================================
+            # 10. LIST DOCUMENTS
+            # ====================================================
+
             elif action == "list_docs":
 
-                kb_id = body.get(
-                    "kb_id"
-                )
-
+                kb_id = body.get("kb_id")
 
                 if not kb_id:
 
@@ -1574,7 +1838,6 @@ def knowledge_base_api(request):
                         status=status.HTTP_400_BAD_REQUEST
                     )
 
-
                 try:
 
                     kb = KnowledgeBase.objects.get(
@@ -1582,16 +1845,13 @@ def knowledge_base_api(request):
                         user=user_profile
                     )
 
-
                     docs = []
-
 
                     for d in kb.documents.all():
 
                         c_count = (
                             get_document_chunks_count(d)
                         )
-
 
                         docs.append(
                             {
@@ -1601,14 +1861,14 @@ def knowledge_base_api(request):
 
                                 "size": getattr(
                                     d,
-                                    'file_size',
-                                    '0 KB'
+                                    "file_size",
+                                    "0 KB"
                                 ),
 
                                 "status": getattr(
                                     d,
-                                    'status',
-                                    'Parsed'
+                                    "status",
+                                    "Parsed"
                                 ),
 
                                 "chunks": c_count,
@@ -1621,14 +1881,13 @@ def knowledge_base_api(request):
                                     )
                                     if hasattr(
                                         d,
-                                        'created_at'
+                                        "created_at"
                                     )
                                     and d.created_at
                                     else ""
                                 )
                             }
                         )
-
 
                     return Response(
                         {
@@ -1643,7 +1902,6 @@ def knowledge_base_api(request):
                         status=status.HTTP_200_OK
                     )
 
-
                 except KnowledgeBase.DoesNotExist:
 
                     return Response(
@@ -1657,6 +1915,11 @@ def knowledge_base_api(request):
                         },
                         status=status.HTTP_404_NOT_FOUND
                     )
+
+            # ====================================================
+            # 11. DELETE DOCUMENT
+            # ====================================================
+
             elif action in [
                 "delete_document",
                 "del_doc",
@@ -1667,7 +1930,6 @@ def knowledge_base_api(request):
                     body.get("doc_id")
                     or body.get("document_id")
                 )
-
 
                 if not doc_id:
 
@@ -1681,6 +1943,7 @@ def knowledge_base_api(request):
                         },
                         status=status.HTTP_400_BAD_REQUEST
                     )
+
                 try:
 
                     doc = Document.objects.get(
@@ -1688,9 +1951,7 @@ def knowledge_base_api(request):
                         knowledge_base__user=user_profile
                     )
 
-
                     doc.delete()
-
 
                     return Response(
                         {
@@ -1701,7 +1962,6 @@ def knowledge_base_api(request):
                         },
                         status=status.HTTP_200_OK
                     )
-
 
                 except Document.DoesNotExist:
 
@@ -1717,9 +1977,17 @@ def knowledge_base_api(request):
                         status=status.HTTP_404_NOT_FOUND
                     )
 
+            # ====================================================
+            # 12. DEFAULT
+            # ====================================================
+
             else:
 
                 return get_kb_list_json()
+
+        # ========================================================
+        # JSON ERROR
+        # ========================================================
 
         except json.JSONDecodeError:
 
@@ -1731,6 +1999,9 @@ def knowledge_base_api(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        # ========================================================
+        # DATABASE INTEGRITY ERROR
+        # ========================================================
 
         except Exception as e:
 
@@ -1742,6 +2013,9 @@ def knowledge_base_api(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+    # ============================================================
+    # 13. METHOD NOT ALLOWED
+    # ============================================================
 
     return Response(
         {
@@ -1750,7 +2024,6 @@ def knowledge_base_api(request):
         },
         status=status.HTTP_405_METHOD_NOT_ALLOWED
     )
-
 
 @csrf_exempt
 def rag_search_api(request):
@@ -1986,7 +2259,7 @@ def get_reminders_api(request, plant_id):
         return JsonResponse({"status": "error", "message": str(e)}, status=400)
 
 
-@api_view(["POST"])
+@api_view(["GET", "POST"])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
 def set_reminder_api(request, plant_id):
@@ -2027,16 +2300,48 @@ def set_reminder_api(request, plant_id):
 
 
         # ========================================================
-        # 3. REQUEST BODY
+        # 3. GET REMINDERS
         # ========================================================
 
-        try:
+        if request.method == "GET":
 
-            body = request.data
+            reminders = Reminder.objects.filter(
+                user=user_profile,
+                device=device,
+                is_active=True
+            ).order_by("id")
 
-        except Exception:
 
-            body = {}
+            reminder_list = []
+
+            for reminder in reminders:
+
+                reminder_list.append({
+                    "id": reminder.id,
+                    "time": reminder.time,
+                    "message": reminder.message,
+                    "is_active": reminder.is_active
+                })
+
+
+            return JsonResponse({
+
+                "status": "success",
+
+                "plant_id": plant_id,
+
+                "count": len(reminder_list),
+
+                "reminders": reminder_list
+
+            }, status=200)
+
+
+        # ========================================================
+        # 4. REQUEST BODY
+        # ========================================================
+
+        body = request.data or {}
 
 
         time_str = (
@@ -2051,7 +2356,7 @@ def set_reminder_api(request, plant_id):
 
 
         # ========================================================
-        # 4. VALIDATION
+        # 5. VALIDATION
         # ========================================================
 
         if not time_str:
@@ -2071,11 +2376,7 @@ def set_reminder_api(request, plant_id):
 
 
         # ========================================================
-        # 5. CREATE REMINDER
-        #
-        # IMPORTANT:
-        # Token wale user ka profile automatically save hoga.
-        # Frontend se user_id lene ki zarurat nahi.
+        # 6. CREATE REMINDER
         # ========================================================
 
         reminder = Reminder.objects.create(
@@ -2093,7 +2394,7 @@ def set_reminder_api(request, plant_id):
 
 
         # ========================================================
-        # 6. CREATE ANNOUNCEMENT TEXT
+        # 7. CREATE ANNOUNCEMENT TEXT
         # ========================================================
 
         announcement_text = (
@@ -2105,7 +2406,7 @@ def set_reminder_api(request, plant_id):
 
 
         # ========================================================
-        # 7. TEXT TO SPEECH
+        # 8. TEXT TO SPEECH
         # ========================================================
 
         try:
@@ -2147,7 +2448,10 @@ def set_reminder_api(request, plant_id):
             )
 
 
-            # WAV filename
+            # ====================================================
+            # WAV FILE
+            # ====================================================
+
             speech_filename = (
                 f"plant_{plant_id}_reminder_speech.wav"
             )
@@ -2184,7 +2488,10 @@ def set_reminder_api(request, plant_id):
             )
 
 
-            # Temporary MP3 delete
+            # ====================================================
+            # DELETE TEMP MP3
+            # ====================================================
+
             if os.path.exists(
                 temp_mp3_path
             ):
@@ -2216,10 +2523,7 @@ def set_reminder_api(request, plant_id):
 
 
         # ========================================================
-        # 8. GET ALL ACTIVE REMINDERS
-        #
-        # IMPORTANT:
-        # Sirf current user's reminders.
+        # 9. GET ALL ACTIVE REMINDERS
         # ========================================================
 
         all_reminders = list(
@@ -2228,14 +2532,16 @@ def set_reminder_api(request, plant_id):
                 device=device,
                 is_active=True
             ).values(
+                "id",
                 "time",
-                "message"
+                "message",
+                "is_active"
             )
         )
 
 
         # ========================================================
-        # 9. MQTT PAYLOAD
+        # 10. MQTT PAYLOAD
         # ========================================================
 
         payload = {
@@ -2253,7 +2559,7 @@ def set_reminder_api(request, plant_id):
 
 
         # ========================================================
-        # 10. PUBLISH MQTT
+        # 11. PUBLISH MQTT
         # ========================================================
 
         publish.single(
@@ -2271,7 +2577,7 @@ def set_reminder_api(request, plant_id):
 
 
         # ========================================================
-        # 11. RESPONSE
+        # 12. POST RESPONSE
         # ========================================================
 
         return JsonResponse({
@@ -2747,15 +3053,33 @@ def audio_upload_view(request, plant_id):
             # HIT 1: KNOWLEDGE BASE
             if not ai_reply and len(text_lower) >= 3:
                 assigned_agent = getattr(device, 'agent', None)
+                
+                # Main admin / first user ke KBs aur assigned agent ke KBs ko combine karein
+                from django.db.models import Q
+                
+                # Maan lijiye aapke KnowledgeBase model mein created_by ya user field hai jo admin ko point karta hai
+                # Yahan hum superuser ya owner role wale users ki KBs le rahe hain
+                # Superuser IDs ya admin role wale users ko direct fetch kar lein
+                admin_user_ids = User.objects.filter(Q(is_superuser=True) | Q(is_staff=True) | Q(profile__role='admin')).values_list('id', flat=True)
+
+                # Ab KnowledgeBase par query chalayein jo in admin users se judi ho
+                admin_kb_query = Q(user_id__in=admin_user_ids)
+
                 if assigned_agent:
-                    kb_list = assigned_agent.knowledge_bases.filter(status="Enabled")
-                    matching_chunks = DocumentChunk.objects.filter(
-                        document__knowledge_base__in=kb_list,
-                        chunk_text__icontains=corrected_text
-                    )
-                    if matching_chunks.exists():
-                        ai_reply = matching_chunks.first().chunk_text[:150]
-                        source = "admin_knowledge_base"
+                    kb_list = KnowledgeBase.objects.filter(
+                        Q(agent=assigned_agent, status="Enabled") | admin_kb_query
+                    ).distinct()
+                else:
+                    kb_list = KnowledgeBase.objects.filter(admin_kb_query, status="Enabled")
+
+                matching_chunks = DocumentChunk.objects.filter(
+                    document__knowledge_base__in=kb_list,
+                    chunk_text__icontains=corrected_text
+                )
+                
+                if matching_chunks.exists():
+                    ai_reply = matching_chunks.first().chunk_text[:150]
+                    source = "admin_knowledge_base"
 
                 if not ai_reply:
                     kb_context, kb_matches = get_kb_context_direct(corrected_text, limit=5)
@@ -2934,3 +3258,15 @@ def audio_upload_view(request, plant_id):
         traceback.print_exc()
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
+    class RegisterView(APIView):
+        permission_classes = [AllowAny]
+
+def post(self, request):
+        serializer = RegisterSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {"message": "User registered successfully!"}, 
+                status=status.HTTP_201_CREATED
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
