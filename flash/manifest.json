@@ -1,0 +1,9 @@
+{
+  "name": "PrathamSmart",
+  "version": "1.4.2",
+  "new_install_prompt_erase": true,
+  "builds": [
+    { "chipFamily": "ESP32-S3", "parts": [ { "path": "firmware/prathamsmart_s3.bin", "offset": 0 } ] },
+    { "chipFamily": "ESP32",    "parts": [ { "path": "firmware/prathamsmart_esp32.bin", "offset": 0 } ] }
+  ]
+}

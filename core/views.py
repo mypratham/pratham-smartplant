@@ -88,12 +88,97 @@ RAG_HINDI_ALIASES = {
 # ==========================================
 # 3. GLOBAL MODEL INITIALIZATION
 # ==========================================
-try:
-    LOCAL_WHISPER_MODEL = whisper.load_model("base")
-    print("[SUCCESS] Local Whisper Model loaded successfully!")
-except Exception as e:
-    LOCAL_WHISPER_MODEL = None
-    print(f"[ERROR] Failed to load Local Whisper Model: {e}")
+# Whisper sirf tab load ho jab koi view sach mein use kare.
+# ESP32 ki aawaz consumers.py (faster-whisper) se chalti hai, isliye
+# server start par yahan model load karke RAM/CPU barbaad nahi karte.
+# ============================================================
+# Upload file se text nikaalna (.docx / .pdf / .txt / .md / .csv)
+# (fix_kb_upload.py ne joda)
+# ============================================================
+# ============================================================
+# Knowledge Base: vakya / paragraph ke hisaab se chunks
+# (fix_kb_chunks.py ne joda)
+# ============================================================
+def smart_chunks(text, size=600, overlap=100):
+    import re as _re
+    text = _re.sub(r"[ \t]+", " ", (text or "").replace("\r", "\n"))
+    text = _re.sub(r"\n{3,}", "\n\n", text).strip()
+    if not text:
+        return []
+    # vakya: . ! ? । ke baad, ya nayi line par
+    pieces = [p.strip() for p in _re.split(r"(?<=[.!?\u0964])\s+|\n+", text) if p.strip()]
+    sentences = []
+    for p in pieces:
+        while len(p) > size:                       # bahut lamba vakya: space par todein
+            cut = p.rfind(" ", 0, size)
+            cut = cut if cut > size // 2 else size
+            sentences.append(p[:cut].strip())
+            p = p[cut:].strip()
+        if p:
+            sentences.append(p)
+    chunks, cur = [], ""
+    for s in sentences:
+        if cur and len(cur) + 1 + len(s) > size:
+            chunks.append(cur)
+            tail = cur[-overlap:]
+            sp = tail.find(" ")
+            tail = tail[sp + 1:] if sp != -1 else tail   # poore shabd se shuru
+            cur = (tail + " " + s).strip()
+        else:
+            cur = (cur + " " + s).strip()
+    if cur:
+        chunks.append(cur)
+    return chunks
+
+
+def extract_upload_text(uploaded_file):
+    import io
+    name = (getattr(uploaded_file, "name", "") or "").lower()
+    data = uploaded_file.read()
+    if name.endswith(".docx") or data[:4] == b"PK\x03\x04":
+        try:
+            import docx  # pip install python-docx
+        except ImportError:
+            raise ValueError("Word file padhne ke liye server par 'pip install python-docx' chahiye")
+        d = docx.Document(io.BytesIO(data))
+        parts = [p.text for p in d.paragraphs if p.text.strip()]
+        for table in d.tables:
+            for row in table.rows:
+                cells = [c.text.strip() for c in row.cells if c.text.strip()]
+                if cells:
+                    parts.append(" | ".join(cells))
+        return "\n".join(parts)
+    if name.endswith(".pdf") or data[:5] == b"%PDF-":
+        try:
+            from pypdf import PdfReader  # pip install pypdf
+        except ImportError:
+            raise ValueError("PDF padhne ke liye server par 'pip install pypdf' chahiye")
+        reader = PdfReader(io.BytesIO(data))
+        text = "\n".join((page.extract_text() or "") for page in reader.pages)
+        if not text.strip():
+            raise ValueError("PDF mein text nahi mila (scan ki hui image PDF ho sakti hai)")
+        return text
+    if name.endswith((".doc", ".xls", ".xlsx", ".ppt", ".pptx", ".zip", ".png", ".jpg", ".jpeg")):
+        raise ValueError("Ye file type support nahi hai. .docx, .pdf ya .txt upload kariye")
+    for enc in ("utf-8-sig", "utf-16"):
+        try:
+            return data.decode(enc)
+        except UnicodeDecodeError:
+            continue
+    return data.decode("latin-1", errors="ignore")
+
+
+class _LazyWhisper:
+    _model = None
+
+    def __getattr__(self, name):
+        if _LazyWhisper._model is None:
+            _LazyWhisper._model = whisper.load_model("base")
+            print("[SUCCESS] Local Whisper Model loaded (on first use)")
+        return getattr(_LazyWhisper._model, name)
+
+
+LOCAL_WHISPER_MODEL = _LazyWhisper()
 
 # ==========================================
 # 4. HELPER FUNCTIONS
@@ -703,8 +788,18 @@ def admin_register_api(request):
 
 @csrf_exempt
 def device_heartbeat(request, plant_id):
+    # 1. Capture Client IP and User-Agent to trace where the request is coming from
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        client_ip = x_forwarded_for.split(',')[0].strip()
+    else:
+        client_ip = request.META.get('REMOTE_ADDR')
+        
+    user_agent = request.META.get('HTTP_USER_AGENT', 'Unknown')
+    print(f"📥 [REQUEST] Method: {request.method} | URL: {request.path} | IP: {client_ip} | User-Agent: {user_agent}")
+
     if request.method == 'GET':
-        # 1. Search by plant_id OR mac_address (Dono support karega)
+        # Search by plant_id OR mac_address
         device = Device.objects.filter(
             Q(plant_id=plant_id) | Q(mac_address=plant_id)
         ).first()
@@ -713,23 +808,26 @@ def device_heartbeat(request, plant_id):
             device.is_online = True
             device.save(update_fields=['is_online'])
 
-            # Agar plant_id update ho chuki hai toh ESP32 ko 'update' action bhejein
             action_type = "update" if device.plant_id != plant_id else "none"
 
-            return JsonResponse({
+            response_data = {
                 "status": "ok",
                 "action": action_type,
                 "plant_id": device.plant_id,
                 "device_token": device.device_token,
                 "is_paired": device.is_paired,
                 "is_online": True
-            }, status=200)
+            }
+            print(f"🟢 [GET] HEARTBEAT SUCCESS: {response_data}")
+            return JsonResponse(response_data, status=200)
 
-        return JsonResponse({
+        response_data = {
             "status": "waiting_for_pairing",
             "action": "none",
             "message": "Waiting for user pairing"
-        }, status=200)
+        }
+        print(f"🟡 [GET] HEARTBEAT WAITING: {response_data}")
+        return JsonResponse(response_data, status=200)
 
     elif request.method == 'POST':
         try:
@@ -737,7 +835,7 @@ def device_heartbeat(request, plant_id):
             pairing_code = data.get('pairing_code')
             device_token = data.get('device_token')
 
-            # 2. Pairing Code ya MAC search ko robust banayein
+            # Pairing Code ya MAC search
             if pairing_code:
                 device_by_code = Device.objects.filter(
                     Q(mac_address=pairing_code) | Q(mac_address__endswith=pairing_code)
@@ -746,89 +844,125 @@ def device_heartbeat(request, plant_id):
                 if device_by_code:
                     device_by_code.is_online = True
                     device_by_code.save(update_fields=['is_online'])
-                    return JsonResponse({
+                    
+                    response_data = {
                         "status": "ok",
                         "action": "update",
                         "plant_id": device_by_code.plant_id,
                         "device_token": device_by_code.device_token,
                         "is_online": True
-                    }, status=200)
+                    }
+                    print(f"🟢 [POST] PAIRING CODE SUCCESS: {response_data}")
+                    return JsonResponse(response_data, status=200)
 
-            # 3. Direct match by plant_id and device_token
+            # Direct match by plant_id and device_token
             device = Device.objects.filter(plant_id=plant_id, device_token=device_token).first()
             if device:
                 device.is_online = True
                 device.save(update_fields=['is_online'])
-                return JsonResponse({
+                
+                response_data = {
                     "status": "ok",
                     "action": "none",
                     "plant_id": device.plant_id,
                     "device_token": device.device_token,
                     "is_online": True
-                }, status=200)
+                }
+                print(f"🟢 [POST] TOKEN MATCH SUCCESS: {response_data}")
+                return JsonResponse(response_data, status=200)
 
             if pairing_code and not device_token:
-                return JsonResponse({
+                response_data = {
                     "status": "waiting_for_pairing",
                     "action": "none",
                     "message": "Waiting for user to enter code in Web App"
-                }, status=200)
+                }
+                print(f"🟡 [POST] WAITING FOR WEB APP: {response_data}")
+                return JsonResponse(response_data, status=200)
 
-            return JsonResponse({
+            response_data = {
                 "status": "error",
                 "action": "reset_device",
                 "message": "Device deleted or not paired yet."
-            }, status=404)
+            }
+            print(f"🔴 [POST] ERROR (404): {response_data}")
+            return JsonResponse(response_data, status=404)
 
         except Exception as e:
-            return JsonResponse({"status": "error", "error": str(e)}, status=400)
+            error_data = {"status": "error", "error": str(e)}
+            print(f"🔴 [POST] EXCEPTION: {error_data}")
+            return JsonResponse(error_data, status=400)
 
-    return JsonResponse({"status": "error", "message": "Method not allowed"}, status=405)
+    method_error = {"status": "error", "message": "Method not allowed"}
+    print(f"❌ METHOD NOT ALLOWED: {method_error}")
+    return JsonResponse(method_error, status=405)
+
+
+def _clean_id(value):
+    return str(value or "").replace(":", "").replace("-", "").strip().lower()
+
+
+def _find_pair_device(mac=None, code=None, plant_id=None):
+    """Device ko MAC, pairing code ya plant_id, kisi se bhi dhoondhein."""
+    mac, code, plant_id = _clean_id(mac), _clean_id(code), str(plant_id or "").strip()
+    q = Q()
+    if mac:
+        q |= Q(mac_address__iexact=mac) | Q(plant_id__iexact=f"plant_{mac}")
+    if code:
+        q |= Q(mac_address__iexact=code) | Q(plant_id__iexact=f"plant_{code}")
+    if plant_id:
+        q |= Q(plant_id__iexact=plant_id)
+    if not q:
+        return None
+    device = Device.objects.filter(q).first()
+    if device is None and code:
+        # Purana tarika (suffix match) sirf code ke liye
+        device = Device.objects.filter(
+            Q(mac_address__iendswith=code) | Q(plant_id__icontains=code)
+        ).first()
+    return device
 
 
 @csrf_exempt
 def device_pair(request):
+    """Device boot par apna MAC + pairing code bhejta hai: entry banao / update karo."""
     if request.method != 'POST':
         return JsonResponse({"success": False, "error": "Invalid request method"}, status=405)
-    
+
     try:
         data = json.loads(request.body or "{}")
-        pairing_code = data.get('mac_address') or data.get('pairing_code') or data.get('code')
-        
-        if not pairing_code or pairing_code == "000000":
+        mac = _clean_id(data.get('mac') or data.get('mac_address'))
+        code = _clean_id(data.get('pairing_code') or data.get('code'))
+        plant_id = data.get('plant_id')
+
+        if (not code and not mac) or code == "000000":
             return JsonResponse({"success": False, "error": "Invalid MAC/Code"}, status=400)
 
-        # 🟢 Clean MAC address format (agar beech me colons hain toh hata dein)
-        clean_mac = pairing_code.replace(":", "").strip().lower()
-
-        # 🟢 Check karein ki kya yeh device pehle se database me maujud hai (exact ya suffix match)
-        device = Device.objects.filter(
-            Q(mac_address__iexact=clean_mac) | 
-            Q(mac_address__iendswith=clean_mac) | 
-            Q(plant_id__icontains=clean_mac)
-        ).first()
+        device = _find_pair_device(mac=mac, code=code, plant_id=plant_id)
 
         if not device:
-            # Agar bilkul naya hai tab hi naya create karein
-            new_plant_id = f"plant_{clean_mac}"
-            new_token = str(uuid.uuid4())
+            # Naya device: dashboard code se dhoondhta hai, isliye plant_<code>
             device = Device.objects.create(
-                mac_address=clean_mac,
-                plant_id=new_plant_id,
-                device_token=new_token,
-                is_paired=False, 
-                is_online=True
+                mac_address=mac or code,
+                plant_id=f"plant_{code or mac}",
+                device_token=str(uuid.uuid4()),
+                is_paired=False,
+                is_online=True,
             )
         else:
-            # Agar pehle se hai, toh naya banane ke bajaye usi ko update karein
+            fields = ['is_online']
             device.is_online = True
-            device.save(update_fields=['is_online'])
+            # Pehle code ko MAC maan liya gaya tha: ab asli MAC save karein
+            if mac and device.mac_address != mac:
+                device.mac_address = mac
+                fields.append('mac_address')
+            device.save(update_fields=fields)
 
         return JsonResponse({
             "success": True,
             "plant_id": device.plant_id,
             "device_token": device.device_token,
-            "is_paired": device.is_paired
+            "is_paired": device.is_paired,
         })
     except Exception as e:
         return JsonResponse({"success": False, "error": str(e)}, status=400)
@@ -836,64 +970,65 @@ def device_pair(request):
 
 @csrf_exempt
 def check_pairing(request):
-    mac_address = request.GET.get('mac') or request.GET.get('code')
-    
-    # Agar POST request hai ya body me claim data aa raha hai toh binding handle karein
+    """
+    Device poll (mac + pairing_code + plant_id): sirf status batata hai.
+    Dashboard (code): device ko claim / pair karta hai (purana tarika).
+    """
+    data = {}
     if request.method == 'POST':
         try:
             data = json.loads(request.body or "{}")
-            mac_address = data.get('mac') or data.get('code') or mac_address
-            user = request.user if request.user.is_authenticated else None
-            
-            if not mac_address:
-                return JsonResponse({"is_paired": False, "error": "MAC/Code missing"}, status=400)
-                
-            # 🟢 Fixed query to support 6-digit suffix matching
-            device = Device.objects.filter(
-                Q(mac_address__iexact=mac_address) | 
-                Q(mac_address__iendswith=mac_address) | 
-                Q(plant_id__icontains=mac_address)
-            ).first()
-            
-            if not device:
-                return JsonResponse({"is_paired": False, "error": "Device not found"}, status=404)
-                
-            device.is_paired = True
-            if user and hasattr(device, 'owner_admin'):
-                device.owner_admin = user
-            device.save(update_fields=['is_paired', 'owner_admin'] if hasattr(device, 'owner_admin') else ['is_paired'])
-            
+        except Exception:
+            return JsonResponse({"is_paired": False, "error": "Invalid JSON"}, status=400)
+    else:
+        data = request.GET
+
+    mac = data.get('mac') or data.get('mac_address')
+    code = data.get('pairing_code') or data.get('code')
+    plant_id = data.get('plant_id')
+
+    if not (mac or code or plant_id):
+        return JsonResponse({"is_paired": False, "error": "MAC/Code missing"}, status=400)
+
+    try:
+        device = _find_pair_device(mac=mac, code=code, plant_id=plant_id)
+        if not device:
+            return JsonResponse({"is_paired": False, "error": "Device not found"}, status=404)
+
+        is_device_poll = (
+            request.method != 'POST'
+            or ('pairing_code' in data and 'plant_id' in data and 'mac' in data)
+        )
+
+        if is_device_poll:
+            clean_mac = _clean_id(mac)
+            if clean_mac and device.mac_address != clean_mac:
+                device.mac_address = clean_mac
+                device.save(update_fields=['mac_address'])
             return JsonResponse({
-                "is_paired": True,
+                "is_paired": bool(device.is_paired),
                 "plant_id": device.plant_id,
                 "device_token": device.device_token,
-                "message": "Device successfully claimed and paired!"
             })
-        except Exception as e:
-            return JsonResponse({"is_paired": False, "error": str(e)}, status=400)
 
-    # GET Request: Sirf check karega ki device paired hai ya nahi
-    if not mac_address:
-        return JsonResponse({"is_paired": False, "error": "MAC/Code missing"}, status=400)
-    
-    try:
-        # 🟢 Fixed query here as well
-        device = Device.objects.filter(
-            Q(mac_address__iexact=mac_address) | 
-            Q(mac_address__iendswith=mac_address) | 
-            Q(plant_id__icontains=mac_address)
-        ).first()
-        
-        if not device:
-            return JsonResponse({"is_paired": False}, status=404)
-            
+        # Dashboard se claim
+        user = request.user if request.user.is_authenticated else None
+        device.is_paired = True
+        fields = ['is_paired']
+        if user and hasattr(device, 'owner_admin'):
+            device.owner_admin = user
+            fields.append('owner_admin')
+        device.save(update_fields=fields)
+
         return JsonResponse({
-            "is_paired": device.is_paired,
+            "is_paired": True,
             "plant_id": device.plant_id,
-            "device_token": device.device_token
+            "device_token": device.device_token,
+            "message": "Device successfully claimed and paired!",
         })
     except Exception as e:
-        return JsonResponse({"is_paired": False, "error": str(e)}, status=500)
+        return JsonResponse({"is_paired": False, "error": str(e)}, status=400)
+
 
 @csrf_exempt
 def device_command(request, plant_id):
@@ -1464,20 +1599,7 @@ def knowledge_base_api(request):
 
                         else:
 
-                            file_bytes = uploaded_file.read()
-
-                            try:
-
-                                content = file_bytes.decode(
-                                    "utf-8"
-                                )
-
-                            except UnicodeDecodeError:
-
-                                content = file_bytes.decode(
-                                    "latin-1",
-                                    errors="ignore"
-                                )
+                            content = extract_upload_text(uploaded_file)
 
                     except Exception as e:
 
@@ -1541,29 +1663,14 @@ def knowledge_base_api(request):
                 # CHUNK DOCUMENT
                 # ------------------------------------------------
 
-                chunk_size = 300
-
                 chunks_count = 0
-
-                for i in range(
-                    0,
-                    len(content),
-                    chunk_size
-                ):
-
-                    chunk_text = content[
-                        i:i + chunk_size
-                    ]
-
-                    if chunk_text.strip():
-
-                        DocumentChunk.objects.create(
-                            document=doc,
-                            chunk_text=chunk_text,
-                            chunk_index=chunks_count + 1
-                        )
-
-                        chunks_count += 1
+                for chunk_text in smart_chunks(content):
+                    DocumentChunk.objects.create(
+                        document=doc,
+                        chunk_text=chunk_text,
+                        chunk_index=chunks_count + 1
+                    )
+                    chunks_count += 1
 
                 return Response(
                     {

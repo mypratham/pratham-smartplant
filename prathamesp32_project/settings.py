@@ -33,6 +33,8 @@ CORS_ALLOW_ALL_ORIGINS = True
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
+    'channels',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -41,9 +43,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'corsheaders',
 
-    # Channels Added
-    'channels',
-
+    
     # Custom App
     'core',
     'rest_framework',
@@ -80,6 +80,13 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'prathamesp32_project.wsgi.application'
 ASGI_APPLICATION = 'prathamesp32_project.asgi.application'  # <-- Yeh line WebSocket / Channels ke liye add ki gayi hai
+
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer",
+    },
+}
 
 
 # Database
@@ -143,6 +150,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Yahan apni OpenAI API Key daal dein
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+PRATHAM_USER_TOKEN = os.getenv("PRATHAM_USER_TOKEN", "")
 # final
 
 REST_FRAMEWORK = {

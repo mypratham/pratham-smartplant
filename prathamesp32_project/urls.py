@@ -17,6 +17,9 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
+from django.urls import re_path
+from django.views.static import serve
+from django.views.generic import RedirectView
 from core.views import admin_dashboard
 from django.conf.urls.static import static
 from core.views import (
@@ -45,12 +48,14 @@ urlpatterns = [
     path("admin-dashboard/", admin_dashboard, name="admin_dashboard"),
     path('api/admin/login/', admin_login_api, name='admin_login_api'),
     path('api/admin/register/', admin_register_api, name='admin_register_api'),
+    path("flash/", RedirectView.as_view(url="/flash/install.html")),
+    re_path(r"^flash/(?P<path>.+)$", serve, {"document_root": settings.BASE_DIR / "flash"}),
     
     # 2. STATIC Device Endpoints (MUST COME BEFORE <str:plant_id>)
     # Pehle static routes check hone chahiye taaki 'check-pairing' ko Django plant_id na samajh le
     path('api/devices/pair/', device_pair, name='device_pair'),
     path('api/devices/check-pairing/', check_pairing, name='check_pairing'),
-
+    
     # 3. DYNAMIC Device Specific Endpoints (<str:plant_id>)
     path('api/devices/<str:plant_id>/command/', device_command, name='device_command'),
     path('api/devices/<str:plant_id>/heartbeat/', device_heartbeat, name='device_heartbeat'),

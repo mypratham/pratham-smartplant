@@ -171,7 +171,7 @@
                     Pratham Plant Pro Console
                 </h3>
                 <small class="text-muted">
-                    ESP32 Device Controller Platform & Knowledge Center (ID: 582abdd86440)[cite: 7]
+                    ESP32 Device Controller Platform & Knowledge Center (ID: )[cite: 7]
                 </small>
             </div>
 
@@ -918,10 +918,10 @@
         /* =========================================================
            BASIC CONFIG
         ========================================================= */
-        const PLANT_ID = "582abdd86440";
+        const PLANT_ID = "";
         const API_BASE = `/api/devices/${PLANT_ID}`;
-        const DEVICE_TOKEN = "582abdd86440";
-        const KB_API_URL = "https://api.prathamsmart.in/api/knowledge-base/";
+        const DEVICE_TOKEN = "";
+        const KB_API_URL = "/api/knowledge-base/";
         const PRATHAM_API_BASE = "https://api.mypratham.com";
  
         let knowledgeBases = [];
@@ -1533,11 +1533,13 @@
             formData.append("name", docNameInput && docNameInput.value ? docNameInput.value : file.name);
             formData.append("file", file);
             if (activeKbId) formData.append("kb_id", activeKbId);
+            formData.append("action", "upload_doc");
  
             log("Uploading document and parsing...");
             try {
                 const response = await fetchKnowledgeBaseApi({
                     method: "POST",
+                    body: formData,
 
                 });
                 const data = await response.json();

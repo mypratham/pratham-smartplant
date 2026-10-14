@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PrathamSmart Firmware Install</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Hind:wght@400;500;600&display=swap" rel="stylesheet">
+<script type="module" src="https://unpkg.com/esp-web-tools@10.0.1/dist/web/install-button.js?module"></script>
+<style>
+  :root{
+    --bg:#0E1013; --card:#171A20; --line:#262A33; --text:#F4F1EC; --muted:#A3A8B3;
+    --accent:#FF8A3D; --accent-ink:#1A1006; --ok:#3DDC97; --warn:#FFB86B;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Hind',sans-serif;font-size:17px;line-height:1.55}
+  main{max-width:720px;margin:0 auto;padding:40px 16px 64px}
+  h1{font-family:'Sora',sans-serif;font-size:clamp(28px,6vw,40px);line-height:1.15;margin:0 0 8px}
+  h2{font-family:'Sora',sans-serif;font-size:19px;margin:0 0 12px}
+  .sub{color:var(--muted);margin:0 0 28px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:22px;margin-bottom:16px}
+  .install{display:flex;flex-direction:column;gap:14px;align-items:flex-start}
+  .ver{font-size:14px;color:var(--muted)}
+  esp-web-install-button button[slot="activate"]{
+    font-family:'Sora',sans-serif;font-size:17px;font-weight:600;height:52px;padding:0 28px;
+    border:none;border-radius:26px;background:var(--accent);color:var(--accent-ink);cursor:pointer}
+  esp-web-install-button button[slot="activate"]:hover{filter:brightness(1.08)}
+  .note{padding:12px 14px;border-radius:12px;background:#2B1B0E;color:var(--warn);font-size:15px}
+  ol{margin:0;padding-left:22px}
+  li{margin:6px 0}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{padding:6px 12px;border-radius:999px;border:1px solid var(--line);font-size:14px;color:var(--muted)}
+  .chip b{color:var(--text);font-weight:600}
+  code{background:#12151A;border:1px solid var(--line);border-radius:6px;padding:1px 6px;font-size:15px}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+<main>
+  <h1>PrathamSmart firmware</h1>
+  <p class="sub">Browser se seedha ESP32 par install karein. Koi software download nahi.</p>
+
+  <section class="card install">
+    <h2>1 click install</h2>
+    <div class="chips">
+      <span class="chip"><b>ESP32-S3</b> · wake word + touch</span>
+      <span class="chip"><b>ESP32</b> · touch / BOOT button</span>
+    </div>
+    <esp-web-install-button manifest="manifest.json">
+      <button slot="activate">Install firmware</button>
+      <span slot="unsupported" class="note">Yeh browser USB flashing support nahi karta. Computer par <b>Chrome</b> ya <b>Edge</b> mein kholiye.</span>
+      <span slot="not-allowed" class="note">Page <b>https://</b> par khulna chahiye, tabhi install hoga.</span>
+    </esp-web-install-button>
+    <span class="ver" id="ver">Chip apne aap pehchana jayega</span>
+  </section>
+
+  <section class="card">
+    <h2>Kaise karein</h2>
+    <ol>
+      <li>Device ko <b>data wali</b> USB cable se computer se jodiye.</li>
+      <li><b>Install firmware</b> dabaiye aur list mein se device ka port chuniye (CP210x / CH340 / USB JTAG).</li>
+      <li>Pehli baar install kar rahe hain to <b>Erase</b> wala option chuniye. Update ke liye erase zaroori nahi.</li>
+      <li>2–3 minute rukiye. Beech mein cable mat nikaliye.</li>
+      <li>Install ke baad device WiFi hotspot banayega. Phone se us hotspot se judkar apna WiFi naam aur password daaliye.</li>
+    </ol>
+  </section>
+
+  <section class="card">
+    <h2>Port nahi dikh raha?</h2>
+    <ol>
+      <li>Cable badal kar dekhiye. Kai cable sirf charging wali hoti hain.</li>
+      <li>USB driver install kariye: <a href="https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers" rel="noopener">CP210x</a> ya <a href="https://www.wch-ic.com/downloads/CH341SER_EXE.html" rel="noopener">CH340</a>.</li>
+      <li>Phir bhi na ho to device ka <b>BOOT</b> button dabaye rakhiye, <b>RST/EN</b> ek baar dabaiye, phir BOOT chhodiye aur dobara Install dabaiye.</li>
+    </ol>
+  </section>
+  <section class="card">
+    <h2>Firmware file download (manual flashing)</h2>
+    <p class="sub" style="margin:0 0 12px">Install button na chale to .bin download karke <a href="https://espressif.github.io/esptool-js/" rel="noopener">esptool-js</a> ya Flash Download Tool se <b>address 0x0</b> par flash karein.</p>
+    <div class="chips" id="dl"><span class="chip">Loading…</span></div>
+  </section>
+</main>
+<script>
+fetch("manifest.json",{cache:"no-store"}).then(r=>r.json()).then(m=>{
+  document.getElementById("ver").textContent="Version "+m.version+" · chip apne aap pehchana jayega";
+  const box=document.getElementById("dl"); box.innerHTML="";
+  m.builds.forEach(b=>{const a=document.createElement("a");a.className="chip";a.href=b.parts[0].path;a.download="";
+    a.innerHTML="<b>"+b.chipFamily+"</b> · .bin download";box.appendChild(a);});
+}).catch(()=>{document.getElementById("dl").innerHTML='<span class="chip">manifest.json nahi mila</span>';});
+</script>
+</body>
+</html>
