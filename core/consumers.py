@@ -1231,9 +1231,14 @@ def _pcm_float_to_wav_bytes(pcm_np, sample_rate=16000):
     return buf.getvalue()
 
 
+# Aakhri cloud STT ka confidence (isi task mein padha jaata hai)
+STT_META = contextvars.ContextVar("pratham_stt_meta", default=None)
+
+
 async def openai_transcribe(pcm_np, prompt=None, engine="openai", language=None, timeout=20):
     """Cloud speech-to-text (Groq Whisper Large V3 ya OpenAI).
     Return text, ya None (fail par local Whisper chalega)."""
+    STT_META.set(None)
     if engine == "groq":
         api_key, url = _groq_key(), GROQ_STT_URL
         models = [_pratham_setting("STT_GROQ_MODEL") or "whisper-large-v3", "whisper-large-v3-turbo"]
@@ -1248,7 +1253,7 @@ async def openai_transcribe(pcm_np, prompt=None, engine="openai", language=None,
     language = language or _pratham_setting("WHISPER_LANGUAGE") or WHISPER_LANGUAGE
     wav_bytes = _pcm_float_to_wav_bytes(pcm_np)
     for model_name in dict.fromkeys(models):
-        data = {"model": model_name, "response_format": "json"}
+        data = {"model": model_name, "response_format": "verbose_json" if engine == "groq" else "json"}
         if language:
             data["language"] = language
         if prompt:
@@ -1262,7 +1267,17 @@ async def openai_transcribe(pcm_np, prompt=None, engine="openai", language=None,
                     files={"file": ("speech.wav", wav_bytes, "audio/wav")},
                 )
             if res.status_code == 200:
-                return (res.json().get("text") or "").strip()
+                body = res.json()
+                segs = [x for x in (body.get("segments") or []) if isinstance(x, dict)]
+                if segs:
+                    try:
+                        STT_META.set({
+                            "no_speech": min(float(x.get("no_speech_prob") or 0.0) for x in segs),
+                            "logprob": sum(float(x.get("avg_logprob") or 0.0) for x in segs) / len(segs),
+                        })
+                    except (TypeError, ValueError):
+                        pass
+                return (body.get("text") or "").strip()
             logger.warning("STT %s/%s failed: HTTP %s %s", engine, model_name, res.status_code, res.text[:200])
         except Exception:
             logger.exception("STT %s/%s error", engine, model_name)
@@ -4085,6 +4100,17 @@ class AudioConsumer(AsyncWebsocketConsumer):
             return
 
         # "Hmm" / "PING" / "<|hi|>": shor tha. Jawab ka intezaar ho ("hmm" = haan) to rakhein.
+        # Groq ka bharosa: Whisper ka apna niyam (no_speech > 0.6 AUR logprob < -1.0) = shor
+        meta = STT_META.get()
+        if meta and transcript:
+            logger.info("STT quality: device=%s no_speech=%.2f logprob=%.2f text=%r",
+                        self.device_id, meta["no_speech"], meta["logprob"], transcript)
+            if (not self._awaiting_reply() and not getattr(self, "quiz", None) and not self.meeting
+                    and meta["no_speech"] >= _env_float("STT_NOSPEECH_MAX", 0.6)
+                    and meta["logprob"] <= _env_float("STT_LOGPROB_MIN", -1.0)):
+                logger.info("Low-confidence transcript ignored: device=%s text=%r", self.device_id, transcript)
+                transcript = ""
+
         if _junk_transcript(transcript) and not self._awaiting_reply():
             logger.info("Junk transcript ignored: device=%s text=%r", self.device_id, transcript)
             transcript = ""
