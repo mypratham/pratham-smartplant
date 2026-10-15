@@ -2073,6 +2073,243 @@ def send_mail_sync(msg):
 
 
 # ---------------------------------------------------------------
+# Mail padhna + reply: "mere naye mail batao", "pehla padho", "reply karo ki ..."
+# Wahi Gmail app password (IMAP). Inbox sirf padhte hain; jo mail sunaya, use "read" mark.
+# ---------------------------------------------------------------
+import email as _email_mod
+from email.header import decode_header as _decode_header, make_header as _make_header
+
+_MAIL_READ_WORDS = ("padho", "padh", "पढ़ो", "पढ़", "पढो", "sunao", "suna", "सुनाओ", "सुना", "batao", "बताओ",
+                    "check", "चेक", "dekho", "देखो", "aaya", "aaye", "aya", "आया", "आए", "आये", "naya", "naye",
+                    "नया", "नए", "नये", "inbox", "इनबॉक्स", "kitne", "कितने", "kisne", "किसने", "kiska", "किसका",
+                    "read", "unread", "latest", "aakhri", "आखिरी", "pichhla", "पिछला", "koi mail", "कोई मेल")
+_MAIL_REPLY_WORDS = ("reply", "रिप्लाई", "रिप्लाय", "jawab do", "jawab de", "जवाब दो", "जवाब दे",
+                     "jawab likho", "जवाब लिखो", "uttar", "उत्तर")
+_MAIL_NEXT_WORDS = ("agla", "अगला", "next", "aage", "आगे")
+_MAIL_ORDINALS = (
+    (("pehla", "pahla", "पहला", "pehle", "first", "1st", " ek ", " एक ", " 1 "), 0),
+    (("dusra", "doosra", "दूसरा", "second", "2nd", " 2 "), 1),
+    (("teesra", "tisra", "तीसरा", "third", "3rd", " teen ", " तीन ", " 3 "), 2),
+    (("chautha", "चौथा", "fourth", "4th", " char ", " चार ", " 4 "), 3),
+    (("paanchva", "panchva", "पांचवा", "पाँचवाँ", "fifth", "5th", " paanch ", " पांच ", " 5 "), 4),
+)
+
+
+def _norm_text(text):
+    import unicodedata
+    return unicodedata.normalize("NFC", (text or "").lower())
+
+
+# mail / mel / meil / miel / mails / email / gmail / मेल / मैल / ईमेल
+_MAIL_WORD_RE = re.compile(r"(?<![a-z])(e-?mail|gmail|m(?:ai|ae|ei|ie|e)l+s?)(?![a-z])|मेल|मैल|मेइल|ईमेल|जीमेल|इनबॉक्स|inbox")
+
+
+def _has_mail_word(text):
+    return bool(_MAIL_WORD_RE.search(_norm_text(text)))
+
+
+def is_mail_read(text):
+    # MAIL_READ_V3
+    t = _norm_text(text)
+    if not _has_mail_word(t):
+        return False
+    sp = " " + t + " "
+    # MoM / meeting notes ka mail alag raasta hai
+    if _contains_any(sp, ("mom", "एमओएम", "minutes", "notes", "नोट्स", "meeting", "मीटिंग", "summary", "सारांश")):
+        return False
+    squashed = re.sub(r"[\s,.!?।-]+", "", t)   # "ba tao" -> "batao"
+    has = lambda words: any(_norm_text(w).strip().replace(" ", "") in squashed for w in words)
+    strong = ("padho", "padh", "पढ़", "पढो", "sunao", "सुनाओ", "batao", "बताओ", "check", "चेक", "inbox",
+              "इनबॉक्स", "aaya", "aaye", "आया", "आए", "kisne", "किसने", "kiska", "किसका", "read", "unread")
+    writing = _contains_any(sp, _MAIL_ACTION_WORDS) or bool(re.search(r"\s(ko|को)\s", sp))
+    if has(strong):
+        return True
+    if writing:
+        return False          # "Atul ko mail karo", "naya mail bhejo"
+    # Mail ka zikr hai, likhne/bhejne ki baat nahi ("mera mail vatau") -> padhna
+    return True
+
+
+def _hdr(value):
+    try:
+        return str(_make_header(_decode_header(value or ""))).strip()
+    except Exception:
+        return (value or "").strip()
+
+
+def _mail_body_text(msg, limit=4000):
+    # text/plain pehle; na ho to html se tags hata kar
+    plain, htm = None, None
+    for part in (msg.walk() if msg.is_multipart() else [msg]):
+        if part.get_content_maintype() == "multipart" or part.get_filename():
+            continue
+        ctype = part.get_content_type()
+        try:
+            payload = part.get_payload(decode=True) or b""
+            txt = payload.decode(part.get_content_charset() or "utf-8", errors="replace")
+        except Exception:
+            continue
+        if ctype == "text/plain" and plain is None:
+            plain = txt
+        elif ctype == "text/html" and htm is None:
+            htm = txt
+    if plain is None and htm is not None:
+        t = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", htm)
+        t = re.sub(r"(?i)<br\s*/?>|</p>|</div>", "\n", t)
+        plain = _html.unescape(re.sub(r"<[^>]+>", " ", t))
+    text = plain or ""
+    # Purane mail ka quote (reply chain) hata dein
+    cut = re.search(r"(?m)^(On .{5,200}wrote:|-{2,}\s*Original Message|From: .+\nSent: )", text)
+    if cut:
+        text = text[:cut.start()]
+    text = "\n".join(l for l in text.splitlines() if not l.lstrip().startswith(">"))
+    text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r"\n\s*\n+", "\n", text).strip()
+    return text[:limit]
+
+
+def _imap_login():
+    user, password = _mail_account()
+    if not user or not password:
+        raise RuntimeError("MOM_SMTP_USER / MOM_SMTP_PASSWORD set nahi")
+    imap = imaplib.IMAP4_SSL(_pratham_setting("MAIL_IMAP_HOST") or "imap.gmail.com", timeout=20)
+    imap.login(user, password)
+    return imap
+
+
+def gmail_list_inbox_sync(limit=5, unread_only=True):
+    # Return (items, unread_count). items: naya pehle. Mail ko "read" mark NAHI karta.
+    imap = _imap_login()
+    try:
+        imap.select("INBOX", readonly=True)
+        typ, data = imap.uid("search", None, "UNSEEN" if unread_only else "ALL")
+        uids = (data[0] or b"").split() if typ == "OK" else []
+        unread_count = len(uids) if unread_only else 0
+        items = []
+        for uid in reversed(uids[-limit:]):
+            typ, msgdata = imap.uid("fetch", uid, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)])")
+            raw = next((p[1] for p in (msgdata or []) if isinstance(p, tuple)), b"")
+            h = _email_mod.message_from_bytes(raw)
+            name, addr = _email_utils.parseaddr(_hdr(h.get("From")))
+            items.append({"uid": uid.decode(), "from_name": name or addr.split("@")[0], "from_addr": addr,
+                          "subject": _hdr(h.get("Subject")) or "(no subject)", "date": h.get("Date", "")})
+        return items, unread_count
+    finally:
+        try:
+            imap.logout()
+        except Exception:
+            pass
+
+
+def gmail_fetch_sync(uid, mark_seen=True):
+    imap = _imap_login()
+    try:
+        imap.select("INBOX", readonly=not mark_seen)
+        typ, msgdata = imap.uid("fetch", str(uid).encode(), "(BODY.PEEK[])")
+        raw = next((p[1] for p in (msgdata or []) if isinstance(p, tuple)), b"")
+        if not raw:
+            return None
+        msg = _email_mod.message_from_bytes(raw)
+        if mark_seen:
+            imap.uid("store", str(uid).encode(), "+FLAGS", "(\\Seen)")
+        name, addr = _email_utils.parseaddr(_hdr(msg.get("Reply-To") or msg.get("From")))
+        fname, faddr = _email_utils.parseaddr(_hdr(msg.get("From")))
+        return {"uid": str(uid), "from_name": fname or faddr.split("@")[0], "from_addr": faddr,
+                "reply_to": addr or faddr, "subject": _hdr(msg.get("Subject")) or "(no subject)",
+                "message_id": (msg.get("Message-ID") or "").strip(),
+                "references": (msg.get("References") or "").strip(),
+                "body": _mail_body_text(msg)}
+    finally:
+        try:
+            imap.logout()
+        except Exception:
+            pass
+
+
+def build_reply_mail(orig, body):
+    subj = orig.get("subject") or ""
+    if not re.match(r"(?i)^re\s*:", subj):
+        subj = "Re: " + subj
+    msg = build_mail(orig["reply_to"], subj, body)
+    if orig.get("message_id"):
+        msg["In-Reply-To"] = orig["message_id"]
+        msg["References"] = (orig.get("references", "") + " " + orig["message_id"]).strip()
+    return msg
+
+
+async def ai_mail_summary(item):
+    # Bolne ke liye chhota Hindi saar. AI na chale to pehli 2 line.
+    fallback = " ".join(item["body"].split()[:40])
+    if not llm_api_key() or not item["body"]:
+        return fallback
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            res = await llm_post(client, json_body={
+                "model": "gpt-4o-mini", "temperature": 0.2, "max_tokens": 220,
+                "messages": [
+                    {"role": "system", "content": (
+                        "Summarize this email so it can be read aloud to its recipient. Simple Hindi in "
+                        "Devanagari, at most 3 short sentences. Keep names, dates, times, amounts and any "
+                        "action the sender wants. Do not add anything that is not in the email. No markdown.")},
+                    {"role": "user", "content": f"From: {item['from_name']}\nSubject: {item['subject']}\n\n{item['body'][:3000]}"},
+                ],
+            })
+            res.raise_for_status()
+            return (res.json()["choices"][0]["message"]["content"] or "").strip() or fallback
+    except Exception:
+        logger.exception("Mail summary AI failed")
+        return fallback
+
+
+async def ai_compose_reply(orig, transcript):
+    # Return {"body", "summary_hi"}; user ne kya likhna hai nahi bataya to body "".
+    if not llm_api_key():
+        return None
+    lang = (_pratham_setting("MAIL_LANGUAGE") or "english").lower()
+    out_lang = "professional English" if lang.startswith("en") else "polite Roman Hinglish"
+    sender = (_pratham_setting("MAIL_SENDER_NAME") or "").strip()
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            res = await llm_post(client, json_body={
+                "model": "gpt-4o-mini", "temperature": 0.3, "max_tokens": 600,
+                "response_format": {"type": "json_object"},
+                "messages": [
+                    {"role": "system", "content": (
+                        "The user is replying to the email below by voice (Hindi/English, may have speech-to-text "
+                        "errors). Write the reply. Return JSON {\"body\": the reply email in " + out_lang +
+                        ", with greeting to the sender and sign-off" +
+                        (f" ending with 'Regards,\\n{sender}'" if sender else " ending with 'Regards,'") +
+                        ", \"summary_hi\": one short Hindi Devanagari sentence saying what the reply says}. "
+                        "Only say what the user asked to say; do not invent facts, dates or promises. "
+                        "If the user did NOT say what to reply (e.g. only 'reply karo'), return \"body\": \"\".")},
+                    {"role": "user", "content": (
+                        f"ORIGINAL EMAIL\nFrom: {orig['from_name']} <{orig['from_addr']}>\nSubject: {orig['subject']}\n"
+                        f"{orig['body'][:1500]}\n\nUSER SAID: {transcript}")},
+                ],
+            })
+            res.raise_for_status()
+            data = json.loads(res.json()["choices"][0]["message"]["content"])
+            return {k: str(data.get(k) or "").strip() for k in ("body", "summary_hi")}
+    except Exception:
+        logger.exception("Mail reply AI failed")
+        return None
+
+
+def _mail_pick_index(text, items):
+    t = " " + (text or "").lower() + " "
+    for words, idx in _MAIL_ORDINALS:
+        if _contains_any(t, words) and idx < len(items):
+            return idx
+    if _contains_any(t, ("aakhri", "आखिरी", "last")) and items:
+        return len(items) - 1
+    for i, it in enumerate(items):
+        for w in re.findall(r"\w{3,}", (it["from_name"] or "").lower()):
+            if w in t:
+                return i
+    return None
+
+
+# ---------------------------------------------------------------
 # Assistant ka naam: .env ASSISTANT_NAME=Tulsi (default "Pratham"),
 # ya device par bolkar: "tumhara naam Tulsi rakho"
 # ---------------------------------------------------------------
@@ -3775,6 +4012,8 @@ class AudioConsumer(AsyncWebsocketConsumer):
             or (getattr(self, "pending_mail", None) and now_t < self.pending_mail["until"])
             or (getattr(self, "pending_mail_pick", None) and now_t < self.pending_mail_pick["until"])
             or (getattr(self, "pending_mail_content", None) and now_t < self.pending_mail_content["until"])
+            or (getattr(self, "pending_mail_read", None) or {}).get("until", 0) > now_t
+            or (getattr(self, "pending_mail_reply", None) or {}).get("until", 0) > now_t
         )
         min_seconds = self.MIN_UTTERANCE_SECONDS * (0.5 if quiz_mode else 1.0)
         min_frames = max(3, self.MIN_SPEECH_FRAMES // 2) if quiz_mode else self.MIN_SPEECH_FRAMES
@@ -4056,7 +4295,7 @@ class AudioConsumer(AsyncWebsocketConsumer):
                 now_m = time.monotonic()
                 waiting_answer = any(
                     (getattr(self, k, None) or {}).get("until", 0) > now_m
-                    for k in ("pending_mail", "pending_mail_pick", "pending_mail_content")
+                    for k in ("pending_mail", "pending_mail_pick", "pending_mail_content", "pending_mail_read", "pending_mail_reply")
                 ) or now_m < getattr(self, "pending_reminder_until", 0.0) or bool(getattr(self, "quiz", None))
                 empty_but_waiting = not (transcript or "").strip() and waiting_answer and duration_sec >= 0.4
                 if (_pratham_setting("STT_HYBRID") or "1") == "1" and _groq_key() \
@@ -4170,6 +4409,9 @@ class AudioConsumer(AsyncWebsocketConsumer):
         if getattr(self, "pending_mail", None) and time.monotonic() < self.pending_mail["until"]:
             if await self._mail_confirm(transcript):
                 return
+        # Mail padhna / reply: "mere naye mail batao", "pehla padho", "reply karo ki ..."
+        if not getattr(self, "quiz", None) and not self.meeting and await self._mail_read_flow(transcript):
+            return
         # "Atul ko mail likho ki ..."
         if not getattr(self, "quiz", None) and not self.meeting and not is_mom_send(transcript) and (
                 is_mail_compose(transcript) or await ai_is_mail_compose(transcript)):
@@ -4626,6 +4868,155 @@ class AudioConsumer(AsyncWebsocketConsumer):
         except Exception:
             logger.exception("Meeting cleanup failed: device=%s", self.device_id)
 
+    # ---------------- Mail padhna + reply ----------------
+    async def _mail_read_flow(self, transcript):
+        # Return True agar baat mail padhne / reply ki thi
+        now = time.monotonic()
+        t = " " + (transcript or "").lower().strip(" .!?।") + " "
+        ctx = getattr(self, "mail_ctx", None)
+        if ctx and now > ctx["until"]:
+            ctx = self.mail_ctx = None
+
+        # "Kya reply likhna hai?" ka jawab
+        rp = getattr(self, "pending_mail_reply", None)
+        if rp and now < rp["until"]:
+            self.pending_mail_reply = None
+            if _contains_any(t, _MAIL_NO) and len(transcript.split()) <= 3:
+                await self._say("ठीक है, जवाब नहीं भेजा।", "Reply cancel")
+                return True
+            await self._mail_reply(rp["mail"], transcript)
+            return True
+
+        # Mail sunane ke baad "reply karna hai?" -> haan / nahi
+        rd = getattr(self, "pending_mail_read", None)
+        asked_reply = bool(rd and now < rd["until"] and rd.get("asked_reply") and ctx and ctx.get("open"))
+        if asked_reply and len(transcript.split()) <= 4 and not _contains_any(t, _MAIL_REPLY_WORDS):
+            if _contains_any(t, _MAIL_NO):
+                self.pending_mail_read = None
+                await self._say("ठीक है।", "OK")
+                return True
+            if _contains_any(t, _MAIL_YES):
+                self.pending_mail_read = None
+                self.pending_mail_reply = {"mail": ctx["open"], "until": now + 60}
+                await self._say("क्या जवाब लिखना है? बोलिए।", "Reply: kya likhna hai?\nBoliye")
+                return True
+
+        # "Iska reply karo ki ..."
+        if _contains_any(t, _MAIL_REPLY_WORDS) and (ctx and ctx.get("open") or _has_mail_word(t)):
+            if not (ctx and ctx.get("open")):
+                await self._say("पहले कोई मेल सुनिए, फिर उसका जवाब बोलिए। जैसे: मेरे नए मेल बताओ।",
+                                "Pehle mail suniye\nphir reply")
+                return True
+            self.pending_mail_read = None
+            await self._mail_reply(ctx["open"], transcript)
+            return True
+
+        # Suchi ke baad: "pehla padho", "Atul wala", "agla"
+        if ctx and ctx.get("items"):
+            in_window = rd and now < rd["until"]
+            idx = _mail_pick_index(transcript, ctx["items"])
+            if _contains_any(t, _MAIL_NEXT_WORDS) and (in_window or _has_mail_word(t)):
+                idx = (ctx.get("idx", -1) + 1)
+                if idx >= len(ctx["items"]):
+                    await self._say("और कोई मेल नहीं है।", "Aur mail nahi")
+                    return True
+            elif idx is None and in_window and len(ctx["items"]) == 1 and _contains_any(t, _MAIL_READ_WORDS + _MAIL_YES):
+                idx = 0
+            if idx is not None and (in_window or _has_mail_word(t)):
+                await self._mail_open(idx)
+                return True
+
+        # "Mere naye mail batao" / "Atul ka mail padho"
+        if is_mail_read(transcript):
+            await self._mail_list(transcript)
+            return True
+        return False
+
+    async def _mail_list(self, transcript):
+        t = " " + (transcript or "").lower() + " "
+        latest = _contains_any(t, ("aakhri", "आखिरी", "latest", "pichhla", "पिछला", "purane", "पुराने", "last"))
+        try:
+            items, unread = await asyncio.to_thread(gmail_list_inbox_sync, 5, not latest)
+            if not items and not latest:
+                items, _u = await asyncio.to_thread(gmail_list_inbox_sync, 3, False)
+                latest = True
+        except Exception as err:
+            logger.exception("Mail list failed")
+            await self._say("मेल नहीं देख पाया। सर्वर की मेल सेटिंग जांचें।", f"Mail error\n{type(err).__name__}")
+            return
+        logger.info("Mail list: device=%s unread=%s items=%d", self.device_id, unread, len(items))
+        if not items:
+            await self._say("इनबॉक्स में कोई मेल नहीं मिला।", "Inbox khaali")
+            return
+        now = time.monotonic()
+        self.mail_ctx = {"items": items, "idx": -1, "open": None, "until": now + 600}
+        # Naam se seedha: "Atul ka mail padho"
+        idx = _mail_pick_index(transcript, items)
+        if idx is not None and not any(_contains_any(t, w) for w, _i in _MAIL_ORDINALS):
+            await self._mail_open(idx)
+            return
+        order = ["पहला", "दूसरा", "तीसरा", "चौथा", "पांचवा"]
+        head = (f"नया मेल नहीं है। आखिरी {len(items)} मेल: " if latest and unread == 0 else
+                f"आपके {unread} नए मेल हैं। " if unread > len(items) else
+                f"आपके {len(items)} नए मेल हैं। " if len(items) > 1 else "आपका एक नया मेल है। ")
+        parts = [f"{order[i]}, {it['from_name']} से: {it['subject']}" for i, it in enumerate(items[:5])]
+        ask = " कौन सा पढ़ूँ?" if len(items) > 1 else " पढ़ दूँ?"
+        speech = head + "। ".join(parts) + "।" + ask
+        display = "MAIL\n" + "\n".join(f"{i}. {ascii_for_display(it['from_name'], 14)}: {ascii_for_display(it['subject'], 26)}"
+                                        for i, it in enumerate(items[:5], 1))
+        self.pending_mail_read = {"until": now + 60}
+        self._remember_turn(transcript, speech, display.replace("\n", " "))
+        await self._say(speech, display)
+
+    async def _mail_open(self, idx):
+        ctx = self.mail_ctx
+        item = ctx["items"][idx]
+        try:
+            full = await asyncio.to_thread(gmail_fetch_sync, item["uid"], True)
+        except Exception as err:
+            logger.exception("Mail fetch failed")
+            await self._say("मेल नहीं खुल पाया।", f"Mail error\n{type(err).__name__}")
+            return
+        if not full:
+            await self._say("यह मेल अब इनबॉक्स में नहीं मिला।", "Mail nahi mila")
+            return
+        summary = await ai_mail_summary(full)
+        now = time.monotonic()
+        ctx.update({"idx": idx, "open": full, "until": now + 600})
+        logger.info("Mail read: device=%s from=%s subject=%r", self.device_id, full["from_addr"], full["subject"])
+        speech = f"{full['from_name']} का मेल, विषय {full['subject']}। {summary} क्या जवाब देना है?"
+        display = (f"From: {ascii_for_display(full['from_name'], 24)}\n{ascii_for_display(full['subject'], 50)}\n"
+                   f"{ascii_for_display(summary, 120)}\nReply? Haan / Nahi")
+        self.pending_mail_read = {"until": now + 60, "asked_reply": True}
+        self._remember_turn(f"mail padho: {full['subject']}", speech, display.replace("\n", " "))
+        await self._say(speech, display)
+
+    async def _mail_reply(self, orig, transcript):
+        draft = await ai_compose_reply(orig, transcript)
+        if draft is None:
+            await self._say("जवाब नहीं लिख पाया। दोबारा बोलिए।", "Reply nahi bana")
+            return
+        if not draft["body"]:
+            self.pending_mail_reply = {"mail": orig, "until": time.monotonic() + 60}
+            await self._say("क्या जवाब लिखना है? बोलिए।", "Reply: kya likhna hai?\nBoliye")
+            return
+        msg = build_reply_mail(orig, draft["body"])
+        try:
+            ok, info = await asyncio.to_thread(gmail_save_draft_sync, msg)
+        except Exception as err:
+            logger.exception("Reply draft save failed")
+            ok, info = False, type(err).__name__
+        logger.info("Mail reply draft: device=%s to=%s draft_saved=%s", self.device_id, orig["reply_to"], ok)
+        # Bhejna wahi purana raasta: pending_mail -> "haan bhej do" -> _mail_confirm
+        self.pending_mail = {"msg": msg, "to": orig["reply_to"], "until": time.monotonic() + 90,
+                             "draft_folder": info if ok else None}
+        name = orig["from_name"] or orig["reply_to"].split("@")[0]
+        speech = f"{name} को जवाब तैयार है। {draft['summary_hi']} भेज दूँ?"
+        display = (f"REPLY DRAFT\nTo: {ascii_for_display(name, 24)}\n{ascii_for_display(msg['Subject'], 50)}\n"
+                   "Bhejein? Haan / Nahi")
+        self._remember_turn(transcript, speech, display.replace("\n", " "))
+        await self._say(speech, display)
+
     async def _mail_compose(self, transcript):
         contacts = await mail_contacts_async()
         draft = await ai_compose_mail(transcript, list(contacts.keys()))
@@ -4815,7 +5206,7 @@ class AudioConsumer(AsyncWebsocketConsumer):
             or (pick and now_m < pick.get("until", 0))
             or now_m < getattr(self, "pending_reminder_until", 0.0)
             or any((getattr(self, k, None) or {}).get("until", 0) > now_m
-                   for k in ("pending_mail", "pending_mail_pick", "pending_mail_content"))
+                   for k in ("pending_mail", "pending_mail_pick", "pending_mail_content", "pending_mail_read", "pending_mail_reply"))
         )
 
     # =========================================================
