@@ -1322,6 +1322,32 @@ MEETING_MAX_SECONDS = _env_int("MEETING_MAX_SECONDS", 3600)   # 1 ghanta max
 ACTIVE_MEETINGS = {}   # device_id -> meeting dict (reconnect par bhi chalta rahe)
 LAST_MEETINGS = {}     # device_id -> pichhli meeting ki .txt file
 
+
+def _meeting_keep_audio():
+    """MEETING_KEEP_AUDIO=1 ho to WAV rakho (default: MoM ke baad hata do)."""
+    return (_pratham_setting("MEETING_KEEP_AUDIO") or "0") == "1"
+
+
+def _cleanup_old_meetings(device_id, keep_base=None):
+    """Is device ki purani meeting files hatao; sirf keep_base wali rakho."""
+    media_dir = getattr(settings, "MEDIA_ROOT", None) or os.path.join(os.getcwd(), "media")
+    folder = os.path.join(str(media_dir), "meetings")
+    try:
+        names = os.listdir(folder)
+    except OSError:
+        return 0
+    keep = os.path.basename(keep_base) + "." if keep_base else None
+    removed = 0
+    for name in names:
+        if not name.startswith(f"{device_id}_") or (keep and name.startswith(keep)):
+            continue
+        try:
+            os.remove(os.path.join(folder, name))
+            removed += 1
+        except OSError:
+            pass
+    return removed
+
 _MEETING_WORDS = ("meeting", "mitting", "miting", "meting", "metting", "meetings",
                   "मीटिंग", "मिटिंग", "मीटींग", "मिटींग",
                   "recording", "रिकॉर्डिंग", "रिकॉर्ड", "record")
@@ -4472,6 +4498,20 @@ class AudioConsumer(AsyncWebsocketConsumer):
             pass   # device disconnect ho gaya ho to bhi MoM bhejein
         if (_pratham_setting("MOM_AUTO_SEND") or "1") == "1":
             await self._send_mom(base + ".txt", quiet_if_unset=True)
+        await self._meeting_cleanup(base)
+
+    async def _meeting_cleanup(self, base):
+        """MoM ban gaya / bhej diya: WAV aur is device ki purani meetings hatao (disk bachao)."""
+        try:
+            removed = await asyncio.to_thread(_cleanup_old_meetings, self.device_id, base)
+            wav_removed = False
+            if not _meeting_keep_audio() and os.path.isfile(base + ".wav"):
+                os.remove(base + ".wav")
+                wav_removed = True
+            logger.info("Meeting cleanup: device=%s old_files=%d wav_removed=%s",
+                        self.device_id, removed, wav_removed)
+        except Exception:
+            logger.exception("Meeting cleanup failed: device=%s", self.device_id)
 
     async def _mail_compose(self, transcript):
         contacts = await mail_contacts_async()
