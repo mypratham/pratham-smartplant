@@ -175,3 +175,11 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ],
 }
+
+# HTTPS nginx ke peeche: login/admin forms ke liye (Django 4+ Origin check)
+CSRF_TRUSTED_ORIGINS = [
+    "https://api.prathamsmart.in",
+    "https://prathamsmart.in",
+    "https://www.prathamsmart.in",
+]
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
