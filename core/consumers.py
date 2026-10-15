@@ -4,6 +4,7 @@ import json
 import wave
 import asyncio
 import io
+import random
 import time
 import threading
 from collections import deque
@@ -2738,15 +2739,28 @@ def list_reminders_sync(device_id, limit=5):
     return items[:limit]
 
 
+_REM_SCHEMA_CACHE = {}
+_REM_DEVFILTER_CACHE = {}   # device_id -> (time, filter), 5 min
+
+
 def pop_due_reminders_sync(device_id):
+    if str(device_id).startswith("loadtest_"):
+        return []   # load test ke nakli device asli reminders na le jaayein
     """Jinka time ho gaya, unhe nikaal kar 'done' mark karein. [(local_dt, title)]"""
     model = _reminder_model()
     if model is None:
         return []
-    schema = _reminder_schema(model)
+    schema = _REM_SCHEMA_CACHE.get(model)
+    if schema is None:
+        schema = _REM_SCHEMA_CACHE[model] = _reminder_schema(model)
     if schema["title"] is None or (schema["active"] is None and schema["done"] is None):
         return []  # bina is_active/done field ke baar-baar bolta rahega, isliye skip
-    dev_filter, _ = _device_filter(schema, device_id)
+    cached = _REM_DEVFILTER_CACHE.get(device_id)
+    if cached and time.monotonic() - cached[0] < 300:
+        dev_filter = cached[1]
+    else:
+        dev_filter, _ = _device_filter(schema, device_id)
+        _REM_DEVFILTER_CACHE[device_id] = (time.monotonic(), dev_filter)
     if dev_filter is None:
         return []
     qs = model.objects.filter(**dev_filter)
@@ -3224,6 +3238,64 @@ class MCPServerConsumer(AsyncWebsocketConsumer):
 ACTIVE_QUIZZES = {}
 
 
+ONLINE_DEVICES = {}          # device_id -> kitne connection khule
+_ONLINE_BATCH_TASK = None
+
+
+def _online_batch_sync(ids):
+    from django.utils import timezone
+    from core.models import Device
+    names = {f.name for f in Device._meta.get_fields()}
+    upd = {}
+    if "is_online" in names:
+        upd["is_online"] = True
+    if "last_seen" in names:
+        upd["last_seen"] = timezone.now()
+    if not upd:
+        return
+    for i in range(0, len(ids), 500):
+        Device.objects.filter(plant_id__in=ids[i:i + 500]).update(**upd)
+
+
+async def _online_batch_loop():
+    """Sab jude devices ko har 20 sec ek hi query mein online rakhein."""
+    while True:
+        await asyncio.sleep(20)
+        ids = [d for d in list(ONLINE_DEVICES) if not str(d).startswith("loadtest_")]
+        if not ids:
+            continue
+        try:
+            await asyncio.to_thread(_online_batch_sync, ids)
+        except Exception:
+            logger.exception("Online batch update fail (%d devices)", len(ids))
+
+
+def _ensure_online_batch_task():
+    global _ONLINE_BATCH_TASK
+    if _ONLINE_BATCH_TASK is None or _ONLINE_BATCH_TASK.done():
+        _ONLINE_BATCH_TASK = asyncio.get_running_loop().create_task(_online_batch_loop())
+
+
+# Shor par Whisper aksar yeh likh deta hai: inka jawab nahi dena
+_JUNK_TRANSCRIPTS = {
+    "hmm", "hm", "hmmm", "hmmmm", "mm", "mmm", "uh", "um", "umm", "ah", "oh", "huh",
+    "ping", "pong", "you", "thank you", "thanks for watching", "subscribe", "music",
+    "हम्म", "हं", "हम", "उह", "आह",
+}
+
+
+def _junk_transcript(text):
+    t = (text or "").strip().lower()
+    if not t:
+        return False
+    if re.fullmatch(r"(<\|[^|>]{1,20}\|>\s*)+", t):
+        return True          # "<|hi|>" jaise token
+    clean = re.sub(r"[^\w\s\u0900-\u097F]", " ", t)
+    clean = re.sub(r"[\u0964\u0965]", " ", clean)   # । ॥
+    clean = re.sub(r"\s+", " ", clean).strip()
+    return not clean or clean in _JUNK_TRANSCRIPTS
+
+
 class AudioConsumer(AsyncWebsocketConsumer):
     @property
     def meeting(self):
@@ -3325,6 +3397,7 @@ class AudioConsumer(AsyncWebsocketConsumer):
 
         # Utterance state machine
         self.in_speech = False
+        self._speech_evt = asyncio.Event()
         self.voice_run_frames = 0
         self.preroll = deque(maxlen=self.VAD_PREROLL_FRAMES)
         self.last_voice_buffer_len = 0
@@ -3588,6 +3661,7 @@ class AudioConsumer(AsyncWebsocketConsumer):
                 self.voice_run_frames += 1
                 if self.voice_run_frames >= self.VAD_START_FRAMES:
                     self.in_speech = True
+                    self._speech_evt.set()
                     self.pcm_buffer = bytearray(b"".join(self.preroll))
                     self.preroll.clear()
                     self.vad_silence_frames = 0
@@ -3625,6 +3699,14 @@ class AudioConsumer(AsyncWebsocketConsumer):
         """ESP32 ka voice gate packets bhejna band kar de to utterance yahan khatam hoti hai."""
         try:
             while self.ws_open:
+                if not self.in_speech:
+                    # Chup: bolna shuru hone tak so jao (har device ka 10/sec jagna band)
+                    try:
+                        await asyncio.wait_for(self._speech_evt.wait(), timeout=5)
+                    except asyncio.TimeoutError:
+                        pass
+                    self._speech_evt.clear()
+                    continue
                 await asyncio.sleep(0.1)
 
                 if (
@@ -4001,6 +4083,11 @@ class AudioConsumer(AsyncWebsocketConsumer):
                 self.device_id,
             )
             return
+
+        # "Hmm" / "PING" / "<|hi|>": shor tha. Jawab ka intezaar ho ("hmm" = haan) to rakhein.
+        if _junk_transcript(transcript) and not self._awaiting_reply():
+            logger.info("Junk transcript ignored: device=%s text=%r", self.device_id, transcript)
+            transcript = ""
 
         await self._send_json({
             "type": "transcript",
@@ -5148,7 +5235,8 @@ class AudioConsumer(AsyncWebsocketConsumer):
         """Har kuch second mein dekhein: kisi reminder ka time hua? To bolein."""
         try:
             while self.ws_open:
-                await asyncio.sleep(REMINDER_CHECK_SECONDS)
+                # Thoda random: saare devices ek hi second mein DB par na aayein
+                await asyncio.sleep(REMINDER_CHECK_SECONDS * random.uniform(0.75, 1.25))
                 if not self.ws_open:
                     break
                 # User bol raha ho ya jawab chal raha ho to beech mein na bolein
@@ -5360,19 +5448,22 @@ class AudioConsumer(AsyncWebsocketConsumer):
             logger.exception("Online status update fail: device=%s", self.device_id)
 
     async def _online_loop(self):
-        try:
-            while True:
-                await self._set_online(True)
-                await asyncio.sleep(20)
-        except asyncio.CancelledError:
-            pass
+        # Alag 20-sec loop nahi: _online_batch_loop sabko ek query mein online rakhta hai
+        ONLINE_DEVICES[self.device_id] = ONLINE_DEVICES.get(self.device_id, 0) + 1
+        _ensure_online_batch_task()
+        await self._set_online(True)
 
     async def disconnect(self, close_code):
         self.ws_open = False
         task = getattr(self, "_online_task", None)
         if task and not task.done():
             task.cancel()
-        await self._set_online(False)
+        left = ONLINE_DEVICES.get(self.device_id, 0) - 1
+        if left > 0:
+            ONLINE_DEVICES[self.device_id] = left   # doosra connection abhi khula hai
+        else:
+            ONLINE_DEVICES.pop(self.device_id, None)
+            await self._set_online(False)
 
         for task in (
             getattr(self, "inactivity_task", None),
