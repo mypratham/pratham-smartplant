@@ -99,6 +99,20 @@ DATABASES = {
     }
 }
 
+# PostgreSQL: .env mein DB_ENGINE=postgres (line hatane par wapas SQLite)
+import os as _os
+if _os.getenv("DB_ENGINE", "").lower() == "postgres":
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': _os.getenv("DB_NAME", "smartplant"),
+            'USER': _os.getenv("DB_USER", "smartplant"),
+            'PASSWORD': _os.getenv("DB_PASSWORD", ""),
+            'HOST': _os.getenv("DB_HOST", "127.0.0.1"),
+            'PORT': _os.getenv("DB_PORT", "5432"),
+        }
+    }
+
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
