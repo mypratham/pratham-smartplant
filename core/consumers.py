@@ -3360,6 +3360,7 @@ class AudioConsumer(AsyncWebsocketConsumer):
         })
 
         logger.info("Audio WebSocket connected: device=%s", self.device_id)
+        self._online_task = asyncio.create_task(self._online_loop())
 
         # Exam list pehle se le aayein: "Excel start karo" pehli baar mein bhi samjhe
         asyncio.create_task(self._prefetch_exams())
@@ -5304,8 +5305,34 @@ class AudioConsumer(AsyncWebsocketConsumer):
                 "message": str(err),
             })
 
+    async def _set_online(self, online):
+        def _do():
+            from django.utils import timezone
+            from core.models import Device
+            names = {f.name for f in Device._meta.get_fields()}
+            upd = {}
+            if "is_online" in names: upd["is_online"] = online
+            if "last_seen" in names: upd["last_seen"] = timezone.now()
+            if upd: Device.objects.filter(plant_id=self.device_id).update(**upd)
+        try:
+            await asyncio.to_thread(_do)
+        except Exception:
+            logger.exception("Online status update fail: device=%s", self.device_id)
+
+    async def _online_loop(self):
+        try:
+            while True:
+                await self._set_online(True)
+                await asyncio.sleep(20)
+        except asyncio.CancelledError:
+            pass
+
     async def disconnect(self, close_code):
         self.ws_open = False
+        task = getattr(self, "_online_task", None)
+        if task and not task.done():
+            task.cancel()
+        await self._set_online(False)
 
         for task in (
             getattr(self, "inactivity_task", None),

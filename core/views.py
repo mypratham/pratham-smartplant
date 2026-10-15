@@ -974,14 +974,17 @@ def check_pairing(request):
     Device poll (mac + pairing_code + plant_id): sirf status batata hai.
     Dashboard (code): device ko claim / pair karta hai (purana tarika).
     """
+    # Code / MAC kahin se bhi aaye: URL (?code=), form-data, ya JSON body
     data = {}
+    data.update(request.GET.dict())
     if request.method == 'POST':
+        data.update(request.POST.dict())
         try:
-            data = json.loads(request.body or "{}")
+            body = json.loads(request.body or "{}")
+            if isinstance(body, dict):
+                data.update(body)
         except Exception:
-            return JsonResponse({"is_paired": False, "error": "Invalid JSON"}, status=400)
-    else:
-        data = request.GET
+            pass
 
     mac = data.get('mac') or data.get('mac_address')
     code = data.get('pairing_code') or data.get('code')
