@@ -72,3 +72,124 @@ class PlantChatHistoryAdmin(admin.ModelAdmin):
     list_display = ('device', 'user_text', 'ai_response', 'created_at')
     search_fields = ('user_text', 'ai_response')
     list_filter = ('created_at',)
+
+
+# ---------------- Device contacts (bulk upload) + Device settings ----------------
+import csv as _csv
+import io as _io
+
+from django import forms as _forms
+from django.contrib import messages as _messages
+from django.shortcuts import redirect as _redirect, render as _render
+from django.urls import path as _path
+
+from core.models import Device as _Device, DeviceContact as _DeviceContact, DeviceSettings as _DeviceSettings
+
+
+def import_contacts_csv(device, text, max_contacts=500):
+    """CSV text -> device ke contacts. Return (added, updated, skipped)."""
+    from core.views import _clean_contact
+    rows = list(_csv.DictReader(_io.StringIO(text.lstrip("﻿"))))
+
+    def pick(row, *names):
+        low = {(k or "").strip().lower(): (v or "").strip() for k, v in row.items() if k}
+        for n in names:
+            v = low.get(n)
+            if v:
+                return v.split(" ::: ")[0].strip()
+        return ""
+
+    existing = {c.name.lower(): c for c in _DeviceContact.objects.filter(device=device)}
+    added = updated = skipped = 0
+    for row in rows:
+        name = pick(row, "name", "full name", "display name") or " ".join(
+            x for x in (pick(row, "first name", "given name"), pick(row, "middle name", "additional name"),
+                        pick(row, "last name", "family name")) if x)
+        data, errors = _clean_contact({
+            "name": name,
+            "aliases": pick(row, "aliases", "alias", "nickname"),
+            "email": pick(row, "email", "e-mail", "e-mail 1 - value", "email 1 - value", "e-mail address"),
+            "phone": pick(row, "phone", "mobile", "whatsapp", "phone 1 - value", "mobile phone", "primary phone"),
+        })
+        if errors:
+            skipped += 1
+            continue
+        c = existing.get(data["name"].lower())
+        if c is not None:
+            changed = False
+            for k in ("email", "phone", "aliases"):
+                if data[k] and getattr(c, k) != data[k]:
+                    setattr(c, k, data[k])
+                    changed = True
+            if changed:
+                c.save()
+                updated += 1
+            continue
+        if len(existing) >= max_contacts:
+            skipped += 1
+            continue
+        c = _DeviceContact.objects.create(device=device, **data)
+        existing[c.name.lower()] = c
+        added += 1
+    return added, updated, skipped
+
+
+class _ContactCsvForm(_forms.Form):
+    device = _forms.ModelChoiceField(queryset=_Device.objects.exclude(plant_id__startswith="loadtest").order_by("plant_id"),
+                                     to_field_name="plant_id")
+    csv_file = _forms.FileField(label="CSV file", help_text="Columns: name, email, phone, aliases (ya Google CSV). 2 MB tak.")
+
+
+@admin.register(_DeviceContact)
+class DeviceContactAdmin(admin.ModelAdmin):
+    list_display = ("name", "email", "phone", "aliases", "device")
+    list_filter = ("device",)
+    search_fields = ("name", "aliases", "email", "phone", "device__plant_id")
+    list_select_related = ("device",)
+    list_per_page = 100
+    change_list_template = "admin/core/devicecontact/change_list.html"
+
+    def get_urls(self):
+        return [_path("bulk-upload/", self.admin_site.admin_view(self.bulk_upload),
+                      name="core_devicecontact_bulk")] + super().get_urls()
+
+    def bulk_upload(self, request):
+        form = _ContactCsvForm(request.POST or None, request.FILES or None)
+        if request.method == "POST" and form.is_valid():
+            f = form.cleaned_data["csv_file"]
+            if f.size > 2_000_000:
+                form.add_error("csv_file", "File 2 MB se badi hai")
+            else:
+                raw = f.read()
+                for enc in ("utf-8-sig", "utf-16", "cp1252"):
+                    try:
+                        text = raw.decode(enc)
+                        break
+                    except UnicodeDecodeError:
+                        continue
+                else:
+                    text = None
+                if text is None:
+                    form.add_error("csv_file", "File padh nahi paaye: CSV (UTF-8) mein save karein")
+                else:
+                    dev = form.cleaned_data["device"]
+                    added, updated, skipped = import_contacts_csv(dev, text)
+                    self.message_user(request, f"{dev.plant_id}: naye {added}, update {updated}, chhode {skipped}",
+                                      _messages.SUCCESS if added or updated else _messages.WARNING)
+                    return _redirect(f"../?device__id__exact={dev.pk}")
+        ctx = {**self.admin_site.each_context(request), "form": form, "title": "Contacts bulk upload (CSV)",
+               "opts": self.model._meta}
+        return _render(request, "admin/core/devicecontact/bulk_upload.html", ctx)
+
+
+@admin.register(_DeviceSettings)
+class DeviceSettingsAdmin(admin.ModelAdmin):
+    # Secrets (keys / passwords) admin mein bhi nahi dikhte; badalne ke liye /device-settings/ page
+    list_display = ("device", "assistant_name", "ai_provider", "ai_model", "gmail_address", "whatsapp_phone", "updated_at")
+    search_fields = ("device__plant_id", "assistant_name", "gmail_address")
+    fields = ("device", "assistant_name", "ai_provider", "ai_model", "gmail_address", "mail_sender_name",
+              "whatsapp_phone", "updated_at")
+    readonly_fields = ("device", "ai_provider", "ai_model", "gmail_address", "whatsapp_phone", "updated_at")
+
+    def has_add_permission(self, request):
+        return False

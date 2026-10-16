@@ -1,0 +1,14 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<h1>{{ title }}</h1>
+<p>CSV ki pehli line mein column ke naam: <code>name,email,phone,aliases</code>.
+Har contact mein email ya phone mein se kam se kam ek chahiye. Phone 10 digit ho to +91 apne aap lagega.
+Google Contacts &rarr; Export &rarr; <b>Google CSV</b> bhi seedha chalti hai. Pehle se jo naam hai, uska email/phone update hoga.</p>
+<pre style="background:var(--darkened-bg);padding:8px">name,email,phone,aliases
+Atul Sharma,atul@example.com,9876543210,"अतुल, atul ji"
+Office,info@example.com,,</pre>
+<form method="post" enctype="multipart/form-data">{% csrf_token %}
+  {{ form.as_p }}
+  <input type="submit" value="Upload" class="default">
+</form>
+{% endblock %}
