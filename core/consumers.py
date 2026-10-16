@@ -1425,20 +1425,69 @@ async def device_lang(device_id):
     return lang
 
 
+_LANG_ACTION_TOKENS = {
+    "baat", "bat", "but", "baath", "bolo", "boliye", "bolna", "bol", "karo", "speak", "talk", "language",
+    "bhasha", "bhaasha", "switch", "change", "reply", "answer", "jawab", "javab", "chalo",
+    "बात", "बोलो", "बोलिए", "भाषा", "करो", "जवाब",
+}
+_LANG_IN_TOKENS = {"mein", "me", "main", "may", "mai", "men", "in", "to", "में", "मे", "मैं"}
+
+
 def parse_language_command(text):
+    """'Hindi mein baat karo', 'Hindi main but karo', 'talk to me in Hindi', 'English please', 'Gujarati mein'."""
     import unicodedata
-    t = " " + unicodedata.normalize("NFC", (text or "").lower()) + " "
-    if len(t.split()) > 8 or not any(w in t for w in _LANG_TRIGGERS):
+    t = unicodedata.normalize("NFC", (text or "").lower())
+    toks = [w for w in re.split(r"[^\wऀ-෿]+", t) if w]
+    if not toks or len(toks) > 8:
         return None
-    for code, names in _LANG_NAMES.items():
+    code = None
+    for c, names in _LANG_NAMES.items():
         if any(n in t for n in names):
-            return code
+            code = c
+            break
+    if code is None:
+        return None
+    if any(w in _LANG_ACTION_TOKENS for w in toks) or any(p in t for p in _LANG_TRIGGERS):
+        return code
+    # sirf "Hindi mein" / "in English" / "English please"
+    if len(toks) <= 3 and (any(w in _LANG_IN_TOKENS for w in toks) or "please" in toks or len(toks) == 1):
+        return code
     return None
 
 
 def _stt_lang(lang):
-    # Hindi: pehle jaisa (WHISPER_LANGUAGE setting); baaki: wahi code Whisper ko
-    return None if lang in ("hi", "sa") else lang
+    # Hindi/Sanskrit: pehle jaisa (WHISPER_LANGUAGE); English: auto (Hindi bhi samjhe); baaki: wahi code
+    if lang in ("hi", "sa"):
+        return None
+    return "auto" if lang == "en" else lang
+
+
+_STT_JUNK_EXTRA = {"music", "música", "musica", "thank you", "thank you.", "thanks for watching", "you", "bye", "subtitles"}
+
+
+_WHISPER_LANG = {"en": ("english", "en"), "hi": ("hindi", "hi", "urdu", "ur"), "gu": ("gujarati", "gu"),
+                 "te": ("telugu", "te"), "ta": ("tamil", "ta"), "mr": ("marathi", "mr"), "bn": ("bengali", "bn"),
+                 "kn": ("kannada", "kn"), "ml": ("malayalam", "ml"), "ur": ("urdu", "ur"), "pa": ("punjabi", "pa"),
+                 "ne": ("nepali", "ne"), "sa": ("sanskrit", "sa", "hindi", "hi")}
+
+
+def _stt_lang_ok(detected, dev_lang):
+    d = (detected or "").lower()
+    if not d:
+        return True
+    ok = set(_WHISPER_LANG["en"]) | set(_WHISPER_LANG["hi"]) | set(_WHISPER_LANG.get(dev_lang, ()))
+    return d in ok
+
+
+def _stt_retry_needed(text, prompt):
+    t = (text or "").strip().lower().strip(" .!?।")
+    if not t or t in _STT_JUNK_EXTRA:
+        return True
+    jt = globals().get("_junk_transcript")
+    if jt and jt(text):
+        return True
+    p = (prompt or "").lower()
+    return bool(p) and len(t) > 15 and t[:20] in p           # prompt ka echo
 
 
 def _tts_args(lang, text):
@@ -1452,6 +1501,66 @@ def _tts_args(lang, text):
     if lang == "en":
         return {"lang": "en", "tld": "co.in"}
     return {"lang": lang if lang in SUPPORTED_LANGS else "hi"}
+
+
+# ---------------------------------------------------------------
+# Pehle se likhe Hindi vakya (quiz, reminder, mail...) device ki bhasha mein
+# ---------------------------------------------------------------
+_TR_CACHE = {}          # (lang, vakya) -> anuvaad
+_TR_CACHE_MAX = 6000
+
+
+def _tr_needed(sentence, lang):
+    if lang == "hi" or lang not in SUPPORTED_LANGS:
+        return False
+    letters = sum(1 for ch in sentence if ch.isalpha()) or 1
+    deva = sum(1 for ch in sentence if "ऀ" <= ch <= "ॿ")
+    return deva / letters > 0.3
+
+
+def _tr_split(text):
+    return [p.strip() for p in _SENTENCE_SPLIT_RE.split(text or "") if p.strip()]
+
+
+async def translate_for_lang(text, lang):
+    """Hindi vakyon ko `lang` mein. AI na chale to wahi Hindi wapas (kabhi khaali nahi)."""
+    if lang == "hi" or not text:
+        return text
+    parts = _tr_split(text) or [text]
+    todo = []
+    for p in parts:
+        if _tr_needed(p, lang) and (lang, p) not in _TR_CACHE and p not in todo:
+            todo.append(p)
+    if todo and llm_api_key():
+        name = SUPPORTED_LANGS.get(lang, lang)
+        script = "plain English" if lang == "en" else f"{name} in its own script"
+        try:
+            async with httpx.AsyncClient(timeout=25) as client:
+                res = await llm_post(client, json_body={
+                    "model": "gpt-4o-mini", "temperature": 0.1, "max_tokens": 2500,
+                    "response_format": {"type": "json_object"},
+                    "messages": [
+                        {"role": "system", "content": (
+                            f"Translate each item from Hindi into {script}, natural spoken style for a voice assistant. "
+                            "Keep numbers, names, exam names and option letters (A, B, C, D) unchanged. "
+                            "Return JSON {\"t\": [translations]} with exactly the same number of items, same order.")},
+                        {"role": "user", "content": json.dumps({"items": todo}, ensure_ascii=False)},
+                    ],
+                })
+                res.raise_for_status()
+                out = json.loads(res.json()["choices"][0]["message"]["content"]).get("t") or []
+            if isinstance(out, list) and len(out) == len(todo):
+                if len(_TR_CACHE) > _TR_CACHE_MAX:
+                    _TR_CACHE.clear()
+                for a, b in zip(todo, out):
+                    b = str(b or "").strip()
+                    if b:
+                        _TR_CACHE[(lang, a)] = b
+            else:
+                logger.warning("Translate: %d items maange, %d mile", len(todo), len(out) if isinstance(out, list) else -1)
+        except Exception:
+            logger.exception("Translate failed: lang=%s", lang)
+    return " ".join(_TR_CACHE.get((lang, p), p) if _tr_needed(p, lang) else p for p in parts)
 
 
 def _lang_prompt(lang):
@@ -1486,6 +1595,8 @@ async def openai_transcribe(pcm_np, prompt=None, engine="openai", language=None,
         logger.warning("STT %s: API key set nahi", engine)
         return None
     language = language or _pratham_setting("WHISPER_LANGUAGE") or WHISPER_LANGUAGE
+    if language == "auto":       # Whisper khud bhasha pehchane
+        language = None
     wav_bytes = _pcm_float_to_wav_bytes(pcm_np)
     for model_name in dict.fromkeys(models):
         data = {"model": model_name, "response_format": "verbose_json" if engine == "groq" else "json"}
@@ -1509,6 +1620,7 @@ async def openai_transcribe(pcm_np, prompt=None, engine="openai", language=None,
                         STT_META.set({
                             "no_speech": min(float(x.get("no_speech_prob") or 0.0) for x in segs),
                             "logprob": sum(float(x.get("avg_logprob") or 0.0) for x in segs) / len(segs),
+                            "language": str(body.get("language") or "").strip().lower(),
                         })
                     except (TypeError, ValueError):
                         pass
@@ -4684,8 +4796,18 @@ class AudioConsumer(AsyncWebsocketConsumer):
             used_engine = "local"
             if stt_engine in ("openai", "groq"):
                 transcript = await openai_transcribe(
-                    pcm_np, stt_prompt if self.lang in ("hi", "en", "ur") else None, stt_engine,
+                    pcm_np, stt_prompt if self.lang in ("hi", "ur") else None, stt_engine,
                     language=_stt_lang(self.lang))
+                if self.lang not in ("hi", "sa") and _stt_retry_needed(transcript, stt_prompt):
+                    logger.info("STT retry (auto): device=%s lang=%s first=%r", self.device_id, self.lang, transcript)
+                    transcript = await openai_transcribe(pcm_np, None, stt_engine, language="auto")
+                if self.lang != "hi" and transcript and not getattr(self, "quiz", None) \
+                        and not (hasattr(self, "_awaiting_reply") and self._awaiting_reply()):
+                    _det = (STT_META.get() or {}).get("language", "")
+                    if not _stt_lang_ok(_det, self.lang):
+                        logger.info("STT other-language ignored: device=%s detected=%s text=%r",
+                                    self.device_id, _det, transcript)
+                        transcript = ""
                 used_engine = stt_engine
             if transcript is None and FAST_WHISPER_MODEL is not None:
                 local_prompt = stt_prompt if (getattr(self, "quiz", None) or getattr(self, "quiz_pick", None)) else None
@@ -4821,7 +4943,7 @@ class AudioConsumer(AsyncWebsocketConsumer):
                 return
         # "Gujarati mein baat karo" -> device ki bhasha badlo
         new_lang = parse_language_command(transcript)
-        if new_lang and not getattr(self, "quiz", None) and not self.meeting:
+        if new_lang and not self.meeting:            # quiz ke beech bhi chalega
             try:
                 await asyncio.to_thread(set_device_lang_sync, self.device_id, new_lang)
             except Exception:
@@ -5125,7 +5247,7 @@ class AudioConsumer(AsyncWebsocketConsumer):
             "display": display_text or ascii_for_display(ai_reply_text, display_limit),
         })
 
-        await self._speak(ai_reply_text)
+        await self._speak(ai_reply_text, native=True)
 
     # =========================================================
     # Meeting mode: "meeting mode on" -> sab kuch record + transcript,
@@ -5864,6 +5986,18 @@ class AudioConsumer(AsyncWebsocketConsumer):
             return
         await self._begin_exam(exam)
 
+    async def _prefetch_quiz_tr(self):
+        # Saare sawal ek saath translate (cache): agla sawal bina ruke bole
+        quiz, lang = self.quiz, getattr(self, "lang", "hi")
+        if not quiz or lang == "hi":
+            return
+        texts = [self._quiz_question_texts(dict(quiz, index=i))[0] for i in range(len(quiz["questions"]))]
+        try:
+            await translate_for_lang(" ".join(texts), lang)
+            logger.info("Quiz translate: device=%s lang=%s questions=%d", self.device_id, lang, len(texts))
+        except Exception:
+            logger.debug("Quiz prefetch translate failed", exc_info=True)
+
     async def _begin_exam(self, exam):
         self.quiz_pick = None
         ok, qdata = await pratham_get_json(f"/school/questions/{exam['id']}")
@@ -5894,6 +6028,8 @@ class AudioConsumer(AsyncWebsocketConsumer):
             "retries": 0,
             "last": time.monotonic(),
         }
+        if getattr(self, "lang", "hi") != "hi":
+            asyncio.create_task(self._prefetch_quiz_tr())
         q_speech, q_display = self._quiz_question_texts(self.quiz)
         intro = (
             f"{exam['name']} क्विज़ शुरू। कुल {len(questions)} सवाल। "
@@ -6249,7 +6385,11 @@ class AudioConsumer(AsyncWebsocketConsumer):
         except asyncio.CancelledError:
             pass
 
-    async def _speak(self, text):
+    async def _speak(self, text, native=False):
+        # native=True: AI ka jawab, pehle se device ki bhasha mein
+        _lg = getattr(self, "lang", "hi")
+        if not native and _lg != "hi" and text:
+            text = await translate_for_lang(text, _lg)
         """Text ko gTTS se bolwa kar ESP32 ko real-time PCM stream karein.
         (Pehle yeh code AI reply ke andar tha; ab voice commands ke
         confirmation bhi isi se bolte hain.)"""

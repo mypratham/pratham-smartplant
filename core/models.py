@@ -140,7 +140,7 @@ class Reminder(models.Model):
         related_name="reminders"
     )
 
-    time = models.CharField(max_length=10)
+    time = models.CharField(max_length=20)   # "YYYY-MM-DD HH:MM"
     message = models.CharField(max_length=255)
     is_active = models.BooleanField(default=True)
 
