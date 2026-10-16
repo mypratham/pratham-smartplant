@@ -46,3 +46,4 @@ venv/
 *.bak[0-9]*
 .env.*
 !.env.example
+static/

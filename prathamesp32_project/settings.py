@@ -27,7 +27,8 @@ DEBUG = __import__("os").getenv("DJANGO_DEBUG", "1") == "1"   # live .env: DJANG
 
 ALLOWED_HOSTS = ['*']
 
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOWED_ORIGINS = ["https://prathamsmart.in", "https://www.prathamsmart.in", "http://localhost:3000"]
 
 
 # Application definition
