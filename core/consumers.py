@@ -1998,6 +1998,14 @@ def _send_mom_email_sync(txt_path):
     port = int(_pratham_setting("MOM_SMTP_PORT") or 587)
     subject, short, full, html_body = _mom_parts(txt_path)
     base = txt_path[:-4]
+    _wa = wa_link("", f"*{subject}*\n\n{short}")
+    short = short + "\n\nWhatsApp par share karein: " + _wa
+    if html_body:
+        _btn = ("<p style='font-family:Arial,sans-serif'><a href='" + _html.escape(_wa) + "' style='display:inline-block;"
+                "background:#25D366;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none;"
+                "font-weight:bold'>WhatsApp par share karein</a></p>")
+        html_body = re.sub(r"(<body[^>]*>)", lambda m: m.group(1) + _btn, html_body, count=1) \
+            if re.search(r"<body[^>]*>", html_body) else _btn + html_body
     msg = EmailMessage()
     msg["Subject"] = subject
     msg["From"] = f"PrathamSmart <{user}>"
@@ -2030,8 +2038,133 @@ async def send_mom_email(txt_path):
         return False, f"email error: {type(err).__name__}"
 
 
+# ---------------------------------------------------------------
+# WhatsApp "link" wala tarika (muft, bina API): wa.me link banakar device ke apne Gmail par bhejo.
+# User mail kholkar link tap kare -> WhatsApp mein message bhara hua -> Send.
+# ---------------------------------------------------------------
+from urllib.parse import quote as _url_quote
+
+_WA_WORDS = ("whatsapp", "whats app", "watsapp", "whatsap", "व्हाट्सएप", "वॉट्सऐप", "व्हाट्सऐप", "वाट्सएप",
+             "व्हाट्सअप", "वॉट्सएप", "واٹس ایپ")
+_WA_ACTION = ("bhejo", "bhej", "भेजो", "भेज", "karo", "kar do", "करो", "कर दो", "send", "message", "मैसेज",
+              "likho", "लिखो", "msg")
+
+
+def is_whatsapp_compose(text):
+    t = " " + (text or "").lower() + " "
+    if not _contains_any(t, _WA_WORDS):
+        return False
+    if _contains_any(t, ("mom", "एमओएम", "minutes", "notes", "नोट्स", "summary", "सारांश")):
+        return False                      # "MoM WhatsApp bhejo" -> MoM wala raasta
+    return bool(re.search(r"\s(ko|को|کو)\s", t)) and _contains_any(t, _WA_ACTION)
+
+
+def wa_link(phone, text):
+    digits = re.sub(r"\D", "", phone or "")
+    text = (text or "")[:1500]
+    return f"https://wa.me/{digits}?text={_url_quote(text)}" if digits else f"https://wa.me/?text={_url_quote(text)}"
+
+
+def _wa_self_mail_sync(subject, intro, link, text):
+    # Device ke apne Gmail se khud ko (wahi address) mail
+    user, password = _mail_account()
+    if not user or not password:
+        return False, "gmail set nahi"
+    msg = build_mail(user, subject, f"{intro}\n\nWhatsApp kholne ke liye yeh link tap karein:\n{link}\n\nMessage:\n{text}\n\n- PrathamSmart")
+    esc = _html.escape
+    msg.add_alternative(
+        f"<div style='font-family:Arial,sans-serif;font-size:15px;line-height:1.5'>"
+        f"<p>{esc(intro)}</p>"
+        f"<p><a href='{esc(link)}' style='display:inline-block;background:#25D366;color:#fff;padding:12px 20px;"
+        f"border-radius:8px;text-decoration:none;font-weight:bold'>WhatsApp mein kholo &amp; Send dabao</a></p>"
+        f"<p style='color:#555;white-space:pre-wrap'>{esc(text)}</p>"
+        f"<p style='color:#999;font-size:12px'>PrathamSmart</p></div>", subtype="html")
+    return send_mail_sync(msg)
+
+
+async def ai_compose_whatsapp(transcript, contact_names):
+    """Return {"to_name", "text", "summary_hi"}; kya likhna hai nahi bataya to text ''."""
+    if not llm_api_key():
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            res = await llm_post(client, json_body={
+                "model": "gpt-4o-mini", "temperature": 0.3, "max_tokens": 400,
+                "response_format": {"type": "json_object"},
+                "messages": [
+                    {"role": "system", "content": (
+                        "The user dictated (voice, may have speech-to-text errors) a WhatsApp message to send. "
+                        f"Known contact names: {', '.join(contact_names) or 'none'}. "
+                        "Return JSON {\"to_name\": recipient name as said (Roman letters, match a known contact if it "
+                        "sounds similar), \"text\": the WhatsApp message, short and friendly, written TO the recipient "
+                        "in the same language the user spoke (Hindi in Devanagari or Roman Hinglish as natural), no "
+                        "greeting line needed, \"summary_hi\": one short Hindi Devanagari sentence saying what the "
+                        "message says}. Only say what the user asked to say; do not invent facts. If the user did NOT "
+                        "say what to write, return \"text\": \"\".")},
+                    {"role": "user", "content": transcript},
+                ],
+            })
+            res.raise_for_status()
+            data = json.loads(res.json()["choices"][0]["message"]["content"])
+            return {k: str(data.get(k) or "").strip() for k in ("to_name", "text", "summary_hi")}
+    except Exception:
+        logger.exception("WhatsApp compose AI failed")
+        return None
+
+
+# ---------------------------------------------------------------
+# Telegram (user ka bot) + SMS (user ka Android phone): core/messaging.py
+# ---------------------------------------------------------------
+from core import messaging as _msgmod
+
+_TG_WORDS = ("telegram", "tele gram", "टेलीग्राम", "टेलिग्राम", "टेलीग्रام")
+_SMS_WORDS = (" sms", "sms ", "एसएमएस", "s.m.s", " s m s ", "text message", "टेक्स्ट मैसेज", "एस एम एस")
+
+
+def is_channel_compose(text):
+    """'Atul ko Telegram karo ki ...' -> 'telegram'; 'Atul ko SMS bhejo ki ...' -> 'sms'; warna None."""
+    t = " " + (text or "").lower() + " "
+    if _contains_any(t, ("mom", "एमओएम", "minutes", "notes", "नोट्स", "summary", "सारांश")):
+        return None
+    if not re.search(r"\s(ko|को|کو)\s", t) or not _contains_any(t, _WA_ACTION):
+        return None
+    if _contains_any(t, _TG_WORDS):
+        return "telegram"
+    if _contains_any(t, _SMS_WORDS):
+        return "sms"
+    return None
+
+
+async def send_mom_telegram(txt_path, device_id, required=False):
+    """MoM device ke maalik ke Telegram par. Bot set na ho: required=False to None (chup)."""
+    try:
+        ready = await asyncio.to_thread(_msgmod.telegram_owner_ready, device_id)
+    except Exception:
+        ready = False
+    if not ready:
+        return (False, "telegram set nahi") if required else None
+    subject, short, _full, _html_body = _mom_parts(txt_path)
+    try:
+        return await asyncio.to_thread(_msgmod.channel_send, device_id, "telegram", "me", f"{subject}\n\n{short}")
+    except Exception as err:
+        logger.exception("MoM Telegram failed")
+        return False, f"telegram error: {type(err).__name__}"
+
+
 async def send_mom_whatsapp(txt_path):
-    """CallMeBot: free, lekin sirf apne (registered) WhatsApp number par."""
+    """MoM ka 'WhatsApp par share karein' link khud ke Gmail par (koi bhi chat chun kar bhejo)."""
+    subject, short, _full, _html_body = _mom_parts(txt_path)
+    text = f"*{subject}*\n\n{short}"[:1500]
+    try:
+        return await asyncio.to_thread(_wa_self_mail_sync, f"WhatsApp: {subject}",
+                                       "Meeting ka MoM WhatsApp par bhejne ke liye:", wa_link("", text), text)
+    except Exception as err:
+        logger.exception("MoM WhatsApp link mail failed")
+        return False, f"whatsapp link error: {type(err).__name__}"
+
+
+async def _old_send_mom_whatsapp_callmebot(txt_path):
+    """(Purana, ab use nahi hota) CallMeBot."""
     phone = _pratham_setting("MOM_WHATSAPP_PHONE")
     apikey = _pratham_setting("MOM_WHATSAPP_APIKEY")
     if not phone or not apikey:
@@ -4701,6 +4834,21 @@ class AudioConsumer(AsyncWebsocketConsumer):
         # Mail padhna / reply: "mere naye mail batao", "pehla padho", "reply karo ki ..."
         if not getattr(self, "quiz", None) and not self.meeting and await self._mail_read_flow(transcript):
             return
+        # Telegram / SMS: "bhejun?" ka jawab
+        pm = getattr(self, "pending_msg", None)
+        if pm:
+            self.pending_msg = None
+            if time.monotonic() < pm["until"] and await self._msg_confirm(pm, transcript):
+                return
+        # "Atul ko Telegram karo ki ..." / "Atul ko SMS bhejo ki ..."
+        _ch = None if (getattr(self, "quiz", None) or self.meeting) else is_channel_compose(transcript)
+        if _ch:
+            await self._msg_compose(transcript, _ch)
+            return
+        # "Atul ko WhatsApp karo ki ..." -> wa.me link khud ke mail par
+        if not getattr(self, "quiz", None) and not self.meeting and is_whatsapp_compose(transcript):
+            await self._wa_compose(transcript)
+            return
         # "Atul ko mail likho ki ..."
         if not getattr(self, "quiz", None) and not self.meeting and not is_mom_send(transcript) and (
                 is_mail_compose(transcript) or await ai_is_mail_compose(transcript)):
@@ -4715,6 +4863,8 @@ class AudioConsumer(AsyncWebsocketConsumer):
                 only = "whatsapp"
             elif _contains_any(low, ("mail", "email", "ईमेल", "मेल")) and not _contains_any(low, ("whatsapp", "व्हाट्सएप", "वॉट्सऐप")):
                 only = "email"
+            if _contains_any(low, _TG_WORDS):
+                only = "telegram"
             await self._send_mom(only=only)
             return
 
@@ -5307,6 +5457,129 @@ class AudioConsumer(AsyncWebsocketConsumer):
         self._remember_turn(transcript, speech, display.replace("\n", " "))
         await self._say(speech, display)
 
+    async def _msg_compose(self, transcript, channel):
+        label = "टेलीग्राम" if channel == "telegram" else "एसएमएस"
+        tag = "TELEGRAM" if channel == "telegram" else "SMS"
+        try:
+            targets, err = await asyncio.to_thread(_msgmod.channel_targets, self.device_id, channel)
+        except Exception:
+            logger.exception("%s targets failed", tag)
+            targets, err = {}, "error"
+        if err:
+            if "set nahi" in err:
+                await self._say(f"{label} अभी जुड़ा नहीं है। डिवाइस सेटिंग में {label} सेट कीजिए।",
+                                f"{tag} set nahi\nDevice Settings")
+            else:
+                await self._say(f"{label} से अभी जुड़ नहीं पाया। थोड़ी देर बाद कोशिश कीजिए।", f"{tag} error")
+            return
+        draft = await ai_compose_whatsapp(transcript, sorted({k.title() for k in targets}))
+        if not draft:
+            await self._say("माफ़ कीजिए, मैसेज नहीं बना पाया। दोबारा बोलिए।", f"{tag}: nahi bana")
+            return
+        who = draft["to_name"] or "उन्हें"
+        if not draft["text"]:
+            await self._say(f"{who} को क्या भेजना है? एक बार में पूरा बोलिए, जैसे: {who} को {label} करो कि मैं पाँच बजे आऊँगा।",
+                            f"{tag}: {ascii_for_display(who, 20)}\nKya likhna hai?")
+            return
+        cands = resolve_contacts(draft["to_name"], targets)
+        if not cands:
+            if channel == "telegram":
+                speech = f"{who} टेलीग्राम से नहीं जुड़े हैं। सेटिंग के कॉन्टैक्ट्स में उनका टेलीग्राम लिंक उन्हें भेजिए।"
+                display = f"{ascii_for_display(who, 22)}\nTelegram se nahi jude\nContacts > Telegram link"
+            else:
+                speech = f"{who} का नंबर मेरे पास नहीं है। डिवाइस सेटिंग में कॉन्टैक्ट जोड़ दीजिए।"
+                display = f"Number nahi mila:\n{ascii_for_display(who, 24)}"
+            await self._say(speech, display)
+            return
+        if len(cands) > 1:
+            names = ", ".join(k.title() for k, _v in cands[:3])
+            await self._say(f"{who} नाम के कई लोग हैं: {names}. पूरा नाम बोलिए।",
+                            "Kaun sa?\n" + "\n".join(ascii_for_display(k.title(), 24) for k, _v in cands[:3]))
+            return
+        name, cid = cands[0]
+        self.pending_msg = {"channel": channel, "cid": cid, "name": name.title(), "text": draft["text"],
+                            "label": label, "tag": tag, "until": time.monotonic() + 60}
+        speech = f"{name.title()} को {label} पर भेजूँ? {draft['summary_hi']} हाँ या नहीं?"
+        display = (f"{tag}\nTo: {ascii_for_display(name.title(), 22)}\n{ascii_for_display(draft['text'], 60)}\n"
+                   "Bhejein? Haan / Nahi")
+        self._remember_turn(transcript, speech, display.replace("\n", " "))
+        await self._say(speech, display)
+
+    async def _msg_confirm(self, pm, transcript):
+        """Return True agar jawab is message ke liye tha."""
+        t = " " + (transcript or "").lower().strip(" .!?।") + " "
+        if _contains_any(t, _MAIL_NO):
+            await self._say("ठीक है, नहीं भेजा।", f"{pm['tag']} cancel")
+            return True
+        if not _contains_any(t, _MAIL_YES):
+            return False
+        try:
+            ok, info = await asyncio.to_thread(_msgmod.channel_send, self.device_id, pm["channel"], pm["cid"], pm["text"])
+        except Exception as err:
+            logger.exception("%s send failed", pm["tag"])
+            ok, info = False, type(err).__name__
+        logger.info("%s send: device=%s contact=%s ok=%s %s", pm["tag"], self.device_id, pm["cid"], ok, info)
+        if ok:
+            await self._say(f"{pm['name']} को {pm['label']} भेज दिया।", f"{pm['tag']} SENT\n{ascii_for_display(pm['name'], 24)}")
+        else:
+            await self._say(f"{pm['label']} नहीं भेज पाया।", f"{pm['tag']} fail\n{info}"[:80])
+        return True
+
+    async def _wa_compose(self, transcript):
+        try:
+            rows = await asyncio.to_thread(device_contacts_sync, self.device_id)
+        except Exception:
+            logger.exception("WhatsApp: contacts read failed")
+            rows = []
+        phones = {}
+        for c in rows:
+            if c.get("phone"):
+                for key in [c["name"]] + (c.get("aliases") or "").split(","):
+                    key = re.sub(r"\s+", " ", key).strip().lower()
+                    if key:
+                        phones[key] = c["phone"]
+        draft = await ai_compose_whatsapp(transcript, sorted({c["name"] for c in rows if c.get("phone")}))
+        if not draft:
+            await self._say("माफ़ कीजिए, मैसेज नहीं बना पाया। दोबारा बोलिए।", "WhatsApp: nahi bana")
+            return
+        who = draft["to_name"] or "उन्हें"
+        if not draft["text"]:
+            await self._say(f"{who} को क्या मैसेज भेजना है? एक बार में पूरा बोलिए, जैसे: {who} को व्हाट्सएप करो कि मैं पाँच बजे आऊँगा।",
+                            f"WhatsApp: {ascii_for_display(who, 20)}\nKya likhna hai? Poora boliye")
+            return
+        cands = resolve_contacts(draft["to_name"], phones)
+        if not cands:
+            logger.info("WhatsApp: contact nahi mila: %r", draft["to_name"])
+            await self._say(f"{who} का व्हाट्सएप नंबर मेरे पास नहीं है। डिवाइस सेटिंग में कॉन्टैक्ट जोड़ दीजिए।",
+                            f"Number nahi mila:\n{ascii_for_display(who, 24)}\nContacts mein jodiye")
+            return
+        if len(cands) > 1:
+            names = ", ".join(k.title() for k, _v in cands[:3])
+            await self._say(f"{who} नाम के कई लोग हैं: {names}. पूरा नाम बोलिए।",
+                            "Kaun sa?\n" + "\n".join(ascii_for_display(k.title(), 24) for k, _v in cands[:3]))
+            return
+        name, phone = cands[0]
+        link = wa_link(phone, draft["text"])
+        try:
+            ok, info = await asyncio.to_thread(_wa_self_mail_sync, f"WhatsApp: {name.title()} ko bhejein",
+                                               f"{name.title()} ({phone}) ke liye WhatsApp message taiyaar hai.",
+                                               link, draft["text"])
+        except Exception as err:
+            logger.exception("WhatsApp link mail failed")
+            ok, info = False, type(err).__name__
+        logger.info("WhatsApp link: device=%s to=%s ok=%s %s", self.device_id, phone, ok, info)
+        if ok:
+            speech = f"{name.title()} के लिए व्हाट्सएप मैसेज तैयार है। लिंक आपके मेल पर भेज दिया, खोलकर सेंड दबाइए।"
+            display = f"WHATSAPP\nTo: {ascii_for_display(name.title(), 22)}\nLink mail par bheja\nKholo > Send"
+        elif "set nahi" in str(info):
+            speech = "लिंक भेजने के लिए डिवाइस सेटिंग में अपना जीमेल जोड़िए।"
+            display = "WhatsApp link\nGmail jodiye\n(Device Settings)"
+        else:
+            speech = "व्हाट्सएप लिंक नहीं भेज पाया। थोड़ी देर बाद कोशिश कीजिए।"
+            display = f"WhatsApp link fail\n{info}"[:80]
+        self._remember_turn(transcript, speech, display.replace("\n", " "))
+        await self._say(speech, display)
+
     async def _mail_compose(self, transcript):
         contacts = await mail_contacts_async()
         draft = await ai_compose_mail(transcript, list(contacts.keys()))
@@ -5434,12 +5707,16 @@ class AudioConsumer(AsyncWebsocketConsumer):
         results = []
         if only in (None, "email"):
             results.append(("email",) + await send_mom_email(txt_path))
-        if only in (None, "whatsapp"):
+        if only == "whatsapp":
             results.append(("whatsapp",) + await send_mom_whatsapp(txt_path))
+        if only in (None, "telegram"):
+            _r = await send_mom_telegram(txt_path, self.device_id, required=(only == "telegram"))
+            if _r is not None:
+                results.append(("telegram",) + _r)
         sent = [name for name, ok, _ in results if ok]
         logger.info("MoM send: device=%s file=%s results=%s", self.device_id, txt_path, results)
         if sent:
-            names = " और ".join("ईमेल" if n == "email" else "व्हाट्सएप" for n in sent)
+            names = " और ".join({"email": "ईमेल", "whatsapp": "व्हाट्सएप लिंक (आपके मेल पर)", "telegram": "टेलीग्राम"}.get(n, n) for n in sent)
             await self._say(f"मीटिंग का MoM {names} पर भेज दिया।",
                             "MoM SENT\n" + ", ".join(n.upper() for n in sent))
         elif not quiet_if_unset or any("set nahi" not in d for _, _, d in results):

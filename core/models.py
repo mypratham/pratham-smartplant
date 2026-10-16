@@ -210,6 +210,11 @@ class DeviceSettings(models.Model):
     whatsapp_phone = models.CharField(max_length=20, blank=True, default="")
     whatsapp_apikey_enc = models.TextField(blank=True, default="")
     pratham_user_token_enc = models.TextField(blank=True, default="")
+    telegram_bot_token_enc = models.TextField(blank=True, default="")
+    telegram_bot_username = models.CharField(max_length=64, blank=True, default="")
+    telegram_owner_chat_id = models.CharField(max_length=32, blank=True, default="")
+    sms_user = models.CharField(max_length=100, blank=True, default="")
+    sms_password_enc = models.TextField(blank=True, default="")
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
@@ -223,6 +228,7 @@ class DeviceContact(models.Model):
     aliases = models.CharField(max_length=200, blank=True, default="")   # "अतुल, atul ji" (awaaz ke liye)
     email = models.CharField(max_length=254, blank=True, default="")
     phone = models.CharField(max_length=20, blank=True, default="")      # +919876543210
+    telegram_chat_id = models.CharField(max_length=32, blank=True, default="")   # bot par Start dabane ke baad
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

@@ -3435,6 +3435,7 @@ def _check_ai_key(provider, key, model):
 
 def _device_settings_payload(device, cfg):
     from core.secretbox import unseal, mask
+    from core.messaging import tg_link
     out = {
         "status": "ok", "plant_id": device.plant_id,
         "assistant_name": cfg.assistant_name, "ai_provider": cfg.ai_provider, "ai_model": cfg.ai_model,
@@ -3445,6 +3446,12 @@ def _device_settings_payload(device, cfg):
         "pratham_user_token": mask(unseal(cfg.pratham_user_token_enc)),
         "ai_models": DEVICE_AI_MODELS,
         "updated_at": cfg.updated_at.isoformat() if cfg.updated_at else None,
+        "telegram_bot": cfg.telegram_bot_username,
+        "telegram_bot_token": mask(unseal(cfg.telegram_bot_token_enc)),
+        "telegram_me_linked": bool(cfg.telegram_owner_chat_id),
+        "telegram_me_link": tg_link(cfg.telegram_bot_username, device.pk, "me"),
+        "sms_user": cfg.sms_user,
+        "sms_password": mask(unseal(cfg.sms_password_enc)),
     }
     if hasattr(device, "language"):
         out["language"] = device.language
@@ -3551,8 +3558,6 @@ def device_settings_api(request, plant_id):
             cfg.whatsapp_phone, cfg.whatsapp_apikey_enc = "", ""
         elif not _re.fullmatch(r"\+?\d{10,15}", phone or ""):
             errors["whatsapp_phone"] = "Number desh code ke saath, jaise +919876543210"
-        elif not _re.fullmatch(r"[A-Za-z0-9]{4,40}", apikey or ""):
-            errors["whatsapp_apikey"] = "CallMeBot apikey daalein"
         else:
             cfg.whatsapp_phone, cfg.whatsapp_apikey_enc = phone, seal(apikey)
 
@@ -3561,6 +3566,40 @@ def device_settings_api(request, plant_id):
         cfg.pratham_user_token_enc = ""
     elif s("pratham_user_token"):
         cfg.pratham_user_token_enc = seal(s("pratham_user_token"))
+
+    # Telegram (user ka apna bot, @BotFather se)
+    _tg_reset = False
+    if "telegram" in clear:
+        cfg.telegram_bot_token_enc, cfg.telegram_bot_username, cfg.telegram_owner_chat_id = "", "", ""
+        _tg_reset = True
+    elif s("telegram_bot_token"):
+        from core.messaging import tg_check_token
+        uname, err = tg_check_token(s("telegram_bot_token"))
+        if err:
+            errors["telegram_bot_token"] = err
+        else:
+            if uname != cfg.telegram_bot_username:      # naya bot: purane jode hue chat hatao
+                cfg.telegram_owner_chat_id = ""
+                _tg_reset = True
+            cfg.telegram_bot_token_enc, cfg.telegram_bot_username = seal(s("telegram_bot_token")), uname
+
+    # SMS (user ka Android phone, "SMS Gateway for Android" app, Cloud server)
+    if "sms" in clear:
+        cfg.sms_user, cfg.sms_password_enc = "", ""
+    elif ("sms_user" in data and s("sms_user") != cfg.sms_user) or s("sms_password"):
+        from core.messaging import sms_check
+        su = s("sms_user") if "sms_user" in data else cfg.sms_user
+        sp = s("sms_password") or unseal(cfg.sms_password_enc)
+        if not su and not sp:
+            cfg.sms_user, cfg.sms_password_enc = "", ""
+        elif not su or not sp:
+            errors["sms_password"] = "App ka username aur password dono daalein"
+        else:
+            err = sms_check(su, sp)
+            if err:
+                errors["sms_password"] = err
+            else:
+                cfg.sms_user, cfg.sms_password_enc = su[:100], seal(sp)
 
     # Bhasha (fix_lang laga ho to)
     lang = s("language").lower() if "language" in data else ""
@@ -3572,6 +3611,9 @@ def device_settings_api(request, plant_id):
     if errors:
         return Response({"status": "error", "errors": errors}, status=400)
     cfg.save()
+    if _tg_reset:
+        from core.models import DeviceContact as _DC
+        _DC.objects.filter(device=device).update(telegram_chat_id="")
     if lang and hasattr(device, "language") and device.language != lang:
         device.language = lang
         device.save(update_fields=["language"])
@@ -3705,7 +3747,8 @@ def _clean_contact(data):
 
 
 def _contact_json(c):
-    return {"id": c.id, "name": c.name, "aliases": c.aliases, "email": c.email, "phone": c.phone}
+    return {"id": c.id, "name": c.name, "aliases": c.aliases, "email": c.email, "phone": c.phone,
+            "telegram": bool(getattr(c, "telegram_chat_id", ""))}
 
 
 @api_view(["GET", "POST"])
@@ -3728,7 +3771,16 @@ def device_contacts_api(request, plant_id):
             return Response({"status": "error", "errors": errors}, status=400)
         c = DeviceContact.objects.create(device=device, **data)
         return Response({"status": "ok", "contact": _contact_json(c)}, status=201)
-    return Response({"status": "ok", "contacts": [_contact_json(c) for c in qs.order_by("name")]})
+    from core.models import DeviceSettings
+    from core.messaging import tg_link
+    cfg = DeviceSettings.objects.filter(device=device).first()
+    bot = cfg.telegram_bot_username if cfg else ""
+    items = []
+    for c in qs.order_by("name"):
+        j = _contact_json(c)
+        j["telegram_link"] = tg_link(bot, device.pk, c.id)
+        items.append(j)
+    return Response({"status": "ok", "telegram_bot": bot, "contacts": items})
 
 
 @api_view(["PUT", "DELETE"])
@@ -3818,3 +3870,23 @@ def device_contacts_import_api(request, plant_id):
         added += 1
     return Response({"status": "ok", "added": added, "updated": updated, "skipped": skipped,
                      "total": len(existing)})
+
+
+@api_view(["POST"])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def device_telegram_sync_api(request, plant_id):
+    # Bot par jinhone Start dabaya unke chat jodo
+    from rest_framework.response import Response
+    from core.models import DeviceSettings
+    from core.messaging import tg_sync
+    device, err = _contact_device(request, plant_id)
+    if err:
+        return err
+    linked, error = tg_sync(device)
+    if error:
+        return Response({"status": "error", "error": error}, status=400)
+    cfg = DeviceSettings.objects.filter(device=device).first()
+    return Response({"status": "ok", "linked": linked,
+                     "me_linked": bool(cfg and cfg.telegram_owner_chat_id),
+                     "contacts_linked": device.contacts.exclude(telegram_chat_id="").count()})

@@ -84,12 +84,32 @@
     </section>
 
     <section class="card">
-      <h2>WhatsApp (CallMeBot)</h2>
-      <label for="whatsapp_phone">Number</label><input id="whatsapp_phone" placeholder="+919876543210">
+      <h2>WhatsApp</h2>
+      <label for="whatsapp_phone">Aapka WhatsApp number</label><input id="whatsapp_phone" placeholder="+919876543210">
       <div class="err" data-err="whatsapp_phone"></div>
-      <label for="whatsapp_apikey">CallMeBot apikey</label><input id="whatsapp_apikey" type="password" autocomplete="new-password">
-      <div class="err" data-err="whatsapp_apikey"></div>
-      <button class="link hidden" data-clear="whatsapp">WhatsApp hatao</button>
+      <div class="hint">Koi token nahi chahiye. "Atul ko WhatsApp karo ki ..." bolne par message ka link aapke Gmail par aata hai; tap karke Send dabaiye. Contact ka number neeche Contacts mein daalein.</div>
+    </section>
+
+    <section class="card">
+      <h2>Telegram</h2>
+      <label for="telegram_bot_token">Apne bot ka token (@BotFather se)</label><input id="telegram_bot_token" type="password" autocomplete="new-password">
+      <div class="hint"><a href="https://prathamsmart.in/guides/telegram-bot.html" target="_blank" rel="noopener">Bot kaise banayein?</a></div>
+      <div class="err" data-err="telegram_bot_token"></div>
+      <div id="tgBox" class="hidden" style="margin-top:10px">
+        <div class="hint" id="tgBot"></div>
+        <div id="tgMe" style="margin-top:6px"></div>
+        <div class="row" style="margin-top:8px"><button id="tgSync" type="button">Jude hue check karo</button><span id="tgMsg" class="hint"></span></div>
+      </div>
+      <button class="link hidden" data-clear="telegram">Telegram hatao</button>
+    </section>
+
+    <section class="card">
+      <h2>SMS (aapke Android phone se)</h2>
+      <label for="sms_user">SMS Gateway app ka username</label><input id="sms_user" autocomplete="off">
+      <label for="sms_password">Password</label><input id="sms_password" type="password" autocomplete="new-password">
+      <div class="hint"><a href="https://prathamsmart.in/guides/sms-android.html" target="_blank" rel="noopener">App kaise lagayein?</a></div>
+      <div class="err" data-err="sms_password"></div>
+      <button class="link hidden" data-clear="sms">SMS hatao</button>
     </section>
 
     <section class="card">
@@ -126,9 +146,9 @@
 </main>
 <script>
 (function () {
-  var SECRETS = ["ai_api_key", "gmail_app_password", "whatsapp_apikey", "pratham_user_token"];
-  var PLAIN = ["assistant_name", "language", "ai_provider", "ai_model", "gmail_address", "mail_sender_name", "whatsapp_phone"];
-  var CLEAR_KEY = { ai: "ai_api_key", gmail: "gmail_app_password", whatsapp: "whatsapp_apikey", pratham: "pratham_user_token" };
+  var SECRETS = ["ai_api_key", "gmail_app_password", "pratham_user_token", "telegram_bot_token", "sms_password"];
+  var PLAIN = ["assistant_name", "language", "ai_provider", "ai_model", "gmail_address", "mail_sender_name", "whatsapp_phone", "sms_user"];
+  var CLEAR_KEY = { ai: "ai_api_key", gmail: "gmail_app_password", pratham: "pratham_user_token", telegram: "telegram_bot_token", sms: "sms_password" };
   var $ = function (id) { return document.getElementById(id); };
   var token = null, cfg = null;
   try { token = sessionStorage.getItem("ps_token"); } catch (e) {}
@@ -174,7 +194,27 @@
     document.querySelectorAll("[data-clear]").forEach(function (b) {
       b.classList.toggle("hidden", !d[CLEAR_KEY[b.dataset.clear]]);
     });
+    renderTelegram(d);
   }
+
+  function renderTelegram(d) {
+    $("tgBox").classList.toggle("hidden", !d.telegram_bot);
+    if (!d.telegram_bot) return;
+    $("tgBot").textContent = "Bot: @" + d.telegram_bot;
+    var me = $("tgMe"); me.innerHTML = "";
+    if (d.telegram_me_linked) { me.textContent = "Aapka Telegram juda hai (MoM yahan aayega)."; return; }
+    var a = document.createElement("a"); a.href = d.telegram_me_link; a.target = "_blank"; a.rel = "noopener";
+    a.textContent = "Apna Telegram jodne ke liye yahan tap karke Start dabaiye";
+    me.appendChild(a);
+  }
+  $("tgSync").onclick = function () {
+    $("tgMsg").textContent = "Check ho raha hai...";
+    api("/api/devices/" + encodeURIComponent($("dev").value) + "/telegram/sync/", { method: "POST" }).then(function (r) {
+      if (!r.ok) { $("tgMsg").textContent = r.d.error || "Nahi hua"; return; }
+      $("tgMsg").textContent = "Naye jude: " + r.d.linked + ", contacts jude: " + r.d.contacts_linked;
+      loadSettings();
+    });
+  };
 
   function loadSettings() {
     clearErrs(); setMsg("", true);
@@ -202,8 +242,17 @@
       var who = document.createElement("div"); who.className = "who";
       var nm = document.createElement("div"); nm.textContent = c.name + (c.aliases ? "  (" + c.aliases + ")" : "");
       var sub = document.createElement("div"); sub.className = "sub";
-      sub.textContent = [c.email, c.phone].filter(Boolean).join("  ·  ");
+      sub.textContent = [c.email, c.phone, c.telegram ? "Telegram juda" : ""].filter(Boolean).join("  ·  ");
       who.appendChild(nm); who.appendChild(sub);
+      if (c.telegram_link && !c.telegram) {
+        var tl = document.createElement("button"); tl.className = "link"; tl.style.color = "var(--accent)";
+        tl.textContent = "Telegram link copy (" + c.name.split(" ")[0] + " ko bhejein)";
+        tl.onclick = function () {
+          try { navigator.clipboard.writeText(c.telegram_link); tl.textContent = "Copied: ab yeh link " + c.name + " ko bhejein"; }
+          catch (e) { prompt("Yeh link copy karke bhejein", c.telegram_link); }
+        };
+        who.appendChild(tl);
+      }
       var del = document.createElement("button"); del.className = "link"; del.textContent = "Hatao";
       del.onclick = function () {
         if (!confirm(c.name + " ko hatana hai?")) return;
