@@ -471,8 +471,133 @@ def _decouple_value(name):
         return ""
 
 
+# ---------------------------------------------------------------
+# Har device ki apni settings (DeviceSettings, frontend se). Na ho to server .env.
+# Har process mein 30 sec ka cache; WS task ke andar CURRENT_DEVICE se pata chalta hai kaun sa device.
+# ---------------------------------------------------------------
+_DEV_CFG = {}          # device_id -> (monotonic time, dict)
+_DEV_CFG_TTL = 30
+_DEV_SETTING_MAP = {
+    "MAIL_USER": "gmail_address", "MOM_SMTP_USER": "gmail_address",
+    "MAIL_PASSWORD": "gmail_app_password", "MOM_SMTP_PASSWORD": "gmail_app_password",
+    "MAIL_SENDER_NAME": "mail_sender_name",
+    "MOM_WHATSAPP_PHONE": "whatsapp_phone", "MOM_WHATSAPP_APIKEY": "whatsapp_apikey",
+    "PRATHAM_USER_TOKEN": "pratham_user_token",
+    "MOM_EMAIL_TO": "gmail_address",        # apna Gmail = MoM bhi apne paas
+}
+# Yeh server account hain: SHARE_SERVER_ACCOUNTS=0 ho to bina apni setting wale device ko nahi milte
+_DEV_PRIVATE = {"MAIL_USER", "MOM_SMTP_USER", "MAIL_PASSWORD", "MOM_SMTP_PASSWORD", "MOM_EMAIL_TO",
+                "MOM_WHATSAPP_PHONE", "MOM_WHATSAPP_APIKEY"}
+# Server ki key par user sirf yeh (sasta) model chun sakta hai; apni key ho to koi bhi list wala
+_SERVER_KEY_MODELS_DEFAULT = "gpt-4o-mini,llama-3.3-70b-versatile,llama-3.1-8b-instant,openai/gpt-oss-20b"
+
+
+def _dev_cfg(device_id=None):
+    cv = globals().get("CURRENT_DEVICE")
+    did = device_id or (cv.get() if cv is not None else None)
+    c = _DEV_CFG.get(did) if did else None
+    return c[1] if c else {}
+
+
+def _load_dev_cfg_sync(device_id):
+    from django.db import close_old_connections
+    from core.models import DeviceSettings
+    from core.secretbox import unseal
+    close_old_connections()
+    c = DeviceSettings.objects.filter(device__plant_id=device_id).first()
+    if c is None:
+        return {}
+    out = {"assistant_name": c.assistant_name.strip(), "ai_provider": c.ai_provider.strip().lower(),
+           "ai_model": c.ai_model.strip(), "ai_api_key": unseal(c.ai_api_key_enc),
+           "mail_sender_name": c.mail_sender_name.strip(), "pratham_user_token": unseal(c.pratham_user_token_enc)}
+    addr, pw = c.gmail_address.strip(), unseal(c.gmail_app_password_enc)
+    if addr and pw:                       # aadha (sirf address) kabhi nahi: server ka password na mile
+        out.update(gmail_address=addr, gmail_app_password=pw)
+    phone, apikey = c.whatsapp_phone.strip(), unseal(c.whatsapp_apikey_enc)
+    if phone and apikey:
+        out.update(whatsapp_phone=phone, whatsapp_apikey=apikey)
+    return {k: v for k, v in out.items() if v}
+
+
+async def refresh_dev_cfg(device_id, force=False):
+    now = time.monotonic()
+    c = _DEV_CFG.get(device_id)
+    if c and not force and now - c[0] < _DEV_CFG_TTL:
+        return c[1]
+    try:
+        v = await asyncio.to_thread(_load_dev_cfg_sync, device_id)
+    except Exception as err:
+        logger.warning("Device settings read failed: device=%s %s", device_id, type(err).__name__)
+        v = c[1] if c else {}
+    if not c or set(v) != set(c[1]):
+        logger.info("Device settings: device=%s own=%s", device_id, sorted(v))   # sirf naam, value nahi
+    _DEV_CFG[device_id] = (now, v)
+    return v
+
+
+def _server_key_models():
+    raw = _pratham_setting("AI_SERVER_KEY_MODELS") or _SERVER_KEY_MODELS_DEFAULT
+    return {m.strip() for m in raw.split(",") if m.strip()}
+
+
+def _dev_override(name):
+    # "" = server .env dekho;  None = server wala bhi mat do
+    cv = globals().get("CURRENT_DEVICE")
+    did = cv.get() if cv is not None else None
+    dc = _dev_cfg()
+    if did and name in _DEV_PRIVATE and not dc.get(_DEV_SETTING_MAP[name]):
+        if (_pratham_setting("SHARE_SERVER_ACCOUNTS") or "1") == "0":
+            return None
+    if not dc:
+        return ""
+    if name == "AI_PROVIDER":
+        return dc.get("ai_provider", "")
+    if name in ("OPENAI_MODEL", "GROQ_MODEL"):
+        want = "openai" if name == "OPENAI_MODEL" else "groq"
+        m = dc.get("ai_model", "")
+        if m and dc.get("ai_provider") == want and (dc.get("ai_api_key") or m in _server_key_models()):
+            return m
+        return ""
+    f = _DEV_SETTING_MAP.get(name)
+    return dc.get(f, "") if f else ""
+
+
+def _device_llm_chain():
+    # Device ki apni AI key: sirf wahi (server ki key par kharcha nahi). None = server wala chain.
+    dc = _dev_cfg()
+    p, key, model = dc.get("ai_provider"), dc.get("ai_api_key"), dc.get("ai_model")
+    if not (p and key):
+        return None
+    if p == "groq":
+        models = [model] if model else []
+        for m in (_GROQ_MODELS or ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]):
+            if m not in models:
+                models.append(m)
+        return [("groq", GROQ_CHAT_URL, key, m) for m in models[:3]]
+    return [("openai", OPENAI_CHAT_URL, key, model or "gpt-4o-mini")]
+
+
+def _save_dev_name_sync(device_id, name):
+    from django.db import close_old_connections
+    from core.models import Device, DeviceSettings
+    try:
+        close_old_connections()
+        dev = Device.objects.filter(plant_id=device_id).first()
+        if dev is not None:
+            DeviceSettings.objects.update_or_create(device=dev, defaults={"assistant_name": name})
+    except Exception:
+        logger.exception("Assistant name DB save failed: device=%s", device_id)
+    finally:
+        close_old_connections()
+
+
 def _pratham_setting(name, default=""):
     """settings.py ya .env se value; '<placeholder>' wali value ignore."""
+    own = _dev_override(name)
+    if own is None:
+        return ""
+    if own:
+        return own
     sources = (
         ("settings.py", getattr(settings, name, "")),
         ("environment", os.getenv(name, "")),
@@ -1041,6 +1166,9 @@ async def _ensure_groq_models(client):
 
 
 def _llm_providers():
+    own = _device_llm_chain()
+    if own is not None:
+        return own
     provider = (_pratham_setting("AI_PROVIDER") or "openai").lower()
     groq_key = _groq_key()
     openai_key = _openai_key()
@@ -1229,6 +1357,113 @@ def _pcm_float_to_wav_bytes(pcm_np, sample_rate=16000):
         wav_file.setframerate(sample_rate)
         wav_file.writeframes(pcm16)
     return buf.getvalue()
+
+
+# ---------------------------------------------------------------
+# Device ki bhasha: dashboard (Device.language) ya awaaz ("Gujarati mein baat karo")
+# ---------------------------------------------------------------
+SUPPORTED_LANGS = {"hi": "Hindi", "en": "English", "gu": "Gujarati", "te": "Telugu", "ta": "Tamil",
+                   "mr": "Marathi", "bn": "Bengali", "kn": "Kannada", "ml": "Malayalam", "ur": "Urdu",
+                   "pa": "Punjabi", "ne": "Nepali", "sa": "Sanskrit"}
+_LANG_NAMES = {
+    "hi": ("hindi", "हिंदी", "हिन्दी"), "en": ("english", "angrezi", "इंग्लिश", "अंग्रेजी", "अंग्रेज़ी"),
+    "gu": ("gujarati", "गुजराती", "ગુજરાતી"), "te": ("telugu", "तेलुगु", "తెలుగు"),
+    "ta": ("tamil", "तमिल", "தமிழ்"), "mr": ("marathi", "मराठी"),
+    "bn": ("bengali", "bangla", "बंगाली", "বাংলা"), "kn": ("kannada", "कन्नड़", "कन्नड", "ಕನ್ನಡ"),
+    "ml": ("malayalam", "मलयालम", "മലയാളം"), "ur": ("urdu", "उर्दू", "اردو"),
+    "pa": ("punjabi", "पंजाबी", "ਪੰਜਾਬੀ"), "ne": ("nepali", "नेपाली"),
+    "sa": ("sanskrit", "sanskrut", "sanskrit", "संस्कृत", "संस्कृतम्"),
+}
+_LANG_TRIGGERS = ("mein baat", "me baat", "main baat", "में बात", "mein bolo", "me bolo", "में बोलो",
+                  "mein jawab", "में जवाब", "language", "bhasha", "भाषा", "speak in", "talk in",
+                  "mein boliye", "में बोलिए", "mein karo", "में करो")
+LANG_CONFIRM = {
+    "hi": "ठीक है, अब मैं हिंदी में बात करूँगा।",
+    "en": "Okay, I will speak in English now.",
+    "gu": "ઠીક છે, હવે હું ગુજરાતીમાં વાત કરીશ.",
+    "te": "సరే, ఇప్పుడు నేను తెలుగులో మాట్లాడతాను.",
+    "ta": "சரி, இனி நான் தமிழில் பேசுவேன்.",
+    "mr": "ठीक आहे, आता मी मराठीत बोलेन.",
+    "bn": "ঠিক আছে, এখন আমি বাংলায় কথা বলব।",
+    "kn": "ಸರಿ, ಈಗ ನಾನು ಕನ್ನಡದಲ್ಲಿ ಮಾತನಾಡುತ್ತೇನೆ.",
+    "ml": "ശരി, ഇനി ഞാൻ മലയാളത്തിൽ സംസാരിക്കും.",
+    "ur": "ٹھیک ہے، اب میں اردو میں بات کروں گا۔",
+    "pa": "ਠੀਕ ਹੈ, ਹੁਣ ਮੈਂ ਪੰਜਾਬੀ ਵਿੱਚ ਗੱਲ ਕਰਾਂਗਾ।",
+    "ne": "ठिक छ, अब म नेपालीमा कुरा गर्छु।",
+    "sa": "अस्तु, इदानीम् अहं संस्कृतेन वदिष्यामि।",
+}
+_LANG_CACHE = {}   # device_id -> (time, lang); dashboard ka badlaav 30 sec mein lagta hai
+
+
+def default_lang():
+    v = (_pratham_setting("DEFAULT_LANGUAGE") or "hi").strip().lower()
+    return v if v in SUPPORTED_LANGS else "hi"
+
+
+def _device_lang_sync(device_id):
+    from core.models import Device
+    return Device.objects.filter(plant_id=device_id).values_list("language", flat=True).first()
+
+
+def set_device_lang_sync(device_id, lang):
+    from core.models import Device
+    return Device.objects.filter(plant_id=device_id).update(language=lang)
+
+
+async def device_lang(device_id):
+    now = time.monotonic()
+    c = _LANG_CACHE.get(device_id)
+    if c and now - c[0] < 30:
+        return c[1]
+    try:
+        v = await asyncio.to_thread(_device_lang_sync, device_id)
+    except Exception:
+        logger.debug("Device language read failed", exc_info=True)
+        v = None
+    lang = v if v in SUPPORTED_LANGS else default_lang()
+    _LANG_CACHE[device_id] = (now, lang)
+    return lang
+
+
+def parse_language_command(text):
+    import unicodedata
+    t = " " + unicodedata.normalize("NFC", (text or "").lower()) + " "
+    if len(t.split()) > 8 or not any(w in t for w in _LANG_TRIGGERS):
+        return None
+    for code, names in _LANG_NAMES.items():
+        if any(n in t for n in names):
+            return code
+    return None
+
+
+def _stt_lang(lang):
+    # Hindi: pehle jaisa (WHISPER_LANGUAGE setting); baaki: wahi code Whisper ko
+    return None if lang in ("hi", "sa") else lang
+
+
+def _tts_args(lang, text):
+    # Pehle se likhe Hindi jawab (Devanagari) Hindi awaaz mein hi bolein
+    deva = sum(1 for ch in (text or "") if "ऀ" <= ch <= "ॿ")
+    letters = sum(1 for ch in (text or "") if ch.isalpha()) or 1
+    if lang == "sa":
+        lang = "hi"
+    if lang not in ("hi", "mr", "ne") and deva / letters > 0.5:
+        lang = "hi"
+    if lang == "en":
+        return {"lang": "en", "tld": "co.in"}
+    return {"lang": lang if lang in SUPPORTED_LANGS else "hi"}
+
+
+def _lang_prompt(lang):
+    if lang == "hi":
+        return []
+    name = SUPPORTED_LANGS.get(lang, "Hindi")
+    script = "plain English" if lang == "en" else f"{name} in its own script"
+    return [{"role": "system", "content": (
+        f"LANGUAGE: The user has chosen {name}. Write \"speech\" ONLY in {script}, simple spoken "
+        "style, at most 2 short sentences. This overrides the earlier instruction to use Hindi "
+        "Devanagari. \"display\" must stay in English letters only (A-Z, 0-9 and . , ? !), "
+        "max 90 characters (transliterate or translate).")}]
 
 
 # Aakhri cloud STT ka confidence (isi task mein padha jaata hai)
@@ -2329,11 +2564,18 @@ def get_assistant_name(device_id):
                 _ASSISTANT_NAMES_CACHE = json.load(fh)
         except Exception:
             _ASSISTANT_NAMES_CACHE = {}
+    own = _dev_cfg(device_id).get("assistant_name")
+    if own:
+        return own
     return _ASSISTANT_NAMES_CACHE.get(device_id) or _pratham_setting("ASSISTANT_NAME") or "Pratham"
 
 
 def set_assistant_name(device_id, name):
     global _ASSISTANT_NAMES_CACHE
+    c = _DEV_CFG.get(device_id)
+    if c:
+        c[1]["assistant_name"] = name
+    threading.Thread(target=_save_dev_name_sync, args=(device_id, name), daemon=True).start()
     get_assistant_name(device_id)
     _ASSISTANT_NAMES_CACHE[device_id] = name
     try:
@@ -3622,6 +3864,7 @@ class AudioConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.device_id = self.scope["url_route"]["kwargs"]["device_id"]
         CURRENT_DEVICE.set(self.device_id)
+        await refresh_dev_cfg(self.device_id, force=True)
 
         # Firmware ka speaker buffer (ms) -> kitna audio aage bhej sakte hain
         from urllib.parse import parse_qs
@@ -3648,6 +3891,7 @@ class AudioConsumer(AsyncWebsocketConsumer):
         self.vad_silence_frames = 0
 
         # Utterance state machine
+        self.lang = default_lang()
         self.in_speech = False
         self._speech_evt = asyncio.Event()
         self.voice_run_frames = 0
@@ -4269,13 +4513,17 @@ class AudioConsumer(AsyncWebsocketConsumer):
                 gain,
             )
 
+            await refresh_dev_cfg(self.device_id)
+            self.lang = await device_lang(self.device_id)
             stt_started = time.monotonic()
             self._last_pcm_np = pcm_np   # quiz mein jawab samajh na aaye to dobara (Hindi) sun sakein
             stt_prompt = self._stt_prompt()
             transcript = None
             used_engine = "local"
             if stt_engine in ("openai", "groq"):
-                transcript = await openai_transcribe(pcm_np, stt_prompt, stt_engine)
+                transcript = await openai_transcribe(
+                    pcm_np, stt_prompt if self.lang in ("hi", "en", "ur") else None, stt_engine,
+                    language=_stt_lang(self.lang))
                 used_engine = stt_engine
             if transcript is None and FAST_WHISPER_MODEL is not None:
                 local_prompt = stt_prompt if (getattr(self, "quiz", None) or getattr(self, "quiz_pick", None)) else None
@@ -4409,6 +4657,18 @@ class AudioConsumer(AsyncWebsocketConsumer):
         if getattr(self, "pending_mail", None) and time.monotonic() < self.pending_mail["until"]:
             if await self._mail_confirm(transcript):
                 return
+        # "Gujarati mein baat karo" -> device ki bhasha badlo
+        new_lang = parse_language_command(transcript)
+        if new_lang and not getattr(self, "quiz", None) and not self.meeting:
+            try:
+                await asyncio.to_thread(set_device_lang_sync, self.device_id, new_lang)
+            except Exception:
+                logger.exception("Language save failed: device=%s", self.device_id)
+            _LANG_CACHE[self.device_id] = (time.monotonic(), new_lang)
+            self.lang = new_lang
+            logger.info("Language set: device=%s lang=%s", self.device_id, new_lang)
+            await self._say(LANG_CONFIRM[new_lang], f"Language: {SUPPORTED_LANGS[new_lang]}")
+            return
         # Mail padhna / reply: "mere naye mail batao", "pehla padho", "reply karo ki ..."
         if not getattr(self, "quiz", None) and not self.meeting and await self._mail_read_flow(transcript):
             return
@@ -4627,6 +4887,7 @@ class AudioConsumer(AsyncWebsocketConsumer):
                                     "Naam poochha jaye to yahi naam batayein; apne aap ko ChatGPT, "
                                     "OpenAI, Llama ya kisi company ka model na batayein."
                                 )}]
+                                + _lang_prompt(getattr(self, "lang", "hi"))
                                 + list(CHAT_HISTORY.get(self.device_id, []))
                                 # Jobs / quiz / learning ka live data (agar maanga ho)
                                 + pratham_context
@@ -5693,7 +5954,7 @@ class AudioConsumer(AsyncWebsocketConsumer):
 
         try:
             def make_tts_pcm(text):
-                tts = gTTS(text=text, lang="hi")
+                tts = gTTS(text=text, **_tts_args(getattr(self, "lang", "hi"), text))
 
                 mp3_buffer = io.BytesIO()
                 tts.write_to_fp(mp3_buffer)

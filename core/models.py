@@ -83,6 +83,9 @@ class Device(models.Model):
     is_quiz_active = models.BooleanField(default=False)
     quiz_topic = models.CharField(max_length=255, blank=True, null=True)
 
+    # Device ki bhasha (STT + AI + TTS): hi en gu te ta mr bn kn ml ur pa ne
+    language = models.CharField(max_length=8, default="hi")
+
     def __str__(self):
         admin_str = f" [{self.owner_admin.username}]" if self.owner_admin else ""
         user_str = f" -> User: {self.assigned_user.username}" if self.assigned_user else ""
@@ -192,3 +195,22 @@ def create_or_update_user_profile(sender, instance, created, **kwargs):
         except Exception:
             pass
     
+
+
+class DeviceSettings(models.Model):
+    """Har device ki apni settings (frontend se). Khaali = server .env wali default."""
+    device = models.OneToOneField(Device, on_delete=models.CASCADE, related_name="cfg")
+    assistant_name = models.CharField(max_length=40, blank=True, default="")
+    ai_provider = models.CharField(max_length=16, blank=True, default="")      # "" | openai | groq
+    ai_model = models.CharField(max_length=80, blank=True, default="")
+    ai_api_key_enc = models.TextField(blank=True, default="")
+    gmail_address = models.CharField(max_length=254, blank=True, default="")
+    gmail_app_password_enc = models.TextField(blank=True, default="")
+    mail_sender_name = models.CharField(max_length=60, blank=True, default="")
+    whatsapp_phone = models.CharField(max_length=20, blank=True, default="")
+    whatsapp_apikey_enc = models.TextField(blank=True, default="")
+    pratham_user_token_enc = models.TextField(blank=True, default="")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Settings {self.device_id}"

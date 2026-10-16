@@ -3380,3 +3380,282 @@ def post(self, request):
                 status=status.HTTP_201_CREATED
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# ---------------- Device settings (frontend) ----------------
+# GET  /api/devices/<plant_id>/settings/   -> abhi ki settings (secrets sirf masked)
+# POST /api/devices/<plant_id>/settings/   -> jo field bheja wahi badle; secret khaali = purana rahe
+#      {"assistant_name": "Tulsi", "ai_provider": "groq", "ai_model": "llama-3.3-70b-versatile",
+#       "ai_api_key": "gsk_...", "gmail_address": "a@gmail.com", "gmail_app_password": "abcd efgh ijkl mnop",
+#       "mail_sender_name": "Ajay", "whatsapp_phone": "+9198...", "whatsapp_apikey": "123456",
+#       "pratham_user_token": "...", "language": "gu", "clear": ["ai", "gmail", "whatsapp", "pratham"]}
+DEVICE_AI_MODELS = {
+    "openai": ["gpt-4o-mini", "gpt-4.1-mini", "gpt-4o", "gpt-4.1"],
+    "groq": ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "openai/gpt-oss-20b", "openai/gpt-oss-120b"],
+}
+_AI_MODELS_URL = {"openai": "https://api.openai.com/v1/models", "groq": "https://api.groq.com/openai/v1/models"}
+
+
+def _check_gmail(addr, password):
+    import imaplib
+    try:
+        imap = imaplib.IMAP4_SSL("imap.gmail.com", timeout=15)
+        try:
+            imap.login(addr, password)
+        finally:
+            try:
+                imap.logout()
+            except Exception:
+                pass
+        return None
+    except imaplib.IMAP4.error:
+        return "Gmail login nahi hua: address ya App Password galat (Google account mein 2-Step Verification + App Password chahiye)"
+    except Exception as err:
+        return f"Gmail se connect nahi hua ({type(err).__name__})"
+
+
+def _check_ai_key(provider, key, model):
+    import httpx
+    try:
+        res = httpx.get(_AI_MODELS_URL[provider], headers={"Authorization": f"Bearer {key}"}, timeout=15)
+    except Exception as err:
+        return f"{provider} se connect nahi hua ({type(err).__name__})"
+    if res.status_code in (401, 403):
+        return "API key galat hai ya band hai"
+    if res.status_code != 200:
+        return f"{provider} ne key jaanch mein HTTP {res.status_code} diya"
+    try:
+        ids = {m.get("id") for m in res.json().get("data", [])}
+    except Exception:
+        ids = set()
+    if model and ids and model not in ids:
+        return f"Is key par model {model} nahi khula"
+    return None
+
+
+def _device_settings_payload(device, cfg):
+    from core.secretbox import unseal, mask
+    out = {
+        "status": "ok", "plant_id": device.plant_id,
+        "assistant_name": cfg.assistant_name, "ai_provider": cfg.ai_provider, "ai_model": cfg.ai_model,
+        "ai_api_key": mask(unseal(cfg.ai_api_key_enc)),
+        "gmail_address": cfg.gmail_address, "gmail_app_password": mask(unseal(cfg.gmail_app_password_enc)),
+        "mail_sender_name": cfg.mail_sender_name,
+        "whatsapp_phone": cfg.whatsapp_phone, "whatsapp_apikey": mask(unseal(cfg.whatsapp_apikey_enc)),
+        "pratham_user_token": mask(unseal(cfg.pratham_user_token_enc)),
+        "ai_models": DEVICE_AI_MODELS,
+        "updated_at": cfg.updated_at.isoformat() if cfg.updated_at else None,
+    }
+    if hasattr(device, "language"):
+        out["language"] = device.language
+        out["languages"] = globals().get("DEVICE_LANGUAGES", {})
+    return out
+
+
+@api_view(["GET", "POST"])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def device_settings_api(request, plant_id):
+    import re as _re
+    from rest_framework.response import Response
+    from core.models import Device, DeviceSettings
+    from core.secretbox import seal, unseal
+    device = Device.objects.filter(plant_id=plant_id).first()
+    if device is None:
+        return Response({"status": "error", "error": "Device nahi mila"}, status=404)
+    u = request.user
+    if not (u.is_superuser or device.owner_admin_id == u.id or device.assigned_user_id == u.id):
+        return Response({"status": "error", "error": "Is device ki permission nahi"}, status=403)
+    cfg, _new = DeviceSettings.objects.get_or_create(device=device)
+    if request.method == "GET":
+        return Response(_device_settings_payload(device, cfg))
+
+    data = request.data or {}
+    clear = {str(x).lower() for x in (data.get("clear") or []) if isinstance(x, str)}
+    errors = {}
+    s = lambda k: str(data.get(k) if data.get(k) is not None else "").strip()
+
+    # Assistant ka naam
+    if "assistant_name" in data:
+        name = s("assistant_name")
+        if name and not _re.fullmatch(r"[A-Za-z\u0900-\u097F ]{2,20}", name):
+            errors["assistant_name"] = "Naam 2-20 akshar, sirf letters"
+        else:
+            cfg.assistant_name = name
+
+    # AI: provider + model + key
+    old_provider = cfg.ai_provider
+    if "ai" in clear:
+        cfg.ai_provider, cfg.ai_model, cfg.ai_api_key_enc = "", "", ""
+    if "ai_provider" in data:
+        p = s("ai_provider").lower()
+        if p and p not in DEVICE_AI_MODELS:
+            errors["ai_provider"] = "openai ya groq"
+        else:
+            cfg.ai_provider = p
+            if not p:
+                cfg.ai_model, cfg.ai_api_key_enc = "", ""
+    if "ai_model" in data:
+        cfg.ai_model = s("ai_model")
+    if cfg.ai_provider and cfg.ai_model and cfg.ai_model not in DEVICE_AI_MODELS.get(cfg.ai_provider, []):
+        errors["ai_model"] = f"{cfg.ai_provider} ke liye yeh model list mein nahi"
+    new_key = s("ai_api_key")
+    if new_key:
+        if not cfg.ai_provider:
+            errors["ai_api_key"] = "Pehle provider chunein (openai / groq)"
+        elif "ai_provider" not in errors and "ai_model" not in errors:
+            err = _check_ai_key(cfg.ai_provider, new_key, cfg.ai_model)
+            if err:
+                errors["ai_api_key"] = err
+            else:
+                cfg.ai_api_key_enc = seal(new_key)
+    elif cfg.ai_api_key_enc and cfg.ai_provider != old_provider:
+        errors["ai_api_key"] = "Provider badla hai: naye provider ki API key bhi daalein"
+    if cfg.ai_model and not cfg.ai_api_key_enc and "ai_model" not in errors and "ai_api_key" not in errors:
+        import os as _os
+        from django.conf import settings as _st
+        raw = (getattr(_st, "AI_SERVER_KEY_MODELS", "") or _os.getenv("AI_SERVER_KEY_MODELS", "")
+               or "gpt-4o-mini,llama-3.3-70b-versatile,llama-3.1-8b-instant,openai/gpt-oss-20b")
+        allowed = [m.strip() for m in raw.split(",") if m.strip()]
+        if cfg.ai_model not in allowed:
+            errors["ai_model"] = "Apni API key ke bina sirf yeh model: " + ", ".join(allowed)
+
+    # Gmail: address + App Password saath mein
+    if "gmail" in clear:
+        cfg.gmail_address, cfg.gmail_app_password_enc = "", ""
+    elif ("gmail_address" in data and s("gmail_address").lower() != cfg.gmail_address) or s("gmail_app_password"):
+        addr = s("gmail_address").lower() if "gmail_address" in data else cfg.gmail_address
+        pw = s("gmail_app_password").replace(" ", "") or unseal(cfg.gmail_app_password_enc)
+        if not addr and not pw:
+            cfg.gmail_address, cfg.gmail_app_password_enc = "", ""
+        elif not _re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", addr or ""):
+            errors["gmail_address"] = "Sahi email address daalein"
+        elif not pw:
+            errors["gmail_app_password"] = "Gmail App Password daalein"
+        else:
+            err = _check_gmail(addr, pw)
+            if err:
+                errors["gmail_app_password"] = err
+            else:
+                cfg.gmail_address, cfg.gmail_app_password_enc = addr, seal(pw)
+    if "mail_sender_name" in data:
+        cfg.mail_sender_name = s("mail_sender_name")[:60]
+
+    # WhatsApp (CallMeBot): number + apikey saath mein
+    if "whatsapp" in clear:
+        cfg.whatsapp_phone, cfg.whatsapp_apikey_enc = "", ""
+    elif ("whatsapp_phone" in data and _re.sub(r"[\s-]", "", s("whatsapp_phone")) != cfg.whatsapp_phone) or s("whatsapp_apikey"):
+        phone = _re.sub(r"[\s-]", "", s("whatsapp_phone")) if "whatsapp_phone" in data else cfg.whatsapp_phone
+        apikey = s("whatsapp_apikey") or unseal(cfg.whatsapp_apikey_enc)
+        if not phone and not apikey:
+            cfg.whatsapp_phone, cfg.whatsapp_apikey_enc = "", ""
+        elif not _re.fullmatch(r"\+?\d{10,15}", phone or ""):
+            errors["whatsapp_phone"] = "Number desh code ke saath, jaise +919876543210"
+        elif not _re.fullmatch(r"[A-Za-z0-9]{4,40}", apikey or ""):
+            errors["whatsapp_apikey"] = "CallMeBot apikey daalein"
+        else:
+            cfg.whatsapp_phone, cfg.whatsapp_apikey_enc = phone, seal(apikey)
+
+    # MyPratham portal token (jobs / quiz / results)
+    if "pratham" in clear:
+        cfg.pratham_user_token_enc = ""
+    elif s("pratham_user_token"):
+        cfg.pratham_user_token_enc = seal(s("pratham_user_token"))
+
+    # Bhasha (fix_lang laga ho to)
+    lang = s("language").lower() if "language" in data else ""
+    langs = globals().get("DEVICE_LANGUAGES", {})
+    if lang and hasattr(device, "language"):
+        if lang not in langs:
+            errors["language"] = "Yeh bhasha support nahi hai"
+
+    if errors:
+        return Response({"status": "error", "errors": errors}, status=400)
+    cfg.save()
+    if lang and hasattr(device, "language") and device.language != lang:
+        device.language = lang
+        device.save(update_fields=["language"])
+    return Response(_device_settings_payload(device, cfg))
+
+
+# ---------------- Device ki bhasha (frontend dropdown) ----------------
+DEVICE_LANGUAGES = {
+    "hi": "हिन्दी (Hindi)", "en": "English", "gu": "ગુજરાતી (Gujarati)", "te": "తెలుగు (Telugu)",
+    "ta": "தமிழ் (Tamil)", "mr": "मराठी (Marathi)", "bn": "বাংলা (Bengali)", "kn": "ಕನ್ನಡ (Kannada)",
+    "ml": "മലയാളം (Malayalam)", "ur": "اردو (Urdu)", "pa": "ਪੰਜਾਬੀ (Punjabi)", "ne": "नेपाली (Nepali)",
+    "sa": "संस्कृतम् (Sanskrit)",
+}
+
+
+@api_view(["GET", "POST"])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def device_language_api(request, plant_id):
+    # GET: abhi ki bhasha + list.  POST {"language": "gu"}: badlo (sirf maalik / assigned user / superuser)
+    from rest_framework.response import Response
+    from core.models import Device
+    device = Device.objects.filter(plant_id=plant_id).first()
+    if device is None:
+        return Response({"status": "error", "error": "Device nahi mila"}, status=404)
+    u = request.user
+    if not (u.is_superuser or device.owner_admin_id == u.id or device.assigned_user_id == u.id):
+        return Response({"status": "error", "error": "Is device ki permission nahi"}, status=403)
+    if request.method == "POST":
+        lang = str((request.data or {}).get("language", "")).strip().lower()
+        if lang not in DEVICE_LANGUAGES:
+            return Response({"status": "error", "error": "Yeh bhasha support nahi hai",
+                             "languages": DEVICE_LANGUAGES}, status=400)
+        device.language = lang
+        device.save(update_fields=["language"])
+    return Response({"status": "ok", "plant_id": device.plant_id, "language": device.language,
+                     "languages": DEVICE_LANGUAGES})
+
+
+# ---------------- Settings web page: /device-settings/ ----------------
+def device_settings_page(request):
+    from pathlib import Path as _P
+    from django.http import HttpResponse
+    html = (_P(__file__).resolve().parent / "pages" / "device_settings.html").read_text(encoding="utf-8")
+    resp = HttpResponse(html, content_type="text/html; charset=utf-8")
+    resp["Cache-Control"] = "no-store"
+    resp["X-Frame-Options"] = "DENY"
+    resp["Referrer-Policy"] = "no-referrer"
+    return resp
+
+
+@api_view(["POST"])
+@authentication_classes([])
+@permission_classes([])
+def settings_login_api(request):
+    # Username + password -> DRF token. Ek IP se 5 minute mein 10 galat try ke baad roko.
+    from django.contrib.auth import authenticate
+    from django.core.cache import cache
+    from rest_framework.authtoken.models import Token
+    from rest_framework.response import Response
+    ip = (request.META.get("HTTP_X_FORWARDED_FOR", "").split(",")[0].strip()
+          or request.META.get("HTTP_X_REAL_IP", "") or request.META.get("REMOTE_ADDR", ""))
+    key = f"settings_login_fail:{ip}"
+    fails = cache.get(key, 0)
+    if fails >= 10:
+        return Response({"error": "Bahut galat try. 5 minute baad"}, status=429)
+    data = request.data or {}
+    user = authenticate(request, username=str(data.get("username", "")).strip(), password=str(data.get("password", "")))
+    if user is None or not user.is_active:
+        cache.set(key, fails + 1, 300)
+        return Response({"error": "Username ya password galat"}, status=400)
+    cache.delete(key)
+    token, _c = Token.objects.get_or_create(user=user)
+    return Response({"token": token.key, "username": user.username})
+
+
+@api_view(["GET"])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def my_devices_api(request):
+    from django.db.models import Q
+    from rest_framework.response import Response
+    from core.models import Device
+    u = request.user
+    qs = Device.objects.all() if u.is_superuser else Device.objects.filter(Q(owner_admin=u) | Q(assigned_user=u))
+    qs = qs.exclude(plant_id__startswith="loadtest").order_by("plant_id")[:200]
+    return Response({"devices": [{"plant_id": d.plant_id, "online": bool(getattr(d, "is_online", False))} for d in qs]})

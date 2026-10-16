@@ -41,7 +41,18 @@ from core.views import (
     admin_register_api    # <-- Yahan add karein
     )
 
+from core.views import device_settings_api
+
+from core.views import device_language_api
+
+from core.views import device_settings_page, settings_login_api, my_devices_api
+
 urlpatterns = [
+    path('device-settings/', device_settings_page, name='device_settings_page'),
+    path('api/settings-login/', settings_login_api, name='settings_login'),
+    path('api/my-devices/', my_devices_api, name='my_devices'),
+    path('api/devices/<str:plant_id>/language/', device_language_api, name='device_language'),
+    path('api/devices/<str:plant_id>/settings/', device_settings_api, name='device_settings'),
     # 1. Admin & Dashboard Routes
     path('admin/', admin.site.urls),
     path('', dashboard, name='dashboard'),
