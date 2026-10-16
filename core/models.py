@@ -214,3 +214,20 @@ class DeviceSettings(models.Model):
 
     def __str__(self):
         return f"Settings {self.device_id}"
+
+
+class DeviceContact(models.Model):
+    """Device ki contact list: awaaz se mail / WhatsApp ke liye. Naam device mein ek hi baar."""
+    device = models.ForeignKey(Device, on_delete=models.CASCADE, related_name="contacts")
+    name = models.CharField(max_length=60)
+    aliases = models.CharField(max_length=200, blank=True, default="")   # "अतुल, atul ji" (awaaz ke liye)
+    email = models.CharField(max_length=254, blank=True, default="")
+    phone = models.CharField(max_length=20, blank=True, default="")      # +919876543210
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["name"]
+        indexes = [models.Index(fields=["device", "name"])]
+
+    def __str__(self):
+        return f"{self.name} ({self.device_id})"

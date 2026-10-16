@@ -2095,7 +2095,7 @@ def is_mail_compose(text):
     return bool(re.search(r"\s(ko|को)\s.*(mail|email|मेल|ईमेल).*\s(ki|कि|that)\s", t))
 
 
-def mail_contacts():
+def _server_mail_contacts():
     contacts = {}
     raw = _pratham_setting("MAIL_CONTACTS") or ""
     for part in re.split(r"[,;\n]", raw):
@@ -2122,6 +2122,35 @@ def mail_contacts():
                         contacts[key] = u.email
         except Exception:
             logger.debug("Mail contacts from users failed", exc_info=True)
+    return contacts
+
+
+def device_contacts_sync(device_id):
+    # [{"name", "aliases", "email", "phone"}] -- device ki apni list (frontend se)
+    from core.models import DeviceContact
+    return list(DeviceContact.objects.filter(device__plant_id=device_id)
+                .values("name", "aliases", "email", "phone")[:500])
+
+
+def mail_contacts():
+    """Naam -> email. Device ki apni list sabse upar; SHARE_SERVER_ACCOUNTS=0 ho to sirf wahi."""
+    cv = globals().get("CURRENT_DEVICE")
+    did = cv.get() if cv is not None else None
+    own = {}
+    if did:
+        try:
+            for c in device_contacts_sync(did):
+                if c["email"]:
+                    for key in [c["name"]] + [a for a in (c["aliases"] or "").split(",")]:
+                        key = re.sub(r"\s+", " ", key).strip().lower()
+                        if key:
+                            own[key] = c["email"]
+        except Exception:
+            logger.exception("Device contacts read failed: device=%s", did)
+        if (_pratham_setting("SHARE_SERVER_ACCOUNTS") or "1") == "0":
+            return own
+    contacts = _server_mail_contacts()
+    contacts.update(own)
     return contacts
 
 

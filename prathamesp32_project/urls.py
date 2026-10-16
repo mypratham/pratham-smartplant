@@ -47,7 +47,12 @@ from core.views import device_language_api
 
 from core.views import device_settings_page, settings_login_api, my_devices_api
 
+from core.views import device_contacts_api, device_contact_detail_api, device_contacts_import_api
+
 urlpatterns = [
+    path('api/devices/<str:plant_id>/contacts/', device_contacts_api, name='device_contacts'),
+    path('api/devices/<str:plant_id>/contacts/import/', device_contacts_import_api, name='device_contacts_import'),
+    path('api/devices/<str:plant_id>/contacts/<int:contact_id>/', device_contact_detail_api, name='device_contact_detail'),
     path('device-settings/', device_settings_page, name='device_settings_page'),
     path('api/settings-login/', settings_login_api, name='settings_login'),
     path('api/my-devices/', my_devices_api, name='my_devices'),

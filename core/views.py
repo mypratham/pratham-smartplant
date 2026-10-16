@@ -3659,3 +3659,162 @@ def my_devices_api(request):
     qs = Device.objects.all() if u.is_superuser else Device.objects.filter(Q(owner_admin=u) | Q(assigned_user=u))
     qs = qs.exclude(plant_id__startswith="loadtest").order_by("plant_id")[:200]
     return Response({"devices": [{"plant_id": d.plant_id, "online": bool(getattr(d, "is_online", False))} for d in qs]})
+
+
+# ---------------- Device contacts ----------------
+DEVICE_CONTACTS_MAX = 500
+
+
+def _contact_device(request, plant_id):
+    from rest_framework.response import Response
+    from core.models import Device
+    device = Device.objects.filter(plant_id=plant_id).first()
+    if device is None:
+        return None, Response({"status": "error", "error": "Device nahi mila"}, status=404)
+    u = request.user
+    if not (u.is_superuser or device.owner_admin_id == u.id or device.assigned_user_id == u.id):
+        return None, Response({"status": "error", "error": "Is device ki permission nahi"}, status=403)
+    return device, None
+
+
+def _clean_contact(data):
+    import re as _re
+    out, errors = {}, {}
+    name = _re.sub(r"\s+", " ", str(data.get("name") or "")).strip()
+    if not (2 <= len(name) <= 60):
+        errors["name"] = "Naam 2-60 akshar"
+    out["name"] = name
+    out["aliases"] = ", ".join(a.strip() for a in str(data.get("aliases") or "").split(",") if a.strip())[:200]
+    email = str(data.get("email") or "").strip().lower()
+    if email and not _re.fullmatch(r"[^@\s,;]+@[^@\s,;]+\.[^@\s,;]+", email):
+        errors["email"] = "Sahi email daalein"
+    out["email"] = email
+    phone = _re.sub(r"[\s\-().]", "", str(data.get("phone") or ""))
+    if phone.startswith("00"):
+        phone = "+" + phone[2:]
+    if _re.fullmatch(r"0?\d{10}", phone):            # 98765 43210 / 098765 43210 -> +91
+        phone = "+91" + phone[-10:]
+    elif _re.fullmatch(r"91\d{10}", phone):
+        phone = "+" + phone
+    if phone and not _re.fullmatch(r"\+\d{10,15}", phone):
+        errors["phone"] = "Number desh code ke saath, jaise +919876543210"
+    out["phone"] = phone
+    if not email and not phone and "email" not in errors and "phone" not in errors:
+        errors["email"] = "Email ya WhatsApp number, koi ek chahiye"
+    return out, errors
+
+
+def _contact_json(c):
+    return {"id": c.id, "name": c.name, "aliases": c.aliases, "email": c.email, "phone": c.phone}
+
+
+@api_view(["GET", "POST"])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def device_contacts_api(request, plant_id):
+    from rest_framework.response import Response
+    from core.models import DeviceContact
+    device, err = _contact_device(request, plant_id)
+    if err:
+        return err
+    qs = DeviceContact.objects.filter(device=device)
+    if request.method == "POST":
+        data, errors = _clean_contact(request.data or {})
+        if not errors and qs.filter(name__iexact=data["name"]).exists():
+            errors["name"] = "Is naam ka contact pehle se hai"
+        if not errors and qs.count() >= DEVICE_CONTACTS_MAX:
+            errors["name"] = f"Ek device mein {DEVICE_CONTACTS_MAX} se zyada contact nahi"
+        if errors:
+            return Response({"status": "error", "errors": errors}, status=400)
+        c = DeviceContact.objects.create(device=device, **data)
+        return Response({"status": "ok", "contact": _contact_json(c)}, status=201)
+    return Response({"status": "ok", "contacts": [_contact_json(c) for c in qs.order_by("name")]})
+
+
+@api_view(["PUT", "DELETE"])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def device_contact_detail_api(request, plant_id, contact_id):
+    from rest_framework.response import Response
+    from core.models import DeviceContact
+    device, err = _contact_device(request, plant_id)
+    if err:
+        return err
+    c = DeviceContact.objects.filter(device=device, id=contact_id).first()
+    if c is None:
+        return Response({"status": "error", "error": "Contact nahi mila"}, status=404)
+    if request.method == "DELETE":
+        c.delete()
+        return Response({"status": "ok"})
+    merged = {**_contact_json(c), **(request.data or {})}
+    data, errors = _clean_contact(merged)
+    if not errors and DeviceContact.objects.filter(device=device, name__iexact=data["name"]).exclude(id=c.id).exists():
+        errors["name"] = "Is naam ka contact pehle se hai"
+    if errors:
+        return Response({"status": "error", "errors": errors}, status=400)
+    for k, v in data.items():
+        setattr(c, k, v)
+    c.save()
+    return Response({"status": "ok", "contact": _contact_json(c)})
+
+
+@api_view(["POST"])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def device_contacts_import_api(request, plant_id):
+    # {"csv": "..."}  Google Contacts -> Export -> Google CSV  (ya simple: name,email,phone)
+    import csv
+    import io
+    from rest_framework.response import Response
+    from core.models import DeviceContact
+    device, err = _contact_device(request, plant_id)
+    if err:
+        return err
+    text = str((request.data or {}).get("csv") or "")
+    if not text.strip() or len(text) > 2_000_000:
+        return Response({"status": "error", "error": "CSV khaali hai ya bahut bada (2 MB tak)"}, status=400)
+    rows = list(csv.DictReader(io.StringIO(text.lstrip("﻿"))))
+    if not rows:
+        return Response({"status": "error", "error": "CSV mein koi line nahi mili"}, status=400)
+
+    def pick(row, *names):
+        low = {(k or "").strip().lower(): (v or "").strip() for k, v in row.items()}
+        for n in names:
+            v = low.get(n)
+            if v:
+                return v.split(" ::: ")[0].strip()   # Google ek khaane mein kai value ' ::: ' se jodta hai
+        return ""
+
+    existing = {c.name.lower(): c for c in DeviceContact.objects.filter(device=device)}
+    added = updated = skipped = 0
+    for row in rows:
+        name = pick(row, "name", "full name", "display name") or " ".join(
+            x for x in (pick(row, "first name", "given name"), pick(row, "middle name", "additional name"),
+                        pick(row, "last name", "family name")) if x)
+        data, errors = _clean_contact({
+            "name": name,
+            "email": pick(row, "email", "e-mail", "e-mail 1 - value", "email 1 - value", "e-mail address"),
+            "phone": pick(row, "phone", "mobile", "whatsapp", "phone 1 - value", "mobile phone", "primary phone"),
+        })
+        if errors:
+            skipped += 1
+            continue
+        c = existing.get(data["name"].lower())
+        if c is not None:
+            changed = False
+            for k in ("email", "phone"):
+                if data[k] and getattr(c, k) != data[k]:
+                    setattr(c, k, data[k])
+                    changed = True
+            if changed:
+                c.save()
+                updated += 1
+            continue
+        if len(existing) >= DEVICE_CONTACTS_MAX:
+            skipped += 1
+            continue
+        c = DeviceContact.objects.create(device=device, **data)
+        existing[c.name.lower()] = c
+        added += 1
+    return Response({"status": "ok", "added": added, "updated": updated, "skipped": skipped,
+                     "total": len(existing)})
