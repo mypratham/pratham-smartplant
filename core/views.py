@@ -3906,6 +3906,14 @@ def _adm_is_admin(u):
     return bool(u and u.is_authenticated and (u.is_superuser or u.is_staff))
 
 
+def _adm_scope(u, qs):
+    """superuser = sab; baaki = sirf jinke owner_admin / assigned_user wahi hain."""
+    from django.db.models import Q
+    if u.is_superuser:
+        return qs
+    return qs.filter(Q(owner_admin=u) | Q(assigned_user=u))
+
+
 def _adm_dev_online(d, now):
     from datetime import timedelta
     ls = getattr(d, "last_seen", None)
@@ -3944,11 +3952,9 @@ def admin_devices_api(request):
     from django.utils import timezone
     from rest_framework.response import Response
     from core.models import Device
-    if not _adm_is_admin(request.user):
-        return Response({"status": "error", "error": "Sirf admin"}, status=403)
     now = timezone.now()
     share = (_os.getenv("SHARE_SERVER_ACCOUNTS", "1") or "1") != "0"
-    qs = Device.objects.exclude(plant_id__startswith="loadtest_")
+    qs = _adm_scope(request.user, Device.objects.exclude(plant_id__startswith="loadtest_"))
     q = (request.GET.get("q") or "").strip()
     if q:
         qs = qs.filter(Q(plant_id__icontains=q) | Q(owner_admin__username__icontains=q)
@@ -3985,7 +3991,7 @@ def admin_devices_api(request):
             "settings": _adm_settings_summary(cfg, share),
         })
     return Response({"status": "ok", "total": total, "online": len(online_rows), "offline": total - len(online_rows),
-                     "count": len(rows), "limit": limit, "offset": offset, "share_server_accounts": share,
+                     "count": len(rows), "limit": limit, "offset": offset, "share_server_accounts": share, "is_superuser": bool(request.user.is_superuser),
                      "devices": out})
 
 
@@ -4006,10 +4012,12 @@ def admin_notices_api(request):
     from django.utils import timezone
     from rest_framework.response import Response
     from core.models import Device, DeviceNotice
-    if not _adm_is_admin(request.user):
-        return Response({"status": "error", "error": "Sirf admin"}, status=403)
     if request.method == "GET":
         qs = DeviceNotice.objects.select_related("target", "created_by").annotate(n=Count("deliveries"))
+        if not request.user.is_superuser:
+            from django.db.models import Q as _Q
+            mine = _adm_scope(request.user, Device.objects.all())
+            qs = qs.filter(_Q(target__in=mine) | _Q(target__isnull=True, created_by=request.user))
         pid = (request.GET.get("plant_id") or "").strip()
         if pid:
             from django.db.models import Q
@@ -4031,13 +4039,19 @@ def admin_notices_api(request):
     common = dict(title=title, message=msg, speak=bool(data.get("speak", True)), created_by=request.user,
                   expires_at=timezone.now() + timedelta(minutes=mins))
     if data.get("all") is True or str(data.get("all")).lower() in ("1", "true"):
+        if not request.user.is_superuser:          # "sab" = sirf apne devices
+            mine = list(_adm_scope(request.user, Device.objects.exclude(plant_id__startswith="loadtest_")))
+            if not mine:
+                return Response({"status": "error", "errors": {"plant_ids": "Aapke account mein koi device nahi"}}, status=400)
+            made = [DeviceNotice.objects.create(target=d, **common) for d in mine]
+            return Response({"status": "ok", "created": [_adm_notice_json(x, 0) for x in made], "missing": []})
         n = DeviceNotice.objects.create(target=None, **common)
         return Response({"status": "ok", "created": [_adm_notice_json(n, 0)]})
     ids = data.get("plant_ids") or ([data["plant_id"]] if data.get("plant_id") else [])
     ids = [str(x).strip() for x in ids if str(x).strip()][:2000]
     if not ids:
         return Response({"status": "error", "errors": {"plant_ids": "Device chunein ya all:true bhejein"}}, status=400)
-    devs = list(Device.objects.filter(plant_id__in=ids))
+    devs = list(_adm_scope(request.user, Device.objects.filter(plant_id__in=ids)))   # dusre ke device = missing
     missing = sorted(set(ids) - {d.plant_id for d in devs})
     made = [DeviceNotice.objects.create(target=d, **common) for d in devs]
     return Response({"status": "ok", "created": [_adm_notice_json(n, 0) for n in made], "missing": missing})
@@ -4049,11 +4063,11 @@ def admin_notices_api(request):
 def admin_notice_cancel_api(request, notice_id):
     from rest_framework.response import Response
     from core.models import DeviceNotice
-    if not _adm_is_admin(request.user):
-        return Response({"status": "error", "error": "Sirf admin"}, status=403)
     n = DeviceNotice.objects.filter(pk=notice_id).first()
     if n is None:
         return Response({"status": "error", "error": "Nahi mila"}, status=404)
+    if not request.user.is_superuser and n.created_by_id != request.user.id:
+        return Response({"status": "error", "error": "Sirf apna bheja message rok sakte hain"}, status=403)
     n.cancelled = True
     n.save(update_fields=["cancelled"])
     return Response({"status": "ok", "id": n.pk, "cancelled": True})

@@ -55,7 +55,7 @@
 <body>
 <div class="wrap">
   <header>
-    <h1>PrathamSmart Admin</h1>
+    <h1 id="hTitle">PrathamSmart Admin</h1>
     <div class="row">
       <a href="/device-settings/" style="color:var(--accent);font-size:14px">Device settings</a>
       <button id="logout" class="ghost hidden">Logout</button>
@@ -78,7 +78,7 @@
     </div>
 
     <div class="card">
-      <h2>Sab devices ko message</h2>
+      <h2 id="allHead">Sab devices ko message</h2>
       <div class="row">
         <input id="allTitle" placeholder="Title (optional)" maxlength="60" style="flex:0 1 180px">
         <input id="allMsg" class="grow" placeholder="Jaise: Aaj shaam 6 baje server update hoga" maxlength="500">
@@ -186,6 +186,8 @@
 
   function renderDevices(d) {
     last = d;
+    $("hTitle").textContent = d.is_superuser ? "PrathamSmart Admin" : "Mere devices";
+    $("allHead").textContent = d.is_superuser ? "Sab devices ko message" : "Mere sab devices ko message";
     $("tTotal").textContent = d.total; $("tOn").textContent = d.online; $("tOff").textContent = d.offline;
     $("pageInfo").textContent = d.count ? (offset + 1) + "–" + Math.min(offset + PAGE, d.count) + " / " + d.count : "0 device";
     $("prev").disabled = offset === 0; $("next").disabled = offset + PAGE >= d.count;
@@ -194,7 +196,7 @@
     var focused = document.activeElement && tb.contains(document.activeElement);
     if (focused) return;
     tb.textContent = "";
-    if (!d.devices.length) { var tr0 = el("tr"); var td0 = el("td", "sub", "Koi device nahi"); td0.colSpan = 12; tr0.appendChild(td0); tb.appendChild(tr0); return; }
+    if (!d.devices.length) { var tr0 = el("tr"); var td0 = el("td", "sub", d.is_superuser ? "Koi device nahi" : "Aapke account mein koi device nahi"); td0.colSpan = 12; tr0.appendChild(td0); tb.appendChild(tr0); return; }
     d.devices.forEach(function (x) {
       var s = x.settings || {}, tr = el("tr");
       var c1 = el("td"); c1.appendChild(el("b", null, x.plant_id)); if (x.name) c1.appendChild(el("div", "sub", x.name));
