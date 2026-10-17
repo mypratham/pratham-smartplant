@@ -3890,3 +3890,170 @@ def device_telegram_sync_api(request, plant_id):
     return Response({"status": "ok", "linked": linked,
                      "me_linked": bool(cfg and cfg.telegram_owner_chat_id),
                      "contacts_linked": device.contacts.exclude(telegram_chat_id="").count()})
+
+
+# ---------------------------------------------------------------
+# Admin: devices ka haal + message / notification (sirf superuser / staff)
+# ---------------------------------------------------------------
+from rest_framework.decorators import api_view as _av, authentication_classes as _ac, permission_classes as _pc
+from rest_framework.authentication import TokenAuthentication as _TokAuth
+from rest_framework.permissions import IsAuthenticated as _IsAuth
+
+_ADMIN_ONLINE_SECONDS = 90          # last_seen itne sec se purana = offline (crash/reboot ke baad bhi sahi)
+
+
+def _adm_is_admin(u):
+    return bool(u and u.is_authenticated and (u.is_superuser or u.is_staff))
+
+
+def _adm_dev_online(d, now):
+    from datetime import timedelta
+    ls = getattr(d, "last_seen", None)
+    return bool(getattr(d, "is_online", False)) and ls is not None and ls >= now - timedelta(seconds=_ADMIN_ONLINE_SECONDS)
+
+
+def _adm_settings_summary(cfg, share):
+    """Har cheez: 'own' (user ki apni) | 'default' (server .env) | 'none' (kuch nahi)."""
+    d = "default" if share else "none"
+    if cfg is None:
+        return {"assistant_name": "", "ai": "default", "ai_model": "", "gmail": d, "gmail_address": "",
+                "pratham": "default", "whatsapp": "none", "telegram": "none", "sms": "none"}
+    g = lambda k: getattr(cfg, k, "") or ""
+    return {
+        "assistant_name": g("assistant_name"),
+        "ai": "own" if g("ai_api_key_enc") else "default",
+        "ai_provider": g("ai_provider"), "ai_model": g("ai_model"),
+        "gmail": "own" if (g("gmail_address") and g("gmail_app_password_enc")) else d,
+        "gmail_address": g("gmail_address"),
+        "pratham": "own" if g("pratham_user_token_enc") else "default",
+        "whatsapp": "own" if g("whatsapp_phone") else "none",
+        "telegram": "own" if g("telegram_bot_token_enc") else "none",
+        "telegram_bot": g("telegram_bot_username"),
+        "sms": "own" if g("sms_user") else "none",
+        "updated_at": cfg.updated_at.isoformat() if getattr(cfg, "updated_at", None) else None,
+    }
+
+
+@_av(["GET"])
+@_ac([_TokAuth])
+@_pc([_IsAuth])
+def admin_devices_api(request):
+    """?online=1|0  ?q=plant_id/owner  ?limit=100  ?offset=0"""
+    import os as _os
+    from django.db.models import Q
+    from django.utils import timezone
+    from rest_framework.response import Response
+    from core.models import Device
+    if not _adm_is_admin(request.user):
+        return Response({"status": "error", "error": "Sirf admin"}, status=403)
+    now = timezone.now()
+    share = (_os.getenv("SHARE_SERVER_ACCOUNTS", "1") or "1") != "0"
+    qs = Device.objects.exclude(plant_id__startswith="loadtest_")
+    q = (request.GET.get("q") or "").strip()
+    if q:
+        qs = qs.filter(Q(plant_id__icontains=q) | Q(owner_admin__username__icontains=q)
+                       | Q(assigned_user__username__icontains=q))
+    names = {f.name for f in Device._meta.get_fields()}
+    rel = [n for n in ("owner_admin", "assigned_user", "cfg") if n in names]
+    qs = qs.select_related(*rel).order_by("plant_id")
+    rows = list(qs)
+    total = len(rows)
+    online_rows = [d for d in rows if _adm_dev_online(d, now)]
+    want = request.GET.get("online")
+    if want in ("1", "true"):
+        rows = online_rows
+    elif want in ("0", "false"):
+        on = {d.pk for d in online_rows}
+        rows = [d for d in rows if d.pk not in on]
+    try:
+        limit = max(1, min(int(request.GET.get("limit", 100)), 500))
+        offset = max(0, int(request.GET.get("offset", 0)))
+    except ValueError:
+        limit, offset = 100, 0
+    out = []
+    for d in rows[offset:offset + limit]:
+        cfg = getattr(d, "cfg", None) if "cfg" in names else None
+        ow, au = getattr(d, "owner_admin", None), getattr(d, "assigned_user", None)
+        ls = getattr(d, "last_seen", None)
+        out.append({
+            "plant_id": d.plant_id,
+            "name": getattr(d, "name", "") or getattr(d, "device_name", "") or "",
+            "online": _adm_dev_online(d, now),
+            "last_seen": ls.isoformat() if ls else None,
+            "owner": ow.username if ow else "", "assigned_user": au.username if au else "",
+            "language": getattr(d, "language", "hi"),
+            "settings": _adm_settings_summary(cfg, share),
+        })
+    return Response({"status": "ok", "total": total, "online": len(online_rows), "offline": total - len(online_rows),
+                     "count": len(rows), "limit": limit, "offset": offset, "share_server_accounts": share,
+                     "devices": out})
+
+
+def _adm_notice_json(n, delivered):
+    return {"id": n.pk, "target": n.target.plant_id if n.target_id else None, "all": n.target_id is None,
+            "title": n.title, "message": n.message, "speak": n.speak, "cancelled": n.cancelled,
+            "created_by": n.created_by.username if n.created_by_id else "",
+            "created_at": n.created_at.isoformat(), "expires_at": n.expires_at.isoformat() if n.expires_at else None,
+            "delivered": delivered}
+
+
+@_av(["GET", "POST"])
+@_ac([_TokAuth])
+@_pc([_IsAuth])
+def admin_notices_api(request):
+    from datetime import timedelta
+    from django.db.models import Count
+    from django.utils import timezone
+    from rest_framework.response import Response
+    from core.models import Device, DeviceNotice
+    if not _adm_is_admin(request.user):
+        return Response({"status": "error", "error": "Sirf admin"}, status=403)
+    if request.method == "GET":
+        qs = DeviceNotice.objects.select_related("target", "created_by").annotate(n=Count("deliveries"))
+        pid = (request.GET.get("plant_id") or "").strip()
+        if pid:
+            from django.db.models import Q
+            qs = qs.filter(Q(target__plant_id=pid) | Q(target__isnull=True))
+        return Response({"status": "ok", "notices": [_adm_notice_json(n, n.n) for n in qs.order_by("-id")[:100]]})
+
+    data = request.data or {}
+    msg = str(data.get("message") or "").strip()
+    title = str(data.get("title") or "").strip()[:60]
+    if not msg:
+        return Response({"status": "error", "errors": {"message": "Message likhein"}}, status=400)
+    if len(msg) > 500:
+        return Response({"status": "error", "errors": {"message": "500 akshar tak"}}, status=400)
+    try:
+        mins = int(data.get("expires_minutes") or 1440)
+    except (TypeError, ValueError):
+        mins = 1440
+    mins = max(1, min(mins, 7 * 1440))
+    common = dict(title=title, message=msg, speak=bool(data.get("speak", True)), created_by=request.user,
+                  expires_at=timezone.now() + timedelta(minutes=mins))
+    if data.get("all") is True or str(data.get("all")).lower() in ("1", "true"):
+        n = DeviceNotice.objects.create(target=None, **common)
+        return Response({"status": "ok", "created": [_adm_notice_json(n, 0)]})
+    ids = data.get("plant_ids") or ([data["plant_id"]] if data.get("plant_id") else [])
+    ids = [str(x).strip() for x in ids if str(x).strip()][:2000]
+    if not ids:
+        return Response({"status": "error", "errors": {"plant_ids": "Device chunein ya all:true bhejein"}}, status=400)
+    devs = list(Device.objects.filter(plant_id__in=ids))
+    missing = sorted(set(ids) - {d.plant_id for d in devs})
+    made = [DeviceNotice.objects.create(target=d, **common) for d in devs]
+    return Response({"status": "ok", "created": [_adm_notice_json(n, 0) for n in made], "missing": missing})
+
+
+@_av(["DELETE"])
+@_ac([_TokAuth])
+@_pc([_IsAuth])
+def admin_notice_cancel_api(request, notice_id):
+    from rest_framework.response import Response
+    from core.models import DeviceNotice
+    if not _adm_is_admin(request.user):
+        return Response({"status": "error", "error": "Sirf admin"}, status=403)
+    n = DeviceNotice.objects.filter(pk=notice_id).first()
+    if n is None:
+        return Response({"status": "error", "error": "Nahi mila"}, status=404)
+    n.cancelled = True
+    n.save(update_fields=["cancelled"])
+    return Response({"status": "ok", "id": n.pk, "cancelled": True})

@@ -51,7 +51,12 @@ from core.views import device_contacts_api, device_contact_detail_api, device_co
 
 from core.views import device_telegram_sync_api
 
+from core.views import admin_devices_api, admin_notices_api, admin_notice_cancel_api
+
 urlpatterns = [
+    path('api/admin/devices/', admin_devices_api, name='admin_devices'),
+    path('api/admin/notices/', admin_notices_api, name='admin_notices'),
+    path('api/admin/notices/<int:notice_id>/', admin_notice_cancel_api, name='admin_notice_cancel'),
     path('api/devices/<str:plant_id>/telegram/sync/', device_telegram_sync_api, name='device_telegram_sync'),
     path('api/devices/<str:plant_id>/contacts/', device_contacts_api, name='device_contacts'),
     path('api/devices/<str:plant_id>/contacts/import/', device_contacts_import_api, name='device_contacts_import'),

@@ -4229,6 +4229,8 @@ class AudioConsumer(AsyncWebsocketConsumer):
         })
 
         logger.info("Audio WebSocket connected: device=%s", self.device_id)
+        _notice_register(self)
+        self._t_conn = time.monotonic()
         self._online_task = asyncio.create_task(self._online_loop())
 
         # Exam list pehle se le aayein: "Excel start karo" pehli baar mein bhi samjhe
@@ -6578,6 +6580,15 @@ class AudioConsumer(AsyncWebsocketConsumer):
         await self._set_online(True)
 
     async def disconnect(self, close_code):
+        try:
+            _wi = getattr(self, "worker_idle", None)
+            logger.info("Audio WebSocket closed: device=%s code=%s after=%.0fs speaking=%s busy=%s",
+                        getattr(self, "device_id", "?"), close_code,
+                        time.monotonic() - getattr(self, "_t_conn", time.monotonic()),
+                        getattr(self, "in_speech", None), (not _wi.is_set()) if _wi else None)
+        except Exception:
+            pass
+        _notice_unregister(self)
         self.ws_open = False
         task = getattr(self, "_online_task", None)
         if task and not task.done():
@@ -6642,3 +6653,116 @@ class AudioConsumer(AsyncWebsocketConsumer):
             getattr(self, "pcm_frame_count", 0),
             close_code,
         )
+
+
+# ---------------------------------------------------------------
+# Admin ke message / notification (DeviceNotice). Har process ek poller:
+# NOTICE_POLL_SECONDS (5) mein naye message, sirf is process ke jude devices ke liye.
+# Device khaali ho tab: TFT par dikhao + bolo. Pahunchne par DeviceNoticeDelivery.
+# ---------------------------------------------------------------
+NOTICE_POLL_SECONDS = float(os.getenv("NOTICE_POLL_SECONDS", "5") or 5)
+_LOCAL_CONS = {}            # plant_id -> consumer (is process mein)
+_NOTICE_TASK = None
+
+
+def _notice_register(cons):
+    global _NOTICE_TASK
+    pid = getattr(cons, "device_id", "") or ""
+    if not pid or pid.startswith("loadtest_"):
+        return
+    _LOCAL_CONS[pid] = cons
+    if _NOTICE_TASK is None or _NOTICE_TASK.done():
+        _NOTICE_TASK = asyncio.get_running_loop().create_task(_notice_poller())
+
+
+def _notice_unregister(cons):
+    pid = getattr(cons, "device_id", None)
+    if pid and _LOCAL_CONS.get(pid) is cons:
+        _LOCAL_CONS.pop(pid, None)
+
+
+def _notice_pending_sync(plant_ids):
+    from datetime import timedelta
+    from django.db.models import Q
+    from django.utils import timezone
+    from core.models import Device, DeviceNotice, DeviceNoticeDelivery
+    now = timezone.now()
+    notices = list(DeviceNotice.objects.filter(cancelled=False, created_at__gte=now - timedelta(days=7))
+                   .filter(Q(expires_at__isnull=True) | Q(expires_at__gt=now))
+                   .filter(Q(target__isnull=True) | Q(target__plant_id__in=plant_ids))
+                   .order_by("id")[:50])
+    if not notices:
+        return []
+    devs = dict(Device.objects.filter(plant_id__in=plant_ids).values_list("id", "plant_id"))
+    done = set(DeviceNoticeDelivery.objects.filter(notice__in=notices, device_id__in=list(devs))
+               .values_list("notice_id", "device_id"))
+    out = []
+    for n in notices:
+        for did in ([n.target_id] if n.target_id else list(devs)):
+            if did in devs and (n.id, did) not in done:
+                out.append((n.id, did, devs[did], n.title, n.message, n.speak))
+    return out
+
+
+def _notice_mark_sync(pairs):
+    from core.models import DeviceNoticeDelivery
+    DeviceNoticeDelivery.objects.bulk_create(
+        [DeviceNoticeDelivery(notice_id=a, device_id=b) for a, b in pairs], ignore_conflicts=True)
+
+
+def _notice_busy(c):
+    wi = getattr(c, "worker_idle", None)
+    return bool(getattr(c, "in_speech", False) or (wi is not None and not wi.is_set())
+                or getattr(c, "keepalive_active", False) or getattr(c, "_notice_saying", False))
+
+
+async def _notice_say(c, items):
+    c._notice_saying = True
+    try:
+        for title, msg, speak in items:
+            if not getattr(c, "ws_open", False):
+                break
+            head = title or "Message"
+            await c._send_json({"type": "ai_reply", "text": msg,
+                                "display": ascii_for_display(f"{head.upper()}\n{msg}", 200)})
+            if speak:
+                text = f"{title}: {msg}" if title else msg
+                try:
+                    await c._speak(text, native=True)
+                except TypeError:
+                    await c._speak(text)
+    except Exception:
+        logger.exception("Notice bolna fail: device=%s", getattr(c, "device_id", "?"))
+    finally:
+        c._notice_saying = False
+
+
+async def _notice_poller():
+    while True:
+        await asyncio.sleep(NOTICE_POLL_SECONDS)
+        ids = [p for p, c in list(_LOCAL_CONS.items()) if getattr(c, "ws_open", False)]
+        if not ids:
+            continue
+        try:
+            pend = await asyncio.to_thread(_notice_pending_sync, ids)
+        except Exception:
+            logger.exception("Notice check fail")
+            continue
+        by_dev, mark = {}, []
+        for nid, did, pid, title, msg, speak in pend:
+            c = _LOCAL_CONS.get(pid)
+            if c is None or not getattr(c, "ws_open", False) or _notice_busy(c):
+                continue                      # agle chakkar mein
+            by_dev.setdefault(pid, []).append((title, msg, speak))
+            mark.append((nid, did))
+        if not mark:
+            continue
+        try:
+            await asyncio.to_thread(_notice_mark_sync, mark)
+        except Exception:
+            logger.exception("Notice delivery save fail")
+            continue
+        for pid, items in by_dev.items():
+            logger.info("Notice delivered: device=%s count=%d", pid, len(items))
+            asyncio.get_running_loop().create_task(_notice_say(_LOCAL_CONS[pid], items))
+

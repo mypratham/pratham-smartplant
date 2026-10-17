@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 from django.contrib.auth.models import User
 from django.db.models.signals import post_save
@@ -237,3 +238,31 @@ class DeviceContact(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.device_id})"
+
+
+class DeviceNotice(models.Model):
+    """Admin ka message: ek device ko (target) ya sab devices ko (target khaali)."""
+    target = models.ForeignKey(Device, null=True, blank=True, on_delete=models.CASCADE, related_name="notices")
+    title = models.CharField(max_length=60, blank=True, default="")
+    message = models.CharField(max_length=500)
+    speak = models.BooleanField(default=True)               # False = sirf TFT par
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+                                   related_name="device_notices")
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(null=True, blank=True)  # iske baad judne wale device ko nahi
+    cancelled = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["-id"]
+
+    def __str__(self):
+        return f"#{self.pk} {'sab' if self.target_id is None else self.target_id}: {self.message[:40]}"
+
+
+class DeviceNoticeDelivery(models.Model):
+    notice = models.ForeignKey(DeviceNotice, on_delete=models.CASCADE, related_name="deliveries")
+    device = models.ForeignKey(Device, on_delete=models.CASCADE, related_name="notice_deliveries")
+    delivered_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = [("notice", "device")]

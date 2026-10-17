@@ -193,3 +193,33 @@ class DeviceSettingsAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return False
+
+
+# ---- Device notices (admin ke message) ----
+from django.db.models import Count as _Count
+from core.models import DeviceNotice as _DeviceNotice
+
+
+@admin.register(_DeviceNotice)
+class DeviceNoticeAdmin(admin.ModelAdmin):
+    list_display = ("id", "kisko", "title", "message", "speak", "pahuncha", "cancelled", "created_at", "expires_at")
+    list_filter = ("cancelled", "speak")
+    search_fields = ("message", "title", "target__plant_id")
+    raw_id_fields = ("target",)
+    readonly_fields = ("created_by", "created_at")
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related("target").annotate(_n=_Count("deliveries"))
+
+    @admin.display(description="Kisko")
+    def kisko(self, obj):
+        return obj.target.plant_id if obj.target_id else "SAB devices"
+
+    @admin.display(description="Pahuncha", ordering="_n")
+    def pahuncha(self, obj):
+        return obj._n
+
+    def save_model(self, request, obj, form, change):
+        if not obj.created_by_id:
+            obj.created_by = request.user
+        super().save_model(request, obj, form, change)
