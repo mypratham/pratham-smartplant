@@ -53,7 +53,10 @@ from core.views import device_telegram_sync_api
 
 from core.views import admin_devices_api, admin_notices_api, admin_notice_cancel_api
 
+from core.views import device_admin_page
+
 urlpatterns = [
+    path('device-admin/', device_admin_page, name='device_admin_page'),
     path('api/admin/devices/', admin_devices_api, name='admin_devices'),
     path('api/admin/notices/', admin_notices_api, name='admin_notices'),
     path('api/admin/notices/<int:notice_id>/', admin_notice_cancel_api, name='admin_notice_cancel'),

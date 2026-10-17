@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PrathamSmart Admin</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --text:#1d2330; --muted:#667085; --line:#d9dee7; --accent:#1f6feb; --err:#c4320a; --ok:#137333;
+          --own-bg:#dafbe1; --own-fg:#116329; --def-bg:#ddf4ff; --def-fg:#0550ae; --none-bg:#eef1f4; --none-fg:#667085; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#12151b; --card:#1b2029; --text:#e6e9ef; --muted:#9aa3b2; --line:#2e3644; --accent:#4c8dff; --err:#ff7a59; --ok:#4cc38a;
+            --own-bg:#173a24; --own-fg:#6fdc96; --def-bg:#14304f; --def-fg:#8cc4ff; --none-bg:#232a35; --none-fg:#9aa3b2; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { max-width:1280px; margin:0 auto; padding:16px; }
+  header { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; gap:10px; }
+  h1 { font-size:20px; margin:0; }
+  h2 { font-size:14px; margin:0 0 10px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; margin-bottom:14px; }
+  input, select { padding:8px 10px; border:1px solid var(--line); border-radius:7px; background:var(--bg); color:var(--text); font-size:14px; min-width:0; }
+  button { padding:8px 12px; border:0; border-radius:7px; background:var(--accent); color:#fff; font-size:14px; cursor:pointer; white-space:nowrap; }
+  button:disabled { opacity:.5; cursor:default; }
+  button.ghost { background:none; color:var(--accent); border:1px solid var(--line); }
+  button.link { background:none; color:var(--err); padding:4px 6px; font-size:13px; }
+  .hidden { display:none !important; }
+  .tiles { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:10px; margin-bottom:14px; }
+  .tile { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px 14px; }
+  .tile .k { font-size:12px; color:var(--muted); }
+  .tile .v { font-size:28px; font-weight:700; font-variant-numeric:tabular-nums; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .grow { flex:1 1 220px; }
+  .hint { font-size:12px; color:var(--muted); margin-top:6px; }
+  .msg { min-height:1.3em; font-size:14px; margin:6px 0; }
+  .msg.ok { color:var(--ok); } .msg.bad { color:var(--err); }
+  .tablebox { overflow-x:auto; border:1px solid var(--line); border-radius:10px; background:var(--card); }
+  table { border-collapse:collapse; width:100%; }
+  th, td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); font-size:13px; vertical-align:middle; }
+  th { color:var(--muted); font-weight:600; background:var(--bg); position:sticky; top:0; }
+  tr:last-child td { border-bottom:0; }
+  .b { border-radius:10px; padding:1px 8px; font-size:12px; white-space:nowrap; }
+  .b.own { background:var(--own-bg); color:var(--own-fg); }
+  .b.default { background:var(--def-bg); color:var(--def-fg); }
+  .b.none { background:var(--none-bg); color:var(--none-fg); }
+  .on { color:var(--ok); } .off { color:var(--err); }
+  .sub { font-size:11px; color:var(--muted); }
+  .mbox { display:flex; gap:6px; align-items:center; min-width:280px; }
+  .mbox input[type=text] { flex:1; }
+  .mbox label { font-size:12px; color:var(--muted); white-space:nowrap; }
+  .login { max-width:360px; margin:60px auto; }
+  .login input { width:100%; margin-bottom:10px; }
+  @media (max-width:600px) { .tiles { grid-template-columns:repeat(3, minmax(0,1fr)); } .tile .v { font-size:22px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>PrathamSmart Admin</h1>
+    <div class="row">
+      <a href="/device-settings/" style="color:var(--accent);font-size:14px">Device settings</a>
+      <button id="logout" class="ghost hidden">Logout</button>
+    </div>
+  </header>
+
+  <div id="loginBox" class="card login hidden">
+    <h2>Admin login</h2>
+    <input id="u" placeholder="Username" autocomplete="username">
+    <input id="p" type="password" placeholder="Password" autocomplete="current-password">
+    <button id="loginBtn" style="width:100%">Login</button>
+    <div id="loginMsg" class="msg bad"></div>
+  </div>
+
+  <div id="app" class="hidden">
+    <div class="tiles">
+      <div class="tile"><div class="k">Kul devices</div><div class="v" id="tTotal">–</div></div>
+      <div class="tile"><div class="k">Online</div><div class="v on" id="tOn">–</div></div>
+      <div class="tile"><div class="k">Offline</div><div class="v off" id="tOff">–</div></div>
+    </div>
+
+    <div class="card">
+      <h2>Sab devices ko message</h2>
+      <div class="row">
+        <input id="allTitle" placeholder="Title (optional)" maxlength="60" style="flex:0 1 180px">
+        <input id="allMsg" class="grow" placeholder="Jaise: Aaj shaam 6 baje server update hoga" maxlength="500">
+        <label style="font-size:13px;color:var(--muted)"><input id="allSpeak" type="checkbox" checked> bolo</label>
+        <select id="allExp" title="Kitni der tak offline device ko bhi mile">
+          <option value="60">1 ghanta</option><option value="1440" selected>24 ghante</option><option value="10080">7 din</option>
+        </select>
+        <button id="allSend">Sab ko bhejo</button>
+      </div>
+      <div class="hint">Online device par turant (bol/sun raha ho to uske baad). Offline device ko chuni hui der ke andar judte hi.</div>
+    </div>
+
+    <div id="msg" class="msg"></div>
+
+    <div class="row" style="margin-bottom:10px">
+      <select id="fOnline"><option value="">Sab</option><option value="1">Sirf online</option><option value="0">Sirf offline</option></select>
+      <input id="fQ" placeholder="plant_id ya user" style="flex:0 1 200px">
+      <span id="pageInfo" class="sub" style="font-size:13px"></span>
+      <button id="prev" class="ghost">‹</button>
+      <button id="next" class="ghost">›</button>
+      <button id="refresh" class="ghost">Taaza karo</button>
+    </div>
+
+    <div class="tablebox">
+      <table>
+        <thead><tr>
+          <th>Device</th><th>Haal</th><th>User</th><th>Bhasha</th><th>Naam</th>
+          <th>AI</th><th>Gmail</th><th>MyPratham</th><th>WhatsApp</th><th>Telegram</th><th>SMS</th><th>Message</th>
+        </tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div class="hint">Apni = user ki apni setting · Default = server ki .env wali · — = kuch nahi bhara</div>
+
+    <h2 style="margin-top:22px">Bheje gaye message</h2>
+    <div class="tablebox">
+      <table>
+        <thead><tr><th>#</th><th>Kisko</th><th>Message</th><th>Pahuncha</th><th>Kab</th><th>Bheja</th><th></th></tr></thead>
+        <tbody id="notices"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var token = null, offset = 0, PAGE = 50, last = null, timer = null, qTimer = null;
+  try { token = sessionStorage.getItem("ps_token"); } catch (e) {}
+
+  function api(path, opts) {
+    opts = opts || {};
+    opts.headers = Object.assign({ "Content-Type": "application/json" }, opts.headers || {});
+    if (token) opts.headers.Authorization = "Token " + token;
+    return fetch(path, opts).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, status: r.status, d: d }; });
+    });
+  }
+  function show(loggedIn) {
+    $("loginBox").classList.toggle("hidden", loggedIn);
+    $("app").classList.toggle("hidden", !loggedIn);
+    $("logout").classList.toggle("hidden", !loggedIn);
+  }
+  function setMsg(t, ok) { var m = $("msg"); m.textContent = t || ""; m.className = "msg " + (ok ? "ok" : "bad"); }
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function ago(iso) {
+    if (!iso) return "kabhi nahi";
+    var s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+    if (s < 90) return "abhi";
+    if (s < 3600) return Math.round(s / 60) + " min pehle";
+    if (s < 86400) return Math.round(s / 3600) + " ghante pehle";
+    return Math.round(s / 86400) + " din pehle";
+  }
+  var LABEL = { own: "Apni", "default": "Default", none: "—" };
+  function badge(v, title) { var b = el("span", "b " + (LABEL[v] ? v : "none"), LABEL[v] || "—"); if (title) b.title = title; return b; }
+
+  function sendNotice(body, label, btn) {
+    if (btn) btn.disabled = true;
+    return api("/api/admin/notices/", { method: "POST", body: JSON.stringify(body) }).then(function (r) {
+      if (!r.ok) {
+        var e = r.d.errors ? Object.values(r.d.errors)[0] : r.d.error;
+        setMsg(e || "Nahi bheja ja saka", false); return false;
+      }
+      setMsg("Bhej diya: " + label + (r.d.missing && r.d.missing.length ? " (nahi mile: " + r.d.missing.join(", ") + ")" : ""), true);
+      loadNotices(); return true;
+    }).catch(function () { setMsg("Server se connect nahi hua", false); return false; })
+      .finally(function () { if (btn) btn.disabled = false; });
+  }
+
+  function msgBox(plantId) {
+    var box = el("div", "mbox");
+    var inp = el("input"); inp.type = "text"; inp.maxLength = 500; inp.placeholder = "Is device ko message";
+    var lab = el("label"); var cb = el("input"); cb.type = "checkbox"; cb.checked = true; lab.appendChild(cb); lab.appendChild(document.createTextNode(" bolo"));
+    var btn = el("button", null, "Bhejo");
+    var go = function () {
+      var t = inp.value.trim(); if (!t) return;
+      sendNotice({ message: t, plant_ids: [plantId], speak: cb.checked }, plantId, btn).then(function (ok) { if (ok) inp.value = ""; });
+    };
+    btn.onclick = go;
+    inp.addEventListener("keydown", function (e) { if (e.key === "Enter") go(); });
+    box.appendChild(inp); box.appendChild(lab); box.appendChild(btn);
+    return box;
+  }
+
+  function renderDevices(d) {
+    last = d;
+    $("tTotal").textContent = d.total; $("tOn").textContent = d.online; $("tOff").textContent = d.offline;
+    $("pageInfo").textContent = d.count ? (offset + 1) + "–" + Math.min(offset + PAGE, d.count) + " / " + d.count : "0 device";
+    $("prev").disabled = offset === 0; $("next").disabled = offset + PAGE >= d.count;
+    var tb = $("rows");
+    // Jis box mein likh rahe ho use mat mitao (har 20 sec ka refresh)
+    var focused = document.activeElement && tb.contains(document.activeElement);
+    if (focused) return;
+    tb.textContent = "";
+    if (!d.devices.length) { var tr0 = el("tr"); var td0 = el("td", "sub", "Koi device nahi"); td0.colSpan = 12; tr0.appendChild(td0); tb.appendChild(tr0); return; }
+    d.devices.forEach(function (x) {
+      var s = x.settings || {}, tr = el("tr");
+      var c1 = el("td"); c1.appendChild(el("b", null, x.plant_id)); if (x.name) c1.appendChild(el("div", "sub", x.name));
+      var c2 = el("td"); c2.appendChild(el("span", x.online ? "on" : "off", "● " + (x.online ? "Online" : "Offline"))); c2.appendChild(el("div", "sub", ago(x.last_seen)));
+      var user = x.owner + (x.assigned_user && x.assigned_user !== x.owner ? " / " + x.assigned_user : "");
+      var cells = [c1, c2, el("td", null, user || "—"), el("td", null, x.language || "hi"), el("td", null, s.assistant_name || "—")];
+      var bAI = el("td"); bAI.appendChild(badge(s.ai, (s.ai_provider || "server") + (s.ai_model ? " · " + s.ai_model : " · default model")));
+      var bG = el("td"); bG.appendChild(badge(s.gmail, s.gmail_address || (s.gmail === "none" ? "Gmail nahi bhara" : "server ka Gmail")));
+      var bP = el("td"); bP.appendChild(badge(s.pratham));
+      var bW = el("td"); bW.appendChild(badge(s.whatsapp));
+      var bT = el("td"); bT.appendChild(badge(s.telegram, s.telegram_bot ? "@" + s.telegram_bot : ""));
+      var bS = el("td"); bS.appendChild(badge(s.sms));
+      var bM = el("td"); bM.appendChild(msgBox(x.plant_id));
+      cells.concat([bAI, bG, bP, bW, bT, bS, bM]).forEach(function (c) { tr.appendChild(c); });
+      tb.appendChild(tr);
+    });
+  }
+
+  function renderNotices(list) {
+    var tb = $("notices"); tb.textContent = "";
+    if (!list.length) { var tr0 = el("tr"); var td0 = el("td", "sub", "Abhi koi message nahi bheja"); td0.colSpan = 7; tr0.appendChild(td0); tb.appendChild(tr0); return; }
+    list.forEach(function (n) {
+      var tr = el("tr"); if (n.cancelled) tr.style.opacity = ".5";
+      var m = el("td"); if (n.title) m.appendChild(el("b", null, n.title + ": ")); m.appendChild(document.createTextNode(n.message + (n.speak ? "" : " (sirf screen)")));
+      var del = n.all ? n.delivered + (last ? " / " + last.total : "") : (n.delivered ? "✓" : "abhi nahi");
+      var act = el("td");
+      if (!n.cancelled) {
+        var b = el("button", "link", "Roko");
+        b.onclick = function () { if (confirm("Yeh message rokna hai?")) api("/api/admin/notices/" + n.id + "/", { method: "DELETE" }).then(loadNotices); };
+        act.appendChild(b);
+      } else act.appendChild(el("span", "sub", "roka"));
+      [el("td", null, String(n.id)), el("td", null, n.all ? "SAB" : n.target), m, el("td", null, del),
+       el("td", null, ago(n.created_at)), el("td", null, n.created_by || "—"), act].forEach(function (c) { tr.appendChild(c); });
+      tb.appendChild(tr);
+    });
+  }
+
+  function loadDevices() {
+    var p = new URLSearchParams({ limit: PAGE, offset: offset });
+    if ($("fOnline").value) p.set("online", $("fOnline").value);
+    if ($("fQ").value.trim()) p.set("q", $("fQ").value.trim());
+    return api("/api/admin/devices/?" + p).then(function (r) {
+      if (r.status === 401) { logout(); return; }
+      if (r.status === 403) { show(false); $("loginMsg").textContent = "Yeh page sirf admin (staff/superuser) ke liye hai"; return; }
+      if (!r.ok) { setMsg(r.d.error || "Devices nahi aaye", false); return; }
+      show(true); renderDevices(r.d);
+    }).catch(function () { setMsg("Server se connect nahi hua", false); });
+  }
+  function loadNotices() {
+    return api("/api/admin/notices/").then(function (r) { if (r.ok) renderNotices(r.d.notices || []); });
+  }
+  function loadAll() { loadDevices().then(loadNotices); }
+  function start() {
+    loadAll();
+    clearInterval(timer); timer = setInterval(loadAll, 20000);
+  }
+  function logout() {
+    token = null; try { sessionStorage.removeItem("ps_token"); } catch (e) {}
+    clearInterval(timer); show(false);
+  }
+
+  $("loginBtn").onclick = function () {
+    $("loginMsg").textContent = "";
+    api("/api/settings-login/", { method: "POST", body: JSON.stringify({ username: $("u").value.trim(), password: $("p").value }) })
+      .then(function (r) {
+        if (!r.ok || !r.d.token) { $("loginMsg").textContent = r.status === 429 ? "Bahut koshish, thodi der baad" : "Username ya password galat"; return; }
+        token = r.d.token; try { sessionStorage.setItem("ps_token", token); } catch (e) {}
+        $("p").value = ""; offset = 0; start();
+      });
+  };
+  $("p").addEventListener("keydown", function (e) { if (e.key === "Enter") $("loginBtn").click(); });
+  $("logout").onclick = logout;
+  $("allSend").onclick = function () {
+    var t = $("allMsg").value.trim();
+    if (!t) { setMsg("Message likhein", false); return; }
+    var n = last ? last.total : "sab";
+    if (!confirm(n + " devices ko bhejna hai?\n\n" + t)) return;
+    sendNotice({ message: t, title: $("allTitle").value.trim(), all: true, speak: $("allSpeak").checked,
+                 expires_minutes: parseInt($("allExp").value, 10) }, "sab devices", $("allSend"))
+      .then(function (ok) { if (ok) { $("allMsg").value = ""; $("allTitle").value = ""; } });
+  };
+  $("fOnline").onchange = function () { offset = 0; loadDevices(); };
+  $("fQ").oninput = function () { clearTimeout(qTimer); qTimer = setTimeout(function () { offset = 0; loadDevices(); }, 350); };
+  $("prev").onclick = function () { offset = Math.max(0, offset - PAGE); loadDevices(); };
+  $("next").onclick = function () { offset += PAGE; loadDevices(); };
+  $("refresh").onclick = loadAll;
+
+  if (token) start(); else show(false);
+})();
+</script>
+</body>
+</html>

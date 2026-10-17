@@ -4057,3 +4057,15 @@ def admin_notice_cancel_api(request, notice_id):
     n.cancelled = True
     n.save(update_fields=["cancelled"])
     return Response({"status": "ok", "id": n.pk, "cancelled": True})
+
+
+# ---------------- Admin web page: /device-admin/ ----------------
+def device_admin_page(request):
+    from pathlib import Path as _P
+    from django.http import HttpResponse
+    html = (_P(__file__).resolve().parent / "pages" / "device_admin.html").read_text(encoding="utf-8")
+    resp = HttpResponse(html, content_type="text/html; charset=utf-8")
+    resp["Cache-Control"] = "no-store"
+    resp["X-Frame-Options"] = "DENY"
+    resp["Referrer-Policy"] = "no-referrer"
+    return resp
