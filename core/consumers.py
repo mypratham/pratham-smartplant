@@ -2695,9 +2695,17 @@ def gmail_list_inbox_sync(limit=5, unread_only=True):
         uids = (data[0] or b"").split() if typ == "OK" else []
         unread_count = len(uids) if unread_only else 0
         items = []
-        for uid in reversed(uids[-limit:]):
-            typ, msgdata = imap.uid("fetch", uid, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)])")
-            raw = next((p[1] for p in (msgdata or []) if isinstance(p, tuple)), b"")
+        sel = list(reversed(uids[-limit:]))
+        heads = {}
+        if sel:
+            typ, msgdata = imap.uid("fetch", b",".join(sel), "(UID BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)])")
+            for p in (msgdata or []):
+                if isinstance(p, tuple):
+                    m_ = re.search(rb"UID (\d+)", p[0] or b"")
+                    if m_:
+                        heads[m_.group(1)] = p[1]
+        for uid in sel:
+            raw = heads.get(uid, b"")
             h = _email_mod.message_from_bytes(raw)
             name, addr = _email_utils.parseaddr(_hdr(h.get("From")))
             items.append({"uid": uid.decode(), "from_name": name or addr.split("@")[0], "from_addr": addr,
@@ -5499,8 +5507,15 @@ class AudioConsumer(AsyncWebsocketConsumer):
     async def _mail_list(self, transcript):
         t = " " + (transcript or "").lower() + " "
         latest = _contains_any(t, ("aakhri", "आखिरी", "latest", "pichhla", "पिछला", "purane", "पुराने", "last"))
+        # MAIL_SPEED_V1: IMAP peechhe chale, tab tak device bole
+        _t0 = time.monotonic()
+        _job = asyncio.ensure_future(asyncio.to_thread(gmail_list_inbox_sync, 5, not latest))
         try:
-            items, unread = await asyncio.to_thread(gmail_list_inbox_sync, 5, not latest)
+            await self._say("एक सेकंड, मेल देख रहा हूँ।", "Mail dekh raha hoon...")
+        except Exception:
+            logger.debug("mail ack fail", exc_info=True)
+        try:
+            items, unread = await _job
             if not items and not latest:
                 items, _u = await asyncio.to_thread(gmail_list_inbox_sync, 3, False)
                 latest = True
@@ -5508,7 +5523,8 @@ class AudioConsumer(AsyncWebsocketConsumer):
             logger.exception("Mail list failed")
             await self._say("मेल नहीं देख पाया। सर्वर की मेल सेटिंग जांचें।", f"Mail error\n{type(err).__name__}")
             return
-        logger.info("Mail list: device=%s unread=%s items=%d", self.device_id, unread, len(items))
+        logger.info("Mail list: device=%s unread=%s items=%d took=%.1fs", self.device_id, unread, len(items),
+                    time.monotonic() - _t0)
         if not items:
             await self._say("इनबॉक्स में कोई मेल नहीं मिला।", "Inbox khaali")
             return
@@ -6418,7 +6434,7 @@ class AudioConsumer(AsyncWebsocketConsumer):
                     .set_channels(self.CHANNELS)
                     .set_sample_width(2)
                 )
-                return audio.raw_data
+                return _tts_loud(audio.raw_data)
 
             # Sentence-by-sentence TTS: pehle poore jawab ka TTS banne ka wait
             # hota tha (2-11 sec). Ab pehla vakya banate hi bolna shuru, aur
@@ -6445,7 +6461,17 @@ class AudioConsumer(AsyncWebsocketConsumer):
 
             async def _make(sentence):
                 async with tts_sem:
-                    return await asyncio.to_thread(make_tts_pcm, sentence)
+                    for _try in range(2):
+                        try:
+                            return await asyncio.wait_for(asyncio.to_thread(make_tts_pcm, sentence),
+                                                          timeout=_env_float("TTS_TIMEOUT", 8.0))
+                        except asyncio.CancelledError:
+                            raise
+                        except Exception as _e:
+                            logger.warning("TTS sentence %s: device=%s try=%d err=%s text=%r",
+                                           "retry" if _try == 0 else "skip", self.device_id, _try + 1,
+                                           type(_e).__name__, sentence[:60])
+                    return b""
 
             tts_tasks = [asyncio.create_task(_make(sent)) for sent in sentences]
 
@@ -6545,7 +6571,7 @@ class AudioConsumer(AsyncWebsocketConsumer):
             play_tail = remaining + 0.25
             self.mute_until = time.monotonic() + play_tail + self.ECHO_GUARD_SECONDS
             if play_tail > 0.05:
-                await asyncio.sleep(min(play_tail, 2.0))
+                await asyncio.sleep(min(play_tail, 3.0))
 
             await self._send_json({"type": "tts_complete"})
 
@@ -6766,3 +6792,51 @@ async def _notice_poller():
             logger.info("Notice delivered: device=%s count=%d", pid, len(items))
             asyncio.get_running_loop().create_task(_notice_say(_LOCAL_CONS[pid], items))
 
+
+# ---- Shor jo Whisper BADE akshar mein likhta hai: "POPP.", "PENG", "PING", "PART" (MAIL_SPEED_V1) ----
+_junk_transcript_base = _junk_transcript
+_CAPS_OK = {"YES", "STOP", "HELP", "HELLO", "MOM", "SOS", "BYE"}
+
+
+def _junk_transcript(text):
+    t_ = (text or "").strip()
+    w_ = t_.rstrip(".!?, ")
+    if re.fullmatch(r"[A-Z]{3,6}", w_) and w_ not in _CAPS_OK:
+        return True
+    return _junk_transcript_base(text)
+
+def _tts_loud(raw):
+    """TTS PCM (int16) ko tez karo: peak normalize + soft limiter. Fail ho to wahi awaaz."""
+    try:
+        x = np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
+        if x.size == 0:
+            return raw
+        pk = float(np.abs(x).max())
+        if pk < 1e-4:
+            return raw
+        x = x / pk
+        drive = float(os.getenv("TTS_DRIVE", "2.0") or 2.0)
+        if drive > 1.0:
+            x = np.tanh(drive * x) / np.tanh(drive)
+        return (x * 0.95 * 32767.0).astype(np.int16).tobytes()
+    except Exception:
+        return raw
+
+
+# ---- gTTS ke HTTP request par timeout (default None tha: atak jaata tha) ----
+try:
+    if HAS_TTS and not getattr(gTTS, "_pratham_timeout", False):
+        _gtts_init_orig = gTTS.__init__
+
+        def _gtts_init(self, *a, **k):
+            k.setdefault("timeout", _env_float("TTS_HTTP_TIMEOUT", 6.0))
+            try:
+                _gtts_init_orig(self, *a, **k)
+            except TypeError:                   # purana gTTS: timeout param nahi
+                k.pop("timeout", None)
+                _gtts_init_orig(self, *a, **k)
+
+        gTTS.__init__ = _gtts_init
+        gTTS._pratham_timeout = True
+except Exception:
+    pass
