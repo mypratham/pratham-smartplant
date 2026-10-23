@@ -1347,6 +1347,11 @@ STT_VOCAB_PROMPT = (
     "option C, option D, shuru karo, band karo, agla, dobara."
 )
 
+STT_VOCAB_PROMPT_HI = (
+    "नमस्ते, हिंदी में बातचीत। माय प्रथम, क्विज़, जीके राजस्थान, नौकरी, रिमाइंडर, वॉल्यूम, "
+    "और बताओ, डिटेल में बताओ।"
+)
+
 
 def _pcm_float_to_wav_bytes(pcm_np, sample_rate=16000):
     pcm16 = (np.clip(pcm_np, -1.0, 1.0) * 32767).astype(np.int16).tobytes()
@@ -4157,7 +4162,7 @@ class AudioConsumer(AsyncWebsocketConsumer):
             buf_ms = 0
         if buf_ms > 0:
             # buffer ka 60% tak bharein (baaki jitter ke liye khaali)
-            self.tts_prebuffer = max(0.12, min(self.TTS_PREBUFFER_SECONDS, buf_ms * 0.6 / 1000.0))
+            self.tts_prebuffer = max(0.12, min(self.TTS_PREBUFFER_SECONDS, buf_ms * min(0.9, _env_float("TTS_PREBUFFER_MAX_RATIO", 0.6)) / 1000.0))
         else:
             self.tts_prebuffer = 0.3   # purana firmware: pehle jaisa
         logger.info("TTS prebuffer: device=%s buf_ms=%d prebuffer=%.2fs",
@@ -5049,6 +5054,9 @@ class AudioConsumer(AsyncWebsocketConsumer):
             if await self._quiz_input(transcript):
                 return
 
+        if await self._more_followup(transcript):
+            return
+        transcript = self._detail_rewrite(transcript)
         if "stop" in transcript.lower():
             await self._send_json({"type": "stop_command"})
             return
@@ -5257,7 +5265,7 @@ class AudioConsumer(AsyncWebsocketConsumer):
             "display": display_text or ascii_for_display(ai_reply_text, display_limit),
         })
 
-        await self._speak(ai_reply_text, native=True)
+        await self._speak_capped(ai_reply_text, native=True)
 
     # =========================================================
     # Meeting mode: "meeting mode on" -> sab kuch record + transcript,
@@ -5902,7 +5910,10 @@ class AudioConsumer(AsyncWebsocketConsumer):
         pm = getattr(self, "pending_mail", None)
         if pm and time.monotonic() < pm.get("until", 0):
             extra.append("जवाब: हाँ, हां, हाँ भेज दो, भेज दो, भेजो, ok, yes, send, नहीं, मत भेजो, cancel")
-        return " ".join([STT_VOCAB_PROMPT] + extra)
+        base = STT_VOCAB_PROMPT
+        if getattr(self, "lang", "hi") in ("hi", "sa") and not quiz and not pick:
+            base = STT_VOCAB_PROMPT_HI          # Devanagari hint -> Devanagari transcript
+        return " ".join([base] + extra)
 
     def _awaiting_reply(self):
         """Device ne kuch poochha hai (haan/nahi, option, time) aur jawab ka wait hai?"""
@@ -6840,3 +6851,150 @@ try:
         gTTS._pratham_timeout = True
 except Exception:
     pass
+
+
+# ---- Lamba AI jawab tukdon mein + "aur batao" (atakna kam) ----
+import os as _ab_os
+import re as _ab_re
+import time as _ab_time
+
+_MORE_WORDS = ("aur batao", "aur bataiye", "aur bataie", "aur bolo", "aage batao", "aage bolo",
+               "aur sunao", "aage", "continue", "tell me more", "more",
+               "और बताओ", "और बताइए", "और बताइये", "और बता", "ओर बताओ", "और बोलो",
+               "आगे बताओ", "आगे बोलो", "आगे", "और सुनाओ", "और")
+_DETAIL_WORDS = ("detail", "details", "detel", "ditail", "vistar", "vistaar", "puri jankari", "poori jankari",
+                 "puri jaankari", "poori jaankari", "explain", "डिटेल", "डिटेल्स", "डीटेल", "विस्तार",
+                 "पूरी जानकारी", "पूरा बताओ", "पूरा बताइए", "समझाओ", "समझाइए")
+_DETAIL_ASK = (" (User ne DETAIL maanga hai: is baar 6-8 chhote vakya mein poori jaankari dein, "
+               "2 vakya wala niyam is baar laagu nahi. Agar vishay nahi bataya to pichhli baat ka detail dein.)")
+_MORE_HINT_HI = "आगे सुनना हो तो 'और बताओ' बोलिए।"
+_MORE_HINT_EN = "Say 'tell me more' to hear more."
+
+
+def _ab_int(name, default):
+    try:
+        return int(_ab_os.environ.get(name, default))
+    except (TypeError, ValueError):
+        return default
+
+
+def _cap_speech(text, max_sent, max_chars):
+    text = (text or "").strip()
+    parts = [p.strip() for p in _ab_re.split(r"(?<=[।॥.!?])\s+", text) if p.strip()]
+    if len(parts) <= max_sent and len(text) <= max_chars:
+        return text, ""
+    head, used = [], 0
+    for p in parts:
+        if head and (len(head) >= max_sent or used + len(p) > max_chars):
+            break
+        head.append(p)
+        used += len(p) + 1
+    h = " ".join(head)
+    rest = " ".join(parts[len(head):])
+    if len(h) > max_chars * 1.5:                       # ek hi bahut lamba vakya: comma/space par todo
+        cut = max(h.rfind(",", 0, max_chars), h.rfind("،", 0, max_chars), h.rfind(" ", 0, max_chars))
+        if cut > 40:
+            rest = (h[cut + 1:].strip() + " " + rest).strip()
+            h = h[:cut].strip() + "।"
+    return h, rest
+
+
+def _is_more_request(transcript):
+    t = _ab_re.sub(r"[^\w\s\u0900-\u097F']", " ", (transcript or "").lower())
+    t = " ".join(t.split())
+    if not t or len(t) > 30:
+        return False
+    if any(x in t for x in ("जानना", "सुनना", "बोलिए", "बुलिए", "बोलिये", "boliye", "bolie", "janna")):
+        return False                                    # apne hi hint ki goonj
+    for w in _MORE_WORDS:
+        if " " not in w:                               # akela shabd: poora transcript hi ho
+            if t == w:
+                return True
+        elif t == w or t.startswith(w + " ") or (t.endswith(" " + w) and len(t) <= len(w) + 10):
+            return True
+    return False
+
+
+def _ab_words(x):
+    return set(_ab_re.sub(r"[^\w\s\u0900-\u097F]", " ", (x or "").lower()).split())
+
+
+def _ab_is_echo(self, transcript):
+    """Device ne bola hua jawab hi wapas suna (speaker -> mic)?"""
+    if _ab_time.monotonic() - getattr(self, "_spoken_at", 0.0) > _ab_int("ECHO_WINDOW_SEC", 7):
+        return False
+    tw = _ab_words(transcript)
+    sw = getattr(self, "_spoken_words", set())
+    if len(tw) < 2 or not sw:
+        return False
+    return len(tw & sw) / len(tw) >= 0.6
+
+
+def _is_detail_request(transcript):
+    t = (transcript or "").lower()
+    return any(w in t for w in _DETAIL_WORDS)
+
+
+async def _ab_speak_capped(self, text, *args, **kwargs):
+    head, rest = _cap_speech(text, _ab_int("AI_SPEAK_MAX_SENTENCES", 2), _ab_int("AI_SPEAK_MAX_CHARS", 170))
+    self._more_text = rest
+    self._more_until = _ab_time.monotonic() + 180 if rest else 0.0
+    if rest:
+        en = (getattr(self, "lang", "hi") or "hi") == "en"
+        head = head.rstrip() + " " + (_MORE_HINT_EN if en else _MORE_HINT_HI)
+        _lg = globals().get("logger")
+        if _lg:
+            _lg.info("AI reply capped: device=%s spoken=%d rest=%d chars",
+                     getattr(self, "device_id", "?"), len(head), len(rest))
+    self._spoken_words = _ab_words(head)
+    try:
+        await self._speak(head, *args, **kwargs)
+    finally:
+        self._spoken_at = _ab_time.monotonic()
+
+
+async def _ab_more_followup(self, transcript):
+    self.__dict__.pop("AI_MAX_TOKENS", None)          # pichhla detail wala bada limit hatao
+    if _ab_is_echo(self, transcript):
+        _lg = globals().get("logger")
+        if _lg:
+            _lg.info("Echo ignore (apni awaaz): device=%s text=%r", getattr(self, "device_id", "?"), transcript)
+        return True
+    is_more = _is_more_request(transcript)
+    if not is_more and _is_detail_request(transcript) and len(transcript or "") <= 30:
+        is_more = True                                  # "details batao" + bacha hissa -> wahi sunao
+    pending = getattr(self, "_more_text", "")
+    if is_more and pending and _ab_time.monotonic() < getattr(self, "_more_until", 0.0):
+        self._more_text = ""
+        try:
+            disp = globals()["ascii_for_display"](pending, 90)
+        except Exception:
+            disp = ""
+        try:
+            await self._send_json({"type": "ai_reply", "text": pending, "display": disp})
+        except Exception:
+            pass
+        _lg = globals().get("logger")
+        if _lg:
+            _lg.info("Aur batao: device=%s next=%d chars", getattr(self, "device_id", "?"), len(pending))
+        await self._speak_capped(pending)
+        return True
+    if not is_more:
+        self._more_text = ""
+    return False
+
+
+def _ab_detail_rewrite(self, transcript):
+    if not _is_detail_request(transcript):
+        return transcript
+    base = int(type(self).__dict__.get("AI_MAX_TOKENS", 150) or 150)
+    self.AI_MAX_TOKENS = max(base, _ab_int("AI_DETAIL_MAX_TOKENS", 700))   # sirf is ek jawab ke liye
+    _lg = globals().get("logger")
+    if _lg:
+        _lg.info("Detail maanga: device=%s", getattr(self, "device_id", "?"))
+    return (transcript or "").rstrip() + _DETAIL_ASK
+
+
+AudioConsumer._detail_rewrite = _ab_detail_rewrite
+AudioConsumer._speak_capped = _ab_speak_capped
+AudioConsumer._more_followup = _ab_more_followup
