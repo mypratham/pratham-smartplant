@@ -1348,8 +1348,7 @@ STT_VOCAB_PROMPT = (
 )
 
 STT_VOCAB_PROMPT_HI = (
-    "नमस्ते, हिंदी में बातचीत। माय प्रथम, क्विज़, जीके राजस्थान, नौकरी, रिमाइंडर, वॉल्यूम, "
-    "और बताओ, डिटेल में बताओ।"
+    "नमस्ते, हिंदी में बातचीत।"
 )
 
 
@@ -1582,6 +1581,71 @@ def _lang_prompt(lang):
 
 # Aakhri cloud STT ka confidence (isi task mein padha jaata hai)
 STT_META = contextvars.ContextVar("pratham_stt_meta", default=None)
+
+
+def _pe_words(x):
+    x = re.sub(r"[^\w\sऀ-ॿ]", " ", (x or "").lower())
+    x = re.sub(r"[।॥]", " ", x)
+    return x.split()
+
+
+def _prompt_echo(transcript, prompt):
+    """Whisper ne shor par hint (STT prompt) hi likh diya?"""
+    f_more = globals().get("_is_more_request")
+    f_det = globals().get("_is_detail_request")
+    try:
+        if (f_more and f_more(transcript)) or (f_det and f_det(transcript)):
+            return False
+    except Exception:
+        pass
+    tw, pw = _pe_words(transcript), _pe_words(prompt)
+    if not tw or not pw:
+        return False
+    # hint ki shuruaat wala shabd ("baatcheet") chhote transcript mein = hint ki goonj
+    if len(tw) <= 4 and any(w in ("baatcheet", "बातचीत", "baatchit") for w in tw):
+        return True
+    # hint ke 4+ shabd usi kram mein lagatar (asli command mein 2-3 hi hote hain)
+    pb = set(zip(pw, pw[1:]))
+    run = best = 0
+    for b in zip(tw, tw[1:]):
+        run = run + 1 if b in pb else 0
+        best = max(best, run)
+    return best >= 3
+
+
+_ONE_WORD_OK = {
+    "stop", "ruko", "रुको", "रुकिए", "बंद", "band", "haan", "han", "ha", "हाँ", "हां", "हा", "nahi", "nahin",
+    "नहीं", "नही", "hello", "hi", "हेलो", "हैलो", "नमस्ते", "namaste", "aage", "आगे", "और", "aur", "more",
+    "ok", "okay", "ओके", "yes", "no", "next", "agla", "अगला", "dobara", "दोबारा", "repeat", "cancel",
+    "thanks", "धन्यवाद", "shukriya", "शुक्रिया", "time", "टाइम", "समय", "mausam", "मौसम", "weather",
+    "quiz", "क्विज़", "क्विज", "mute", "unmute", "म्यूट", "details", "detail", "डिटेल",
+    "a", "b", "c", "d", "ए", "बी", "सी", "डी",
+}
+
+
+def _nz_words(x):
+    x = re.sub(r"[^\w\sऀ-ॿ]", " ", (x or "").lower())
+    x = re.sub(r"[।॥]", " ", x)
+    return x.split()
+
+
+def _noise_transcript(text, meta):
+    """Shor se bana transcript? Wajah (str) ya '' (theek hai)."""
+    w = _nz_words(text)
+    if not w:
+        return ""
+    lp = None
+    try:
+        lp = float((meta or {}).get("logprob"))
+    except (TypeError, ValueError):
+        lp = None
+    if lp is not None and lp < _env_float("STT_LOGPROB_DROP", -0.85):
+        return f"logprob {lp:.2f}"
+    if len(w) == 1 and w[0] not in _ONE_WORD_OK:
+        return "akela shabd"
+    if len(w) >= 3 and len(set(w)) / len(w) <= 0.5:
+        return "dohraye shabd"
+    return ""
 
 
 async def openai_transcribe(pcm_np, prompt=None, engine="openai", language=None, timeout=20):
@@ -4897,6 +4961,16 @@ class AudioConsumer(AsyncWebsocketConsumer):
                 logger.info("Low-confidence transcript ignored: device=%s text=%r", self.device_id, transcript)
                 transcript = ""
 
+        if transcript and not self._awaiting_reply() and not getattr(self, "quiz", None) \
+                and _prompt_echo(transcript, self._stt_prompt()):
+            logger.info("Prompt echo ignored: device=%s text=%r", self.device_id, transcript)
+            transcript = ""
+        if transcript and not self._awaiting_reply() and not getattr(self, "quiz", None) \
+                and not getattr(self, "meeting", None):
+            _nr = _noise_transcript(transcript, STT_META.get())
+            if _nr:
+                logger.info("Noise ignored: device=%s reason=%s text=%r", self.device_id, _nr, transcript)
+                transcript = ""
         if _junk_transcript(transcript) and not self._awaiting_reply():
             logger.info("Junk transcript ignored: device=%s text=%r", self.device_id, transcript)
             transcript = ""
